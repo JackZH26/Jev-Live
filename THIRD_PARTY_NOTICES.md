@@ -27,4 +27,6 @@ The Windows helper uses Windows OCR and Win32 APIs provided by the operating sys
 
 The research document discusses AIRI and other candidate projects. Discussion is not incorporation: the initial implementation does not vendor their code or assets.
 
-The bundled default SVG avatar is original project artwork under the repository license. Imported portraits and VRM files retain their own asset licenses and are not included in Git or the desktop distribution. Windows SAPI voices are supplied by Windows and are not redistributed. Neural TTS candidates discussed in the design are not bundled or represented as tested.
+The bundled default SVG avatar is original project artwork under the repository license. Imported portraits and VRM files retain their own asset licenses and are not included in Git or the desktop distribution. Windows SAPI voices are supplied by Windows and are not redistributed. Optional neural speech is not bundled; tested configurations are listed in the iteration reports.
+
+Optional local speech: MeloTTS and its downloaded voice models retain their upstream licenses (MIT model cards); Qwen3-TTS retains its upstream license (Apache-2.0). Python, PyTorch, Transformers, tokenizers, MeCab bindings/dictionaries and all model files are installed separately outside Git and are not bundled. The Melo model/revision manifest is in services/melo-models.json; see docs/ITERATION_013.en.md for measured acceptance and limitations. python-mecab-ko is BSD-3-Clause; its dictionary and all transitive dependencies retain their own notices.

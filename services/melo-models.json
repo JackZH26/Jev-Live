@@ -1,0 +1,72 @@
+{
+  "tts": {
+    "Chinese": {
+      "repo": "myshell-ai/MeloTTS-Chinese",
+      "revision": "af5d207a364ea4208c6f589c89f57f88414bdd16",
+      "code": "ZH"
+    },
+    "English": {
+      "repo": "myshell-ai/MeloTTS-English",
+      "revision": "bb4fb7346d566d277ba8c8c7dbfdf6786139b8ef",
+      "code": "EN"
+    },
+    "Japanese": {
+      "repo": "myshell-ai/MeloTTS-Japanese",
+      "revision": "367f8795464b531b4e97c1515bddfc1243e60891",
+      "code": "JP"
+    },
+    "Korean": {
+      "repo": "myshell-ai/MeloTTS-Korean",
+      "revision": "0207e5adfc90129a51b6b03d89be6d84360ed323",
+      "code": "KR"
+    }
+  },
+  "text": {
+    "bert-base-multilingual-uncased": {
+      "revision": "7cbf9a625e29989f6b9c6c2fa68234c304f7e38f",
+      "weights": true
+    },
+    "bert-base-uncased": {
+      "revision": "86b5e0934494bd15c9632b12f734a8a67f723594",
+      "weights": true
+    },
+    "dbmdz/bert-base-french-europeana-cased": {
+      "revision": "b895c3cf291f7bf4c15639078a6bee0b3e272c5b",
+      "weights": false
+    },
+    "dccuchile/bert-base-spanish-wwm-uncased": {
+      "revision": "d1c9c4565c9d6731e57ed7f027b802697bad861e",
+      "weights": false
+    },
+    "kykim/bert-kor-base": {
+      "revision": "1779cc0982ada0216dd6de0dd4e86fb78201926d",
+      "weights": true
+    },
+    "tohoku-nlp/bert-base-japanese-v3": {
+      "revision": "65243d6e5629b969c77309f217bd7b1a79d43c7e",
+      "weights": false
+    }
+  },
+  "nltk": [
+    {
+      "name": "cmudict",
+      "sha256": "d07cca47fd72ad32ea9d8ad1219f85301eeaf4568f8b6b73747506a71fb5afd6"
+    },
+    {
+      "name": "averaged_perceptron_tagger",
+      "sha256": "e1f13cf2532daadfd6f3bc481a49859f0b8ea6432ccdcd83e6a49a5f19008de9"
+    },
+    {
+      "name": "averaged_perceptron_tagger_eng",
+      "sha256": "6025f530624335c67d6547d44757b357b4e79bae030a0383e9887a92c1718f0b"
+    },
+    {
+      "name": "punkt",
+      "sha256": "51c3078994aeaf650bfc8e028be4fb42b4a0d177d41c012b6a983979653660ec"
+    },
+    {
+      "name": "punkt_tab",
+      "sha256": "e57f64187974277726a3417ca6f181ec5403676c717672eef6a748a7b20e0106"
+    }
+  ]
+}

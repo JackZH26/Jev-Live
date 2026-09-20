@@ -11,7 +11,7 @@ export const hostConfigSchema=z.object({
  avatar:z.object({kind:z.enum(['builtin','image','vrm']).default('builtin'),asset:z.string().regex(/^$|^[a-f0-9]{32}\.(png|webp|jpg|vrm)$/).default(''),name:z.string().trim().min(1).max(40).default('JEV'),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#9b8cff')}).default(()=>({kind:'builtin' as const,asset:'',name:'JEV',color:'#9b8cff'})),
  persona:z.string().max(3000).default('A friendly, curious gaming companion. Keep reactions concise, varied and grounded in visible game information. Be honest when uncertain.'),
  language:z.enum(['zh-CN','zh-TW','ja','ko','en']).default('zh-CN'),voice:z.string().max(200).default(''),
- speechProvider:z.enum(['system','qwen']).default('system'),neuralVoice:z.enum(['','aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']).default(''),
+ speechProvider:z.enum(['system','qwen','melo']).default('system'),neuralVoice:z.enum(['','aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']).default(''),
  pace:z.enum(['calm','balanced','lively']).default('balanced'),
  blockedWords:z.array(z.string().trim().min(1).max(50)).max(50).default([]),
  speech:z.boolean().default(true),textReplies:z.boolean().default(false),commentary:z.boolean().default(true),

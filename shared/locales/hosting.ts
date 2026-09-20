@@ -30,6 +30,7 @@ export const hosting=[
  ['setup.privacy','平台开播资格、画面和声音还需实际验收。Twitch 为公开直播；X 私密性请在 Live Studio 选择 Private。','平台開播資格、畫面與聲音仍須實際驗收。Twitch 為公開直播；X 私密性請在 Live Studio 選擇 Private。','配信権限、映像と音声は実機で確認してください。Twitch は公開配信です。X の非公開配信は Live Studio で Private を選択します。','방송 자격, 화면과 소리는 실제 검증이 필요합니다. Twitch는 공개 방송입니다. X 비공개 방송은 Live Studio에서 Private를 선택하세요.','Platform eligibility, picture and sound still require a real check. Twitch broadcasts are public. Select Private in Live Studio for private X review.'],
  ['host.speechProvider','语音引擎','語音引擎','音声エンジン','음성 엔진','Speech engine'],
  ['host.systemVoice','Windows 系统语音','Windows 系統語音','Windows 音声','Windows 음성','Windows voices'],
+ ['host.meloVoice','MeloTTS · 本地 CPU 五语','MeloTTS · 本地 CPU 五語','MeloTTS · ローカル CPU・5 言語','MeloTTS · 로컬 CPU · 5개 언어','MeloTTS · local CPU · five languages'],
  ['host.neuralUnavailable','本地自然语音不可用或超时，本句保留字幕。请检查语音服务或切换系统语音。','本地自然語音不可用或逾時，本句保留字幕。請檢查語音服務或切換系統語音。','ローカル音声が利用不可またはタイムアウトです。字幕を保持します。音声サービスを確認するか Windows 音声に切り替えてください。','로컬 음성 서비스가 없거나 시간이 초과되었습니다. 자막은 유지됩니다. 서비스를 확인하거나 Windows 음성으로 전환하세요.','Local neural speech is unavailable or timed out. Captions are preserved. Check the voice service or select Windows voices.'],
  ['host.pace','主持节奏','主持節奏','司会の頻度','진행 빈도','Hosting pace'],
  ['host.calm','安静陪伴','安靜陪伴','控えめ','차분하게','Calm'],

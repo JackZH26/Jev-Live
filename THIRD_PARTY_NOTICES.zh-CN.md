@@ -25,3 +25,5 @@ OBS 作为单独安装的程序被控制；本仓库及桌面包不分发 OBS �
 Windows 观察程序使用操作系统提供的 Windows OCR 与 Win32 接口，不分发 Windows。.NET 运行时许可与第三方声明随观察程序输出提供。Steam 需单独安装，软件通过注册协议启动游戏。可选原创 ETC 桥接面向独立授权的游戏。ETC 资产、Unreal Engine、Lyra、模型、音频与平台标识不由本仓库重新授权。仓库不包含账号凭证、OAuth 导出、OBS 配置或推流密钥。
 
 调研讨论 AIRI 等候选项目不代表已经整合；初始实现没有直接引入这些项目的代码或素材。
+
+可选本地语音：MeloTTS 及下载的声音模型保留上游许可证（模型卡标注 MIT）；Qwen3-TTS 保留上游 Apache-2.0 许可证。Python、PyTorch、Transformers、分词器、MeCab 绑定/词典及模型文件均在 Git 外单独安装，不随桌面包分发。固定模型版本见 services/melo-models.json，实际验收与限制见 docs/ITERATION_013.md。python-mecab-ko 采用 BSD-3-Clause，词典与间接依赖分别保留自身版权声明。

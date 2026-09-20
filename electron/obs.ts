@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { Store, atomicWrite } from './storage';
 import { delay } from './http';
+import { boundObsRequests } from './obs-deadline';
 import type { OutputState, Provider } from '../shared/types';
 import { providers, providerNames } from '../shared/types';
 import type { Layout } from '../shared/hosting';
@@ -57,7 +58,7 @@ export class Obs {
         await atomicWrite(join(config,'user.ini'),'[Basic]\nProfile=JEV\nProfileDir=JEV\nSceneCollection=JEV\nSceneCollectionFile=JEV\n\n[General]\nFirstRun=true\n');
         await atomicWrite(join(config,'basic','scenes','JEV.json'),JSON.stringify({name:'JEV',current_scene:'JEV Program',current_program_scene:'JEV Program',scene_order:[{name:'JEV Program'}],sources:[{name:'JEV Program',id:'scene',versioned_id:'scene',settings:{items:[]},mixers:0}],groups:[],quick_transitions:[]}));
       }
-      const client=new OBSWebSocket();
+      const client=boundObsRequests(new OBSWebSocket());
       client.on('ConnectionClosed',()=>{this.states[provider].connected=false;this.states[provider].ready=false;});
       client.on('ConnectionError',()=>{this.states[provider].connected=false;this.states[provider].ready=false;});
       client.on('StreamStateChanged',e=>{this.states[provider].active=e.outputActive;this.states[provider].reconnecting=e.outputState==='OBS_WEBSOCKET_OUTPUT_RECONNECTING';});
