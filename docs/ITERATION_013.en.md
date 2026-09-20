@@ -40,6 +40,12 @@ Five WAV samples and the benchmark are in ignored `test-results/melo-service`. C
 
 Type checks, 99 TS tests, two real subprocess timeout/recovery tests, five-language desktop checks, five-language offline speech and HTTP boundaries, and actual OBS crash recovery passed. Release acceptance still depends on new-build endurance reports.
 
+Deployment record at 2026-09-20 21:21 UTC+8: code `836f1a7` reached main and [GitHub checks passed](https://github.com/JackZH26/Jev-Live/actions/runs/35512920042). Packaged Steam selection/native observation/manual mode/renderer isolation and actual five-language Electron audio playback passed. Private X now runs 0.1.3 with MeloTTS; OBS recorded speech starts/ends without errors. After reconnecting its player, platform playback measured 1920×1080 at approximately 59.99 fps. The brief upgrade interruption left this browser's player at Try again; retry restored playback without recreating the event. Viewers may need to retry or refresh; this is not seamless upgrading.
+
+Generated `JEV-Studio-0.1.3-Setup.exe` (155,769,363 bytes), SHA256: `3F39770A0E4E6BB37850B880794E3479ACB6F71B7C6076E695867655AC803AC3`. The packaged directory was run and checked; the installer wizard and clean-machine installation remain unverified.
+
+The new local three-output two-hour run started at 21:15:34, code `836f1a7`, Steam build `25420188`, with the private X review stream running separately. Evidence is in ignored `test-results/host-soak-1789910118983`. It is still underway at this snapshot, not passed. This run uses Windows speech and synthetic chat to verify overlays; private X uses MeloTTS. It does not replace full MeloTTS endurance acceptance.
+
 The previous local two-hour run failed on overlay errors; see the [acceptance record](ACCEPTANCE_2026-09-20.en.md). New runs must complete on the new build. Lobby capture and synthetic chat do not certify full matches or real viewer interaction. Eight-, 24- and 72-hour stages remain unpassed.
 
 ## Outstanding
