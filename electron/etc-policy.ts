@@ -85,6 +85,7 @@ export class EtcPolicy {
         ||!threatened&&eligible.some(a=>a.kind==='equip')
         ||!threatened&&weakLoadout&&supply&&supply.distance<=3000;
       const legal=tactical&&(tactical.kind!=='engage'||visible&&o.self.magazine>0&&!o.self.protected)
+        &&!(tactical.kind==='portal'&&(tactical.destinationRisk??0)>=2&&escape.some(a=>a.destinationRisk===0))
         &&(!threatened||!['loot','pickup','scan'].includes(tactical.kind));
       if(legal&&!emergency)return this.select(tactical,now);
     }

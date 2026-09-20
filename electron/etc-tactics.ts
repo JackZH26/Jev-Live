@@ -37,7 +37,11 @@ export class EtcTactics {
     if(JSON.stringify(item)!==JSON.stringify(this.history.at(-1))){this.history.push(item);if(this.history.length>12)this.history.shift();}
   }
   options(o:EtcObservation){
-    const choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
+    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
+    // An optional relocation must not enter active collapse while an observed
+    // safe exit remains usable. A trapped player retains every open escape.
+    if(!o.self.danger&&choices.some(a=>a.kind==='portal'&&a.destinationRisk===0))
+      choices=choices.filter(a=>a.kind!=='portal'||(a.destinationRisk??0)<2);
     // A room with no new observations must not keep winning "scan" forever.
     // Keep scanning available when there is no safe actionable alternative.
     return this.scoutMs>=12000&&choices.some(a=>['portal','loot','pickup','engage'].includes(a.kind))

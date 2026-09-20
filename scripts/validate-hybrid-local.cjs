@@ -13,6 +13,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  for(const name of ['etc-autoplay','etc-policy','etc-tactics','etc-recovery','etc-bridge','etc-map','etc-knowledge'])report.runtimeHashes[name]=createHash('sha256').update(await fs.readFile(path.join(root,'dist-main/electron',name+'.js'))).digest('hex');
  report.harnessHash=createHash('sha256').update(await fs.readFile(__filename)).digest('hex');
  report.focusHelperHash=createHash('sha256').update(await fs.readFile(path.join(__dirname,'focus-etc-candidate.ps1'))).digest('hex');
+ report.releaseHelperHash=createHash('sha256').update(await fs.readFile(path.join(__dirname,'verify-manual-release.cjs'))).digest('hex');
  const exe=path.join(release,'content',artifact.config.executable),digest=createHash('sha256').update(await fs.readFile(exe)).digest('hex');
  if(artifact.config.app_id!==5272970||digest!==artifact.files.find(f=>f.path===artifact.config.executable)?.sha256)throw Error('artifact_identity');
  const data=await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JevHybridSmoke-'));app.setPath('userData',data);process.env.JEV_TEST_DATA_DIR=data;
@@ -61,6 +62,6 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  report.summary=control.summary;report.cloudStats=control.stats;report.stopReason??='time_budget';
  if(report.stopReason!=='official_result')process.exitCode=2;
 }).catch(e=>{report.error=/^[a-z_]+$/.test(e.message)?e.message:'test_failed';process.exitCode=1}).finally(async()=>{
- if(control){await control.change('manual',999).catch(()=>{});await sleep(300);const state=await control.observe(child?.pid);report.manualRelease=state?.mode==='manual'&&state?.diagnostics.heldInputs===0;await control.close(1000).catch(()=>{});}
+ if(control){const requestedAt=Date.now();await control.change('manual',999).catch(()=>{});const {verifyManualRelease}=require('./verify-manual-release.cjs');report.releaseCheck=await verifyManualRelease({observe:pid=>control.observe(pid),pid:child?.pid,epoch:999,requestedAt});report.manualRelease=report.releaseCheck.confirmed;await control.close(1000).catch(()=>{});}
  secret=undefined;report.finishedAt=new Date().toISOString();if(out)await fs.writeFile(path.join(out,'receipt.json'),JSON.stringify(report,null,2));if(child?.exitCode===null)child.kill();console.log(JSON.stringify({out,summary:report.summary,cloudStats:report.cloudStats,stopReason:report.stopReason,error:report.error,manualRelease:report.manualRelease}));app.exit(process.exitCode??0);
 });

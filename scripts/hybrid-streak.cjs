@@ -1,6 +1,6 @@
 // Recompute from EVERY chronological receipt; never cherry-pick two wins.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-function version(r){return JSON.stringify([r.sha256,r.runtimeHashes,r.graphicsHash,r.harnessHash,r.focusHelperHash??null,r.provider]);}
+function version(r){return JSON.stringify([r.sha256,r.runtimeHashes,r.graphicsHash,r.harnessHash,r.focusHelperHash??null,r.releaseHelperHash??null,r.provider]);}
 function evaluate(receipts){
  let streak=0,last='',best=0;const rows=[];
  for(const {file,r} of [...receipts].sort((a,b)=>a.r.startedAt.localeCompare(b.r.startedAt))){

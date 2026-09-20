@@ -64,6 +64,15 @@ describe('hybrid tactical contract',()=>{
     expect(t.advice(o,at)).toBeUndefined();expect(t.context().recent).toEqual([]);
     expect(t.accept('portal',o,o,1,at)).toBe(false);
   });
+  it('does not offer optional travel into active collapse while a safe exit is available',()=>{
+    const t=new EtcTactics(),o=state();o.actions.find(a=>a.id==='portal')!.destinationRisk=0;
+    o.actions.push({id:'red_door',kind:'portal',safe:true,distance:10,destinationRisk:2,destination:3});t.observe(o,1,at);
+    expect(t.options(o).some(a=>a.id==='red_door')).toBe(false);
+    expect(new EtcPolicy().choose(o,at,false,true,'red_door')?.id).not.toBe('red_door');
+    o.self.danger=true;expect(t.options(o).some(a=>a.id==='red_door')).toBe(true);
+    o.self.danger=false;o.actions.find(a=>a.id==='portal')!.safe=false;
+    expect(t.options(o).some(a=>a.id==='red_door')).toBe(true);
+  });
   it('expires unproductive scouting without stopping the movement heartbeat',()=>{
     const t=new EtcTactics(),o=state();o.enemies=[];o.actions=o.actions.filter(a=>a.kind!=='engage');
     o.executor={...o.executor!,objective:'scan'};t.observe(o,1,at);expect(t.accept('scan',o,o,1,at)).toBe(true);
