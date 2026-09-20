@@ -34,6 +34,10 @@ export class EtcAutoplay {
       this.cloudAt=now;void this.advise(o,epoch);
     }
   }
+  async resumeControl(epoch:number){
+    this.epoch=epoch;this.frame=-1;this.request?.abort();this.advice='';this.adviceUntil=0;
+    await this.bridge.command('auto',epoch,this.observation,'wait');
+  }
   private async advise(o:EtcObservation,epoch:number){
     this.pending=true;const controller=new AbortController();this.request=controller;
     try{

@@ -39,8 +39,12 @@ export class Game {
  readonly autoplay:EtcAutoplay;
  private process?:ChildProcessWithoutNullStreams;private timer?:NodeJS.Timeout;
  private inFlight=false;private selectedId='';private settingsAt=0;private focusUntil=0;private modeRequest=0;private settingsCache?:Awaited<ReturnType<Store['settings']>>;
+ private portalUntil=0;private portalMatch='';private portalRoom=-1;
+ private reconnectUntil=0;private reconnectMatch='';
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
-  this.autoplay=new EtcAutoplay(new EtcBridge(join(process.env.LOCALAPPDATA??store.directory,'JevLive','etc-bridge')),store);
+  const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
+   ?process.env.JEV_TEST_ETC_BRIDGE_DIR:join(process.env.LOCALAPPDATA??store.directory,'JevLive','etc-bridge');
+  this.autoplay=new EtcAutoplay(new EtcBridge(bridgeDirectory),store);
  }
  get decisionStats(){return this.autoplay.stats;}
  get connected(){return !!this.observation?.connected&&Date.now()-this.observation.timestamp<3000;}
@@ -69,6 +73,7 @@ export class Game {
   }
   if(request!==this.modeRequest)return;
   const epoch=this.gate.change(mode);
+  if(mode==='manual'){this.portalUntil=0;this.reconnectUntil=0;}
   // SteamObserver remains an observer. ETC owns all gameplay input.
   this.send({op:'stop',epoch});
   this.focusUntil=mode==='auto'?Date.now()+1000:0;
@@ -83,9 +88,16 @@ export class Game {
    const now=Date.now();if(!this.settingsCache||now-this.settingsAt>500){this.settingsCache=await this.store.settings();this.settingsAt=now;}
    const settings=this.settingsCache;
    if(this.selectedId!==ETC_APP_ID)return;
+   const previous=this.autoplay.observation;
    const o=await this.autoplay.observe(this.connected?this.pid:undefined,this.gate.mode==='auto');
    if(!o){
-    if(this.gate.mode==='auto'&&now<this.autoplay.transitionUntil){this.state=null;return;}
+    if(this.gate.mode==='auto'&&(now<this.autoplay.transitionUntil||now<this.portalUntil)){this.state=null;return;}
+    const transient=['age','ENOENT','EACCES','EPERM','EBUSY'].includes(this.autoplay.bridge.lastReadFailure);
+    if(this.gate.mode==='auto'&&transient&&this.connected&&this.observation?.foreground===true){
+     if(!this.reconnectUntil&&previous?.phase==='playing'&&previous.foreground){this.reconnectUntil=now+1000;this.reconnectMatch=previous.matchId;}
+     // No stale command is sent. Native input still expires after 250 ms.
+     if(now<this.reconnectUntil){this.state=null;return;}
+    }
     if(this.gate.mode==='auto'){await this.setMode('manual');this.error=message('etc.lost');}
     else if(this.connected)this.decision=message('etc.unavailable');
     this.state=null;return;
@@ -94,13 +106,37 @@ export class Game {
    if(this.gate.mode!=='auto')return;
    if(!o.foreground&&now<this.focusUntil)return;
    if(o.phase==='unsupported'||!o.foreground){await this.setMode('manual');this.error=message(o.phase==='unsupported'?'etc.offlineOnly':'steam.foreground');return;}
+   if(this.reconnectUntil){
+    if(now>=this.reconnectUntil||o.matchId!==this.reconnectMatch||o.epoch!==this.gate.epoch){await this.setMode('manual');this.error=message('etc.lost');return;}
+    this.reconnectUntil=0;
+    await this.autoplay.resumeControl(this.gate.change('auto'));
+   }
+   // A positively observed portal journey can suspend game frames while the
+   // destination streams in. Never extend this grace from stale telemetry.
+   if(!this.portalUntil&&o.self.traveling&&this.autoplay.strategy==='portal'){
+    this.portalUntil=now+15000;this.portalMatch=o.matchId;this.portalRoom=o.self.room;
+   }
+   if(this.portalUntil){
+    if(now>=this.portalUntil||o.matchId!==this.portalMatch||o.epoch!==this.gate.epoch){
+     await this.setMode('manual');this.error=message('etc.lost');return;
+    }
+    if(o.self.traveling)return;
+    if(o.self.room===this.portalRoom)return;
+    this.portalUntil=0;
+    await this.autoplay.resumeControl(this.gate.change('auto'));
+   }
    if(o.matchId!==this.autoplay.transitionMatch&&now<this.autoplay.transitionUntil){
+    // A new world ID appears before room generation/drop-in finishes. Keep the
+    // bounded loading grace and let native input leases expire until play starts.
+    if(o.phase==='loading')return;
     this.autoplay.transitionUntil=0;
     await this.autoplay.change('auto',this.gate.change('auto'));
    }else if(o.mode==='manual'&&o.epoch===this.gate.epoch){
     await this.setMode('manual');this.error=message('etc.lost');return;
    }
+   if(this.gate.mode!=='auto')return;
    await this.autoplay.tick(settings,this.gate.epoch);
+   if(this.gate.mode!=='auto')return;
    this.decision=message(('etc.'+this.autoplay.strategy) as MessageKey);
   }finally{this.inFlight=false;}
  }

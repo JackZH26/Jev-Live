@@ -75,6 +75,13 @@ describe('ETC tactical priorities',()=>{
 });
 
 describe('ETC authenticated local transport',()=>{
+ it('tolerates only a brief Windows replace-file gap within the original freshness and PID limits',async()=>{
+  const b=await bridge(),now=Date.now(),file=join(b.directory,'state.json');
+  await writeFile(file,JSON.stringify(observation({session:b.session,timestamp:now})));
+  expect(await b.read(123,now)).not.toBeNull();await rm(file);
+  expect(await b.read(123,now+100)).not.toBeNull();expect(b.lastReadFailure).toBe('ENOENT');
+  expect(await b.read(123,now+251)).toBeNull();expect(await b.read(124,now+150)).toBeNull();
+ });
  it('can release manual control before the first heartbeat or game selection',async()=>{
   const b=await bridge(),nested=new EtcBridge(join(b.directory,'new-mailbox'));
   await expect(nested.command('manual',1,null)).resolves.toBe(true);
@@ -121,6 +128,80 @@ describe('ETC authenticated local transport',()=>{
 });
 
 describe('ETC evaluation truthfulness and independent control',()=>{
+ it('does not issue an automatic decision when manual takeover happens during reauthorization',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  (game as any).reconnectUntil=Date.now()+1000;(game as any).reconnectMatch='match-1';
+  vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({mode:'manual'}));
+  let release!:()=>void,started!:()=>void;const pending=new Promise<void>(r=>release=r),ready=new Promise<void>(r=>started=r);
+  vi.spyOn(game.autoplay,'resumeControl').mockImplementation(()=>{started();return pending;});
+  vi.spyOn(game.autoplay,'change').mockResolvedValue();const decide=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  const running=(game as any).tick();await ready;await game.setMode('manual');release();await running;
+  expect(game.gate.mode).toBe('manual');expect(decide).not.toHaveBeenCalled();
+ });
+ it('pauses commands during a brief game-frame stall and requires fresh same-match telemetry to resume',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,foreground:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  game.autoplay.observation=observation();game.autoplay.bridge.lastReadFailure='age';
+  const observe=vi.spyOn(game.autoplay,'observe').mockResolvedValue(null),tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue(),resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
+  vi.spyOn(game.autoplay,'change').mockResolvedValue();
+  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(tick).not.toHaveBeenCalled();
+  observe.mockResolvedValue(observation({mode:'manual'}));await (game as any).tick();expect(resume).toHaveBeenCalledWith(2);
+  expect(game.gate.mode).toBe('auto');expect((game as any).reconnectUntil).toBe(0);
+ });
+ it('never resumes a long stall, invalid identity, focus loss or explicit manual takeover',async()=>{
+  for(const failure of ['timeout','identity','focus','manual']){
+   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+   (game as any).selectedId='5272970';game.observation={connected:true,foreground:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+   game.autoplay.observation=observation();game.autoplay.bridge.lastReadFailure='age';
+   const observe=vi.spyOn(game.autoplay,'observe').mockResolvedValue(null),resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
+   vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);
+   await (game as any).tick();
+   if(failure==='timeout')(game as any).reconnectUntil=Date.now()-1;
+   if(failure==='identity')game.autoplay.bridge.lastReadFailure='identity';
+   if(failure==='focus')observe.mockResolvedValue(observation({foreground:false}));
+   if(failure==='manual')await game.setMode('manual');
+   await (game as any).tick();expect(game.gate.mode).toBe('manual');expect(resume).not.toHaveBeenCalled();
+  }
+ });
+ it('recovers an observed portal journey with a new lease without weakening normal stale-state protection',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  game.autoplay.strategy='portal';const traveling=observation();traveling.self.traveling=true;
+  const observe=vi.spyOn(game.autoplay,'observe').mockResolvedValue(traveling);
+  const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();vi.spyOn(game.autoplay,'tick').mockResolvedValue();vi.spyOn(game.autoplay,'change').mockResolvedValue();
+  await (game as any).tick();observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('auto');
+  const arrived=observation({mode:'manual'});arrived.self.room=2;observe.mockResolvedValue(arrived);
+  await (game as any).tick();expect(resume).toHaveBeenCalledWith(2);expect(game.gate.mode).toBe('auto');
+  observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
+ });
+ it('does not resume a portal journey after manual takeover or loss of foreground',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');game.autoplay.strategy='portal';
+  const o=observation();o.self.traveling=true;const observe=vi.spyOn(game.autoplay,'observe').mockResolvedValue(o);
+  vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
+  await (game as any).tick();observe.mockResolvedValue({...o,foreground:false});await (game as any).tick();
+  expect(game.gate.mode).toBe('manual');expect((game as any).portalUntil).toBe(0);expect(resume).not.toHaveBeenCalled();
+ });
+ it('keeps a requested match loading grace through world replacement and rearms only after drop-in',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};
+  game.gate.change('auto');game.autoplay.transitionMatch='menu';game.autoplay.transitionUntil=Date.now()+120000;
+  const observe=vi.spyOn(game.autoplay,'observe');const change=vi.spyOn(game.autoplay,'change').mockResolvedValue();
+  const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  observe.mockResolvedValue(observation({phase:'loading',mode:'manual',epoch:game.gate.epoch}));
+  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(game.autoplay.transitionUntil).toBeGreaterThan(Date.now());expect(change).not.toHaveBeenCalled();expect(tick).not.toHaveBeenCalled();
+  observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('auto');
+  observe.mockResolvedValue(observation({phase:'playing',mode:'manual',epoch:game.gate.epoch}));
+  await (game as any).tick();expect(game.autoplay.transitionUntil).toBe(0);expect(change).toHaveBeenCalledWith('auto',game.gate.epoch);expect(tick).toHaveBeenCalledTimes(1);
+  observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
+ });
+ it('manual takeover during loading cancels automatic rearming',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  game.gate.change('auto');game.autoplay.transitionUntil=Date.now()+120000;
+  vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);
+  await game.setMode('manual');expect(game.autoplay.transitionUntil).toBe(0);expect(game.gate.mode).toBe('manual');
+ });
  it('manual takeover cancels an automatic-enable request still awaiting telemetry',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
   (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};

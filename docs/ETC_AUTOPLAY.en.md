@@ -54,10 +54,11 @@ The private mailbox is `%LOCALAPPDATA%/JevLive/etc-bridge`: `session.json`, `sta
 - Commands carry version/session/token/matchId/id/epoch/frame/expiry and may reference only recently offered actions. No console, script or arbitrary-target endpoint.
 - 250 ms command lease. Reject duplicate IDs, old epochs/matches, stale frames and excessive leases. Focus loss, expired lease, disconnect and pawn/world changes release held inputs.
 - Manual takeover increases epoch, cancels advice and serializes release after pending writes. Old async results cannot restore automatic mode. Ctrl+Alt+M remains available.
-- Only an explicitly requested new-match transition gets a bounded 120 s loading wait; native input still expires, then control is reauthorized after fresh state from the new world. Ordinary disconnects do not wait indefinitely.
+- Requested matches get at most 120 s through actual drop-in; positively observed portal travel gets at most 15 s. Native input still expires, with reauthorization only after the matching fresh destination state.
+- Ordinary frame stalls pause commands for at most 1 s. Resuming requires fresh foreground telemetry from the same match and control epoch; timeout, identity mismatch and manual takeover stop control. A Windows file-replacement gap may reuse only an authenticated frame within its original 250 ms freshness limit.
 - Only `NM_Standalone` is supported; network matches report unsupported.
 
-The default mailbox is single-controller. Starting a second isolated JEV acceptance instance replaces the session and safely invalidates the older controller. Multi-instance control is not supported.
+The default mailbox is single-controller. Use `--isolated` for acceptance alongside another JEV instance: separate app data and control directory, with the installed game launched through Steam using its private directory argument. Close the Steam game before this test. The existing broadcasting instance is not modified.
 
 ## Acceptance
 
@@ -69,13 +70,15 @@ npm run build
 node scripts/smoke-autoplay.cjs
 # After a compatible game build is installed: full matches, no OBS setup
 node scripts/smoke-autoplay.cjs --run --matches 20
+# When another JEV instance is running, close the Steam game first
+node scripts/smoke-autoplay.cjs --run --isolated --matches 1
 ```
 
 ETC developers install the source adapter with `integrations/etc/install.ps1 -Project <ETC-root>` and build through ETC's `Tools/Build.bat`. Native automation test `Project.ETC.Jev.PlayerMotor` covers reaction/turn limits, shortest rotation, frame hitches, occlusion/protection/empty-ammo fire gates and lease/epoch/frame validation. Code-level automation does not replace Steam match acceptance.
 
 Reports go to `test-results/etc-autoplay/acceptance.json` with a whitelist of summary fields, no tokens/accounts/keys. Deduplicate official results; manual intervention or interrupted/missing results are not autonomous wins. Latency means **observation timestamp to completed command write**, not end-to-end hit latency. Ammo decreases estimate shots; they do not establish hit accuracy.
 
-Measured on 2026-09-20: Steam BuildID **25364079**, actual installed Shipping process detected, **API v3 not connected**, **zero completed autonomous matches**. JEV displayed the compatibility message and disabled automatic mode. No stream started. See [acceptance record](ETC_AUTOPLAY_ACCEPTANCE.en.md) for code checks/builds.
+Retested on 2026-09-20: installed Steam candidate BuildID **25420188** successfully connects **API v3** and executes automatic match start and real player movement. The missing-interface result for old build 25364079 no longer applies. See the [latest acceptance record](ETC_AUTOPLAY_ACCEPTANCE.en.md) for completed matches, takeover checks and remaining limits.
 
 ## Win-rate benchmark
 

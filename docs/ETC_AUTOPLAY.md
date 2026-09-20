@@ -54,10 +54,11 @@
 - 指令带 version/session/token/matchId/id/epoch/frame/expiresAt，只能引用本帧附近已经提供的候选动作。无任意控制台、脚本或自定义目标接口。
 - 指令租约 250 ms；重复序号、旧 epoch、旧对局、过时观察和超长租约拒绝。租约到期、失焦、断线、换控制器/世界会释放已有自动输入。
 - 手动切换提高 epoch、取消云请求，按队列发送释放命令；过时异步结果不能覆盖新的手动状态。Ctrl+Alt+M 仍有效。
-- 只有已发起的新对局加载允许最多 120 秒等待；期间原生租约照常停止输入，恢复真实新世界状态后重新授权控制。普通断线不会无限等待。
+- 已发起的新对局允许最多 120 秒等待，直到新世界真正落地；已观察到的穿门过程最多等待 15 秒。期间原生租约照常停止输入，恢复对应的新鲜状态后重新授权控制。
+- 普通游戏帧短暂停顿最多等待 1 秒，期间不发送过期动作；仅同一对局/控制代次、仍处于前台的新鲜状态可恢复。超过时限、身份不符或手动接管均停止。Windows 替换状态文件的瞬间缺口仅可复用仍在原 250 ms 有效期内的已验证帧。
 - 目前明确限制 `NM_Standalone`。在线模式返回 unsupported，不控制网络对局。
 
-JEV 单实例持有默认 mailbox。开发验收同时启动第二个 JEV 实例会替换旧会话，让旧控制安全失效；正式多人/多实例控制尚不支持。
+JEV 单实例持有默认 mailbox。并行运行验收时使用 `--isolated`，同时隔离 JEV 数据和游戏控制目录，由 Steam 启动带专用目录参数的安装版游戏，避免替换已有 JEV 的会话。它要求先关闭 Steam 游戏，不修改已有直播实例。普通用户的默认控制通道仍仅支持一个控制器。
 
 ## 验收与证据
 
@@ -71,13 +72,15 @@ npm run build
 node scripts/smoke-autoplay.cjs
 # 游戏已含接口后，连续完整对局；不配置或启动 OBS
 node scripts/smoke-autoplay.cjs --run --matches 20
+# 另一套 JEV 正在运行时，先关闭 Steam 游戏，再启动完全独立的单局验收
+node scripts/smoke-autoplay.cjs --run --isolated --matches 1
 ```
 
 ETC 开发者运行 `integrations/etc/install.ps1 -Project <ETC根目录>`，按 ETC 工程的 `Tools/Build.bat` 编译。原生自动化测试为 `Project.ETC.Jev.PlayerMotor`；测试反应时间、最大转速、180° 跨界、帧卡顿、保护/空弹/遮挡禁射和租约/epoch/帧校验。它是代码级测试，不是编辑器对局代替 Steam 验收。
 
 实机脚本报告放 `test-results/etc-autoplay/acceptance.json`，只记录白名单摘要；不导出会话令牌、账号或 API Key。单局结果去重。中途手动介入、退出或缺失结算不能计为自动获胜；中断单列。决策延迟是**观察时间到本机命令写完**，不是端到端命中延迟；弹药减少估计开火数，不冒充命中率。
 
-2026-09-20 实测：Steam 安装 BuildID **25364079**，真实安装目录下的 Shipping 游戏进程存在，**未连接 API v3**；完整自动对局 **0 局**。JEV 正确显示不可用并禁用自动按钮。未开启直播。代码测试与编译结果见 [验收记录](ETC_AUTOPLAY_ACCEPTANCE.md)。
+2026-09-20 新版实测：Steam candidate 安装 BuildID **25420188** 已成功连接 **API v3**，自动开局与实际角色移动已验证。旧版 25364079 的接口缺失结论不再适用于新版。完整对局、输入接管与限制以 [最新验收记录](ETC_AUTOPLAY_ACCEPTANCE.md) 为准。
 
 ## 胜率基准与下一次迭代
 
