@@ -1,6 +1,6 @@
-import type {EtcObservation} from '../shared/etc';
+import type {EtcAction,EtcObservation} from '../shared/etc';
 
-export const KNOWLEDGE_VERSION='etc-20260921-01';
+export const KNOWLEDGE_VERSION='etc-20260921-03';
 export interface RoomKnowledge {id:number;name:string;zh:string;crossingSeconds:number;rules:string[];rulesZh:string[];source:string}
 const room=(id:number,name:string,zh:string,crossingSeconds:number,source:string,rules:string[],rulesZh:string[]):RoomKnowledge=>({id,name,zh,crossingSeconds,source,rules,rulesZh});
 /** Authored mechanics, not live world state. Crossing times are conservative policy estimates, not promises. */
@@ -35,6 +35,25 @@ export const ROOM_KNOWLEDGE:ReadonlyArray<RoomKnowledge>=[
  room(28,'Container Terminal','集装箱码头',45,'Docs/Room028/Implementation.md',['Trucks and dangerous suspended loads can hit. Observe lowering warnings and clear the load path; standing on or inside a safely carrying container is not itself damage. Cargo motion changes routes.'],['避开卡车和危险吊载，降箱预警时离开货物路径；正常站在承载货箱上或箱内不会自动受伤。货物流动会改变路线。']),
 ];
 export const roomKnowledge=(id:number|undefined)=>ROOM_KNOWLEDGE.find(r=>r.id===id);
+const terrainRooms=new Set([4,5,9,13,14,17,18,22,25]);
+// Verified terrain/cover rooms. Unknown types and active-mechanism rooms do
+// not gain a stationary-safety assumption from their map number or appearance.
+export function canDefendRoom(o:EtcObservation){return !o.self.danger
+ &&terrainRooms.has(o.self.roomType??-1)
+ &&!/(?:StarterPistol|^$)/.test(o.self.weapon)&&o.self.magazine>0&&o.self.reserve>=15;}
+/** A short supply stop in a yellow room needs a fresh, actually viewed map and
+ * enough estimated time to finish crossing. Active damage never gets this budget. */
+export function canResupplyBeforeEvacuation(o:EtcObservation,a:EtcAction){
+ const m=o.mapView,z=o.zone,r=roomKnowledge(o.self.roomType);
+ return !!r&&terrainRooms.has(r.id)&&o.self.danger&&o.self.grounded!==false
+  &&o.self.evacuationSeconds<=0&&o.enemies.length===0&&z?.stage==='warning'
+  &&!!m&&m.revision>0&&m.phase===z.phase&&m.stage===z.stage
+  &&o.timestamp-m.observedAt>=0&&o.timestamp-m.observedAt<=15000
+  &&m.rooms.find(v=>v.id===o.self.room)?.risk===1
+  &&a.safe&&['loot','pickup'].includes(a.kind)&&a.distance<=1200
+  &&o.actions.some(v=>v.kind==='portal'&&v.safe&&v.destinationRisk===0)
+  &&z.secondsLeft>r.crossingSeconds+Math.ceil(a.distance/300)+3+8;
+}
 export const MATCH_RULES=[
  'Win by being the last survivor. Official placement is authoritative; no hidden enemies, future collapse order or random schedules are available.',
  'Map display numbers, instance slots and room archetype IDs are different. Learn an archetype only from the current room arrival title; never infer it from the map number.',
@@ -42,11 +61,20 @@ export const MATCH_RULES=[
  'The fixed starter pistol cannot be dropped or replaced. Main weapons occupy slots 2 and 3; improve the loadout through visible reachable supplies.',
  'Ordinary headgear protects one accepted ordinary-gun headshot; SR01 headshots bypass it. A helmet is not general invulnerability.',
  'Discrete collision hazards use the current 60 damage baseline, with explicit exceptions such as lethal falls, discharge/burn and push-only obstacles. Never generalize one room rule to all rooms.',
+ 'Budgeted supply actions are brief opportunities before evacuation, not permission to defend a yellow room. They require a fresh map and time for the estimated crossing plus margin; damage immediately cancels them.',
  'Use only offered actions. The local shared controller handles real-time avoidance; cloud objectives must not override its safety or normal game physics.'
 ];
 export class EtcKnowledge {
  private match='';readonly visited=new Map<number,number>();
  observe(o:EtcObservation){if(this.match!==o.matchId){this.match=o.matchId;this.visited.clear();}if(o.phase==='playing'&&o.self.room>=0&&roomKnowledge(o.self.roomType))this.visited.set(o.self.room,o.self.roomType!);}
  crossingSeconds(slot:number){return roomKnowledge(this.visited.get(slot))?.crossingSeconds??30;}
- context(o:EtcObservation){const r=roomKnowledge(this.visited.get(o.self.room));return {version:KNOWLEDGE_VERSION,rules:MATCH_RULES,currentRoom:r?{id:r.id,name:r.name,rules:r.rules,crossingEstimateSeconds:r.crossingSeconds,source:r.source}:null,knownRooms:[...this.visited].map(([slot,id])=>({slot,type:id,name:roomKnowledge(id)!.name})),uncertainty:'Crossing times are estimates, not live hazard phases. Unvisited archetypes and future random events remain unknown.'};}
+ context(o:EtcObservation){
+  const r=roomKnowledge(this.visited.get(o.self.room));
+  return {version:KNOWLEDGE_VERSION,rules:MATCH_RULES,
+   posture:canDefendRoom(o)?'Defend this safe terrain room with the stocked primary weapon. Watch for enemies and zone changes; unnecessary room hopping adds hazard exposure.':'Acquire supplies or plan safe movement using the current room mechanics.',
+   budgetedSupplyActions:(o.actions??[]).filter(a=>canResupplyBeforeEvacuation(o,a)).map(a=>a.id),
+   currentRoom:r?{id:r.id,name:r.name,rules:r.rules,crossingEstimateSeconds:r.crossingSeconds,source:r.source}:null,
+   knownRooms:[...this.visited].map(([slot,id])=>({slot,type:id,name:roomKnowledge(id)!.name})),
+   uncertainty:'Crossing times are estimates, not live hazard phases. Unvisited archetypes and future random events remain unknown.'};
+ }
 }

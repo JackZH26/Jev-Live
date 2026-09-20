@@ -1,6 +1,6 @@
 # ETC gameplay knowledge and map planning
 
-[中文](ROOM_KNOWLEDGE.md) · Knowledge version: etc-20260921-01
+[中文](ROOM_KNOWLEDGE.md) · Knowledge version: etc-20260921-03
 
 Current UE room catalog, implementation records and source code take precedence over older design proposals. The referenced legacy Godot GDD was unavailable locally; it is not silently treated as current. These are short authored summaries, not copies of the original design documents.
 
@@ -8,7 +8,11 @@ Only the current room arrival title identifies its archetype. Map display number
 
 Local control requests a review initially, before the countdown refresh (at least the estimated crossing time plus 8 seconds), after a phase change and after repeated route failures. Combat, recent damage and last-second evacuation defer the overlay. The cloud selects a safe target and an immediate tactical action; the shared controller still handles real-time traversal and hazards. Replies from another room, map revision or phase cannot change the route.
 
+Knowledge also decides whether relocation is worthwhile. In confirmed terrain/cover types 004/005/009/013/014/017/018/022/025, a safe room and stocked primary weapon enable defensive holding and temporarily exclude aimless portal travel. Enemy sightings, damage and room warnings remain monitored; danger immediately restores evacuation. Unknown types and active-mechanism rooms receive no assumption that standing still is safe. This avoids unnecessary exposure after resupply; it grants no immunity to gunfire or collapse.
+
 Traversal budgets below are initial conservative policy estimates, not measured guaranteed times. Unvisited rooms use a 30-second estimate. Yellow transit rooms are rejected when arrival plus crossing plus an 8-second buffer would miss the warning deadline. Safe destinations prefer short paths and multiple safe exits; no future collapse order is used.
+
+A starter-pistol or ammunition-depleted player may make a brief supply attempt in a verified terrain room only when an actual map snapshot is at most 15 seconds old and matches the phase, the current room is only yellow, a safe exit exists, supplies are within 12 metres and the countdown covers collection, estimated crossing and an 8-second margin. Enemies, recent damage, an active evacuation timer, hazard rooms or stale maps disable this exception. Eligible supply actions are also sent to Jev; they do not permit prolonged defense in a warned room. Newly established defensive conditions cancel an older optional portal objective immediately.
 
 Confirmed corrections: collision damage is currently 60, replacing historical 75/100 examples; room 026 now rotates a single spotlight, replacing the initial four-light design; 027 obstacles push while water is lethal. Older TEST labels do not override the current formal 001–028 catalog. Room 003 special mechanics have not been verified; that uncertainty remains explicit.
 

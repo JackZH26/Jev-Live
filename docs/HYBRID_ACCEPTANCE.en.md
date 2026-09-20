@@ -1,6 +1,18 @@
-# Shared executor: first acceptance round · 2026-09-20
+# Shared executor: live-game acceptance
 
 [简体中文](HYBRID_ACCEPTANCE.md) · [Architecture](HYBRID_AUTOPLAY.en.md)
+
+## Knowledge-based defense and first official victory · 2026-09-21
+
+The first six-match batch for this strategy placed 14th, 18th, 1st, 14th, 19th and 6th in order, all with official results and confirmed release. Final streak: zero; longest: one. Follow-up knowledge version `etc-20260921-03` adds countdown-budgeted nearby supplies and immediately cancels an old optional portal objective when defense becomes eligible. All 177 tests and type checks passed. This later strategy needs separate live results and cannot inherit the earlier win.
+
+Knowledge version `etc-20260921-02` adds a defensive posture to the existing 28 archetype rules. It applies only in a verified safe terrain room with a loaded primary and adequate ammunition. Cloud choices temporarily exclude unnecessary room hopping; visible enemies, recent damage or zone warnings restore combat and relocation. Unknown and active-hazard rooms never inherit an assumption that standing still is safe.
+
+Local candidate `20260921-04`, trial `hybrid-smoke-1789927318106`, achieved the first official first place: 638.9 seconds for the full flow, two kills, seven rounds consumed, 100 health at the result and 266 Jev requests / 254 admitted replies. Input release was confirmed on the third read. The player acquired a shotgun in type 025 Sunworn Arcade, defended until the room became threatened, then evacuated, equipped an SMG and continued to the official victory. Actual M-map snapshots span P1–P5. Knowledge and map observations remain limited to player-visible information.
+
+This is not two consecutive firsts: the next trial, `1789927957342`, placed 14th and reset the streak. All records remain available. The 19 Regular opponents, difficulty, damage and result calculation were unchanged. All 175 TypeScript tests and type checks passed; the native candidate and graphics configuration were unchanged. Raw evidence and redacted extracts stay in local Git-ignored `test-results`; account credentials, keys, bridge credentials and full runtime records are not committed.
+
+The previous strategy batch's third trial, `1789926726317`, placed 6th with one kill, twelve rounds consumed, 75 requests / 68 admitted replies and successful release. It kept changing rooms after acquiring a primary, eventually dying in Bumper Arena. This motivated room-aware defense; the location alone does not establish the damage source.
 
 ## Gameplay knowledge integration · 2026-09-21
 
@@ -89,7 +101,7 @@ Candidate `20260920-03` fixes this integration and gates room 010/011/024/027 pe
 
 1. Install the new build from Steam, launch from its library and validate cloud Jev.
 2. Obtain valid native automation results; complete 40 navigation routes and 20 full matches.
-3. Improve early supplies and continuous threat discovery. The cloud run fired no shots; its cause needs investigation before claiming capable combat.
+3. Improve early supplies, continuous threat discovery and hazard traversal reliability. Official kills and a victory are recorded, but multiple early deaths remain; consistently strong combat is not yet established.
 4. Run matched-seed, equipment and information tests across Bot tiers and nineteen-Pro battle royale trials. No superiority claim before statistical gates pass.
 5. Complete the two-hour broadcast and subsequent 8/24/72-hour endurance trials.
 

@@ -1,5 +1,5 @@
 import {it,expect} from 'vitest';
-import {EtcKnowledge,ROOM_KNOWLEDGE,roomKnowledge} from '../electron/etc-knowledge';
+import {EtcKnowledge,ROOM_KNOWLEDGE,roomKnowledge,canDefendRoom} from '../electron/etc-knowledge';
 import {etcObservationSchema,type EtcObservation} from '../shared/etc';
 const state=(match='m',slot=27,type?:number)=>({matchId:match,phase:'playing',self:{room:slot,roomType:type}} as EtcObservation);
 it('learns archetypes only from visited arrival titles, never map display numbers',()=>{
@@ -16,4 +16,11 @@ it('has bilingual, sourced entries for the current 28-room catalog with explicit
 it('rejects corrupt room identities at the bridge schema boundary',()=>{
  const shape=etcObservationSchema.shape.self;
  expect(shape.shape.roomType.safeParse(99).success).toBe(false);expect(shape.shape.roomType.safeParse(undefined).success).toBe(true);
+});
+it('defends only a known safe terrain room with a stocked primary, not a guessed type or hazard room',()=>{
+ const o=state('m',27,5);Object.assign(o.self,{danger:false,weapon:'ID_ETC_SMG02_C',magazine:30,reserve:105});
+ expect(canDefendRoom(o)).toBe(true);o.self.danger=true;expect(canDefendRoom(o)).toBe(false);
+ o.self.danger=false;o.self.roomType=1;expect(canDefendRoom(o)).toBe(false);
+ o.self.roomType=undefined;expect(canDefendRoom(o)).toBe(false);
+ o.self.roomType=5;o.self.weapon='ID_ETC_StarterPistol_C';expect(canDefendRoom(o)).toBe(false);
 });

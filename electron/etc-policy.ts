@@ -1,4 +1,5 @@
 import { ETC_MAX_AGE_MS, type EtcAction, type EtcObservation } from '../shared/etc';
+import {canDefendRoom,canResupplyBeforeEvacuation} from './etc-knowledge';
 
 /** Only observed affordances enter the policy. No world actors, hidden HP or future collapse schedule. */
 export class EtcPolicy {
@@ -45,10 +46,16 @@ export class EtcPolicy {
     this.health=o.self.health;
     if(visible)this.seenAt=now;
     const underFire=now-this.hurtAt<5000, threatened=visible||underFire||now-this.seenAt<2000;
+    const defending=canDefendRoom(o)&&!threatened;
     // Survival constraints have priority over cloud advice, loot and target persistence.
     const eligible=o.actions.filter(a=>!['new_match','inspect_map'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe);
     const escape=eligible.filter(a=>a.kind==='portal');
     const escapeOrder=(a:EtcAction,b:EtcAction)=>(a.destinationRisk??0)-(b.destinationRisk??0)||a.distance-b.distance;
+    const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;
+    if(weakLoadout&&!threatened){
+      const briefSupply=eligible.filter(a=>canResupplyBeforeEvacuation(o,a)).sort((a,b)=>a.distance-b.distance)[0];
+      if(briefSupply)return this.select(briefSupply,now);
+    }
     if(o.self.danger&&escape.length)return this.select(planned&&escape.includes(planned)?planned:escape.sort(escapeOrder)[0],now);
     if(o.self.healing&&!threatened&&!o.self.danger)return wait;
     // Moving uses the normal game's cast interruption. Do not restart a heal
@@ -67,24 +74,25 @@ export class EtcPolicy {
       const fight=eligible.filter(a=>a.kind==='engage').sort((a,b)=>a.distance-b.distance)[0];
       if(fight)return this.select(fight,now);
     }
-    const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;
     const supply=eligible.filter(a=>a.distance<=3000&&(a.kind==='pickup'||a.kind==='loot')).sort((a,b)=>
       (b.kind==='pickup'?35+(b.rank??0)*4:0)-(a.kind==='pickup'?35+(a.rank??0)*4:0)||a.distance-b.distance)[0];
     // Let a progressing movement finish a short execution window. A new sighting,
     // damage or room danger interrupts immediately; cloud chatter alone does not.
     if(!threatened&&!o.self.danger&&now-this.activeAt<5000&&o.executor?.status==='running'
       &&o.executor.objective===this.active&&continuing&&['loot','pickup','portal'].includes(continuing.kind)
+      &&(!defending||continuing.kind!=='portal')
       &&!(continuing.destinationRisk??0)&&eligible.includes(continuing))return continuing;
     // A capable native motor executes a real tactical objective, not a +10 hint.
     // Only immediate survival/maintenance overrides it; healthy fighters may retreat.
     if(o.executor?.kind==='shared-bot-v1'&&advice&&!o.self.danger){
-      const tactical=eligible.find(a=>a.id===advice&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
+      const tactical=eligible.find(a=>a.id===advice&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
       const emergency=visible&&low&&eligible.some(a=>a.kind==='cover')
         ||o.self.magazine===0&&eligible.some(a=>a.kind==='equip'||a.kind==='reload'&&o.self.reserve>0)
         ||!threatened&&o.self.health<o.self.maxHealth*.8&&eligible.some(a=>a.kind==='heal')
         ||!threatened&&eligible.some(a=>a.kind==='equip')
         ||!threatened&&weakLoadout&&supply&&supply.distance<=3000;
       const legal=tactical&&(tactical.kind!=='engage'||visible&&o.self.magazine>0&&!o.self.protected)
+        &&!(defending&&tactical.kind==='portal')
         &&!(tactical.kind==='portal'&&(tactical.destinationRisk??0)>=2&&escape.some(a=>a.destinationRisk===0))
         &&(!threatened||!['loot','pickup','scan'].includes(tactical.kind));
       if(legal&&!emergency)return this.select(tactical,now);
@@ -93,7 +101,7 @@ export class EtcPolicy {
       const distance=a.distance/100; // UE centimetres -> metres
       let n=-1000;
       switch(a.kind){
-        case 'wait': n=-100;break;
+        case 'wait': n=defending?65:-100;break;
         case 'scan': n=0;break;
         case 'engage': n=visible&&o.self.magazine>0&&!o.self.protected?90-distance*0.6: -1000;break;
         case 'cover': n=threatened?(low||o.self.magazine===0?160:65)-distance: -80;break;

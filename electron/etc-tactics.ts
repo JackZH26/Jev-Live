@@ -1,4 +1,5 @@
 import type { EtcObservation } from '../shared/etc';
+import {canDefendRoom} from './etc-knowledge';
 
 /** Cloud objectives are bounded leases, independent of the native input heartbeat. */
 export class EtcTactics {
@@ -37,7 +38,9 @@ export class EtcTactics {
     if(JSON.stringify(item)!==JSON.stringify(this.history.at(-1))){this.history.push(item);if(this.history.length>12)this.history.shift();}
   }
   options(o:EtcObservation){
-    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
+    const defending=canDefendRoom(o)&&!o.enemies.length&&(!this.damageAt||o.timestamp-this.damageAt>5000);
+    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
+    if(defending)choices=choices.filter(a=>a.kind!=='portal');
     // An optional relocation must not enter active collapse while an observed
     // safe exit remains usable. A trapped player retains every open escape.
     if(!o.self.danger&&choices.some(a=>a.kind==='portal'&&a.destinationRisk===0))

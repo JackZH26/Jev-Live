@@ -25,6 +25,21 @@ function choose(o:EtcObservation,advice?:string){return new EtcPolicy().choose(o
 async function bridge(){const d=await mkdtemp(join(tmpdir(),'jev-etc-'));dirs.push(d);return new EtcBridge(d);}
 
 describe('ETC tactical priorities',()=>{
+ it('allows only a brief, budgeted starter-weapon supply stop in a verified upcoming terrain room',()=>{
+  const p=new EtcPolicy(),o=observation({enemies:[]});o.self.weapon='ID_ETC_StarterPistol_C';o.self.roomType=5;o.self.danger=true;
+  o.zone={phase:1,stage:'warning',secondsLeft:140};o.mapView={open:false,revision:1,observedAt:o.timestamp,phase:1,stage:'warning',rooms:[{id:1,number:7,x:0,y:0,w:1,h:1,risk:1,visited:true}],edges:[]};
+  o.actions.find(a=>a.kind==='portal')!.destinationRisk=0;
+  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('loot');
+  o.self.health=90;o.timestamp+=50;
+  expect(p.choose(o,o.timestamp,false,true,'loot')?.kind).toBe('portal');
+  const safe=()=>new EtcPolicy().choose(o,o.timestamp,false,true,'loot')?.kind;
+  o.zone.secondsLeft=40;expect(safe()).toBe('portal');o.zone.secondsLeft=140;
+  o.mapView.rooms[0].risk=2;expect(safe()).toBe('portal');o.mapView.rooms[0].risk=1;
+  o.self.roomType=27;expect(safe()).toBe('portal');o.self.roomType=5;
+  o.mapView.observedAt=o.timestamp-15001;expect(safe()).toBe('portal');o.mapView.observedAt=o.timestamp;
+  o.self.evacuationSeconds=10;expect(safe()).toBe('portal');o.self.evacuationSeconds=-1;
+  o.actions.find(a=>a.kind==='loot')!.distance=1201;expect(safe()).toBe('portal');
+ });
  it('prioritizes a safe collapse exit over combat, loot and cloud advice',()=>{
   const o=observation();o.self.danger=true;o.actions.push(action('portal',{id:'unsafe',safe:false,distance:1}));
   expect(choose(o,'engage')?.id).toBe('portal');
