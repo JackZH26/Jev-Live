@@ -1,0 +1,11 @@
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
+@@ -1796,6 +1796,8 @@
+ 		}
+ 	}
+ 
++	if (bExternalControl && !bGenericDirectMovement) EtcJevBridge::UpdateAwarenessLook(Pawn, DeltaTime);
++
+ 	bool bWantsToFire = false;
+ 	if (Mode == EEtcBotMode::Fight && bHasWeapon)
+ 	{

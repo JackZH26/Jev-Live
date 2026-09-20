@@ -50,6 +50,28 @@ inline EPathFollowingStatus::Type Status(AController* Controller)
     auto* Follow = Path(Controller);
     return Follow ? Follow->GetStatus() : EPathFollowingStatus::Idle;
 }
+// The player adapter's path may end at a hazard waypoint. Predict against a
+// fresh route to the tactical goal, not a straight line through cover geometry.
+inline FVector NextPathCorner(AController* Controller, const FVector& Goal)
+{
+    static TWeakObjectPtr<AController> CachedController;
+    static FVector CachedGoal, CachedCorner;
+    static double Until=0;
+    const double Now=FPlatformTime::Seconds();
+    if(Controller==CachedController.Get() && Now<Until && FVector::DistSquared(Goal,CachedGoal)<3600)
+        return CachedCorner;
+    CachedController=Controller;CachedGoal=Goal;CachedCorner=Goal;Until=Now+.25;
+    if(!Controller||!Controller->GetPawn())return Goal;
+    auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(Controller->GetWorld());
+    const FVector Start=Controller->GetNavAgentLocation();
+    const auto* Data=Nav?Nav->GetNavDataForProps(Controller->GetNavAgentPropertiesRef(),Start):nullptr;
+    if(!Data)return Goal;
+    FPathFindingQuery Query(Controller,*Data,Start,Goal);Query.SetAllowPartialPaths(false);
+    const auto Result=Nav->FindPathSync(Query);
+    if(Result.IsSuccessful()&&Result.Path.IsValid()&&Result.Path->GetPathPoints().Num()>1)
+        CachedCorner=Result.Path->GetPathPoints()[1].Location;
+    return CachedCorner;
+}
 inline void AssignedSlot(AController* Controller, int32 Slot)
 {
     if (auto* Bot = Cast<AEtcBotController>(Controller)) Bot->SetAssignedSlot(Slot);

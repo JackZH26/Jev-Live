@@ -2,6 +2,18 @@
 
 [简体中文](HYBRID_ACCEPTANCE.md) · [Architecture](HYBRID_AUTOPLAY.en.md)
 
+## Update · 2026-09-21
+
+The current local candidate is `20260920-05`. Two consecutive first places remain unachieved. Official receipt `hybrid-smoke-1789920022258` recorded 3rd place, one kill, eight rounds consumed, 283 cloud requests / 251 admitted replies and successful manual release. The next match placed 19th, followed by another 3rd with no kills. All failures and interruptions remain in the record; intervening losses cannot be skipped.
+
+This iteration fixes repeated healing under fire, repeated reloads of a full seven-shell shotgun, short-lived target oscillation, movement without net path progress, pendulum-room path corners and known destination-room risk ordering. Enemy count, difficulty, damage, health and result calculation were unchanged. Candidates use isolated real game settings: 720p, a 60 FPS cap, unchanged view distance and reduced shadow/reflection cost. Steam preferences remain untouched. Heavy native builds are kept outside full-match trials.
+
+`scripts/validate-hybrid-series.cjs` runs complete matches serially, stopping on two consecutive official first places for one version. An interruption or unsuccessful input release stops the batch. `scripts/hybrid-streak.cjs` recomputes the streak from every chronological receipt. Version identity includes native package, runtime policies, test harness and graphics hashes. Official results, cloud participation and successful input release are all required.
+
+Studio type checks and the full **155/155** suite passed. Private-console Python access-protection tests passed **4/4**. Candidate 05 passed Prepare → Cook → Build-snapshot → Stage and 137-file verification. The website console passed real HTTPS access protection, mobile layout and browser-script checks. The private X output was visually checked against the active game and avatar; game/audio rebinding now follows each new test process. See the [console guide](../console/README.en.md). These engineering checks do not replace victory or endurance acceptance.
+
+The sections below retain the earlier rounds' history. New Steam installation acceptance and two consecutive first places remain outstanding.
+
 ## Conclusion
 
 Implementation, compilation and two packaged-candidate matches completed. Evidence covers sustained movement, room transitions, ammunition consumption, official results and manual release. **Both matches finished in 16th place; outperforming existing Bots has not been achieved.** Cloud Jev participated in the second match, but recorded no shots or kills. Supply selection, threat discovery and reactions to damage still need improvement.

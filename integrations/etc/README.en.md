@@ -10,7 +10,7 @@ ETC developers compile this native integration into the game. Players launch Ent
 ./Tools/Build.bat LyraGame Shipping
 ```
 
-The installer checks `shared-controller.patch` and `room-control.patch`, reuses Bot Brain / Aim and room movement, then copies the bridge, controller adapter and tests into EtcCore. Repeated installation detects applied patches; source conflicts stop installation for review. Module Install/Uninstall hooks are retained. Legacy Steam v3 builds without `shared-bot-v1` retain the previous Studio policy; new executor deployment is never inferred from compilation.
+The installer checks `shared-controller.patch`, `room-control.patch`, `awareness.patch` and `pendulum-path.patch`, reuses Bot Brain / Aim and room movement, then copies the bridge, controller adapter and tests into EtcCore. Repeated installation detects applied patches; source conflicts stop installation for review. Module Install/Uninstall hooks are retained. Legacy Steam v3 builds without `shared-bot-v1` retain the previous Studio policy; new executor deployment is never inferred from compilation.
 
 The player retains PlayerController, camera and HUD while sharing UE path following and Bot weapon, hazard and stationary-recovery logic. Jev selects leased tactical objectives. Local renewals run at approximately 20 Hz; renewing a target does not restart its path. Existing Bot strategy remains separate.
 
@@ -27,4 +27,8 @@ npm run build
 npx electron scripts/validate-hybrid-local.cjs --candidate <directory-with-artifact.json> --jev --seconds 1800 --requests 1200
 ```
 
-The runner verifies the executable hash, launches its own game/bridge and reads the locally encrypted Jev key. It focuses its own window once, then stops on focus loss; it does not configure OBS. Each trial is saved under ignored `test-results`. Only an official result counts as completion; time/request exhaustion exits with code 2. Maximum duration is one hour with 2400 requests. Omit `--jev` for the local-rule baseline.
+The runner verifies the executable hash, launches its own game/bridge and reads the locally encrypted Jev key. It focuses its own window once, then stops on focus loss; it does not configure OBS. Each trial is saved under ignored `test-results`. Only an official result counts as completion; time/request exhaustion returns a nonzero exit code. Maximum duration is one hour with 2400 requests. Omit `--jev` for the local-rule baseline.
+
+Own damage retains a five-second threat window to prevent healing loops when the attacker leaves the view. Native camera search is bounded; remembered cover threats use last-seen snapshots only. Tests isolate Saved settings and use ordinary low lighting quality with unchanged view distance, without changing Steam preferences or Bot stats.
+
+`node scripts/hybrid-streak.cjs` rebuilds a chronological ledger from all local receipts at ignored `test-results/hybrid-streak.json`. Two official firsts must share native, policy, graphics and harness versions, with actual Jev participation and verified input release. Losses, interruptions and version changes reset the streak. `destinationRisk` comes from normal map state: 0 safe, 1 upcoming, 2 active danger, 4 closed. Closed exits cannot execute; tactics and evacuation rules evaluate the other risks.

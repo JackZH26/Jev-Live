@@ -40,12 +40,32 @@ describe('ETC tactical priorities',()=>{
   const o=observation();o.self.magazine=0;o.actions.push(action('reload'));expect(choose(o)?.kind).toBe('reload');
   o.self.reserve=0;expect(choose(o)?.kind).not.toBe('reload');expect(choose(o)?.kind).not.toBe('engage');
  });
+ it('does not repeatedly reload a full seven-shell shotgun',()=>{
+  const o=observation({enemies:[]});o.self.weapon='SG01';o.self.magazine=7;o.actions.push(action('reload'));
+  expect(choose(o)?.kind).not.toBe('reload');
+ });
  it('does not heal in visible enemy fire and preserves a safe ongoing cast',()=>{
   const o=observation();o.self.health=50;o.actions.push(action('heal'));expect(choose(o)?.kind).toBe('engage');
   o.enemies=[];expect(choose(o)?.kind).toBe('heal');o.self.healing=true;expect(choose(o)?.kind).toBe('wait');
  });
  it('blocks firing during spawn protection and all movement during portal travel',()=>{
   const o=observation();o.self.protected=true;expect(choose(o)?.kind).not.toBe('engage');o.self.traveling=true;expect(choose(o)?.kind).toBe('wait');
+ });
+ it('retreats after unseen damage and breaks the interrupted-heal loop',()=>{
+  const p=new EtcPolicy(),at=Date.now(),o=observation({enemies:[]});o.actions.push(action('heal'));
+  p.choose(o,at,false,true);o.self.health=60;o.self.healing=true;o.timestamp=at+50;
+  expect(p.choose(o,at+50,false,true,'scan')?.kind).toBe('portal');
+  o.self.healing=false;o.timestamp=at+2000;
+  expect(p.choose(o,at+2000,false,true)?.kind).toBe('portal');
+  o.self.health=48;o.timestamp=at+4000;
+  expect(p.choose(o,at+4000,false,true)?.kind).toBe('portal');
+  o.timestamp=at+9100;expect(p.choose(o,at+9100,false,true)?.kind).toBe('heal');
+ });
+ it('does not treat a disappearing enemy as immediate permission to heal',()=>{
+  const p=new EtcPolicy(),at=Date.now(),o=observation();o.self.health=60;o.actions.push(action('heal'));
+  p.choose(o,at,false,true);o.enemies=[];o.timestamp=at+100;
+  expect(p.choose(o,at+100,false,true)?.kind).not.toBe('heal');
+  o.timestamp=at+2100;expect(p.choose(o,at+2100,false,true)?.kind).toBe('heal');
  });
  it.each(['loading','paused','unsupported'] as const)('waits in %s',phase=>expect(choose(observation({phase}))?.kind).toBe('wait'));
  it('waits on stale, future or background observations',()=>{
@@ -68,6 +88,17 @@ describe('ETC tactical priorities',()=>{
   const at=Date.now();expect(p.choose(o,at,false,true)?.kind).toBe('portal');
   o.diagnostics.stuck=true;expect(p.choose(o,at+50,false,true)?.kind).toBe('scan');
   o.diagnostics.stuck=false;o.timestamp=at+5100;expect(p.choose(o,at+5100,false,true)?.kind).toBe('portal');
+ });
+ it('abandons a route oscillating without net progress, even when native movement is active',()=>{
+  const p=new EtcPolicy(),at=Date.now(),o=observation({enemies:[],actions:[action('wait'),action('scan'),action('portal')]});
+  o.executor={kind:'shared-bot-v1',objective:'portal',status:'running',reason:'accepted',failures:0,pathStatus:3};
+  expect(p.choose(o,at,false,true)?.kind).toBe('portal');
+  o.timestamp=at+20001;o.actions.find(a=>a.id==='portal')!.distance=150;
+  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('scan');
+ });
+ it('prefers a safe destination and still evacuates through an open warned door when trapped',()=>{
+  const o=observation();o.self.danger=true;o.actions.push(action('portal',{id:'warned',distance:10,destinationRisk:2}));
+  expect(choose(o)?.id).toBe('portal');o.actions=o.actions.filter(a=>a.id!=='portal');expect(choose(o)?.id).toBe('warned');
  });
  it('cannot choose a cloud-suggested action outside current affordances',()=>{
   expect(choose(observation(),'teleport_and_win')?.id).toBe('engage');

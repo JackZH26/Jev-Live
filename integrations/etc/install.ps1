@@ -7,10 +7,14 @@ $entry = Join-Path $module 'Private\EtcCoreRuntimeModule.cpp'
 $source = [IO.File]::ReadAllText($entry)
 # Check all independent patches before changing source or copying runtime files.
 $pending = @()
-foreach ($name in @('shared-controller.patch','room-control.patch')) {
+foreach ($name in @('shared-controller.patch','room-control.patch','awareness.patch','pendulum-path.patch')) {
     $patch = Join-Path $PSScriptRoot $name
+    # A failed reverse-check means "not installed", not a terminating PS5 error.
+    $ErrorActionPreference = 'Continue'
     & git -C $root apply --reverse --check --ignore-space-change $patch 2>$null
-    if ($LASTEXITCODE -eq 0) { continue }
+    $applied = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = 'Stop'
+    if ($applied) { continue }
     & git -C $root apply --check --ignore-space-change $patch
     if ($LASTEXITCODE -ne 0) { throw "ETC sources changed. Review $name before installing; no files copied." }
     $pending += $patch

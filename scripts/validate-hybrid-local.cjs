@@ -11,6 +11,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  if(!path.isAbsolute(release)||!Number.isInteger(seconds)||seconds<10||seconds>3600||!Number.isInteger(requestBudget)||requestBudget<1||requestBudget>2400)throw Error('invalid_test_arguments');
  report.candidate=artifact.release;report.requestedSeconds=seconds;report.requestBudget=requestBudget;report.runtimeHashes={};
  for(const name of ['etc-autoplay','etc-policy','etc-tactics','etc-recovery','etc-bridge'])report.runtimeHashes[name]=createHash('sha256').update(await fs.readFile(path.join(root,'dist-main/electron',name+'.js'))).digest('hex');
+ report.harnessHash=createHash('sha256').update(await fs.readFile(__filename)).digest('hex');
  const exe=path.join(release,'content',artifact.config.executable),digest=createHash('sha256').update(await fs.readFile(exe)).digest('hex');
  if(artifact.config.app_id!==5272970||digest!==artifact.files.find(f=>f.path===artifact.config.executable)?.sha256)throw Error('artifact_identity');
  const data=await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JevHybridSmoke-'));app.setPath('userData',data);process.env.JEV_TEST_DATA_DIR=data;
@@ -25,11 +26,19 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  TypeSafeClient.prototype.systemOne=async function(...args){if(report.cloudCalls.length>=requestBudget)throw Error('request_budget');const row={at:Date.now(),state:structuredClone(args[0].state)};report.cloudCalls.push(row);try{const r=await call.apply(this,args);Object.assign(row,{ok:true,ms:Date.now()-row.at,model:r.model,action:r.answers.action.choice});return r;}catch(e){Object.assign(row,{ok:false,ms:Date.now()-row.at,error:e.name});throw e;}};
  }
  control=new EtcAutoplay(new EtcBridge(dir),store);
- child=spawn(exe,['/EtcCore/Maps/L_ETC_MainMenu','-dx12','-windowed','-ResX=1280','-ResY=720',`-JevBridgeDir=${dir}`],{cwd:path.join(release,'content'),env:{...process.env,SteamAppId:'5272970',SteamGameId:'5272970'},windowsHide:false,stdio:'ignore'});await new Promise((res,rej)=>{child.once('spawn',res);child.once('error',rej)});
+ report.graphics='1280x720, 60fps cap, low shadows/effects/reflections/GI/textures, unchanged view distance';
+ // Shipping ignores some console commands. Use real, isolated user settings;
+ // never rewrite the user's Steam installation preferences or account profile.
+ const gameData=path.join(data,'game'),config=path.join(gameData,'Saved/Config/Windows');await fs.mkdir(config,{recursive:true});
+ const graphics='[ScalabilityGroups]\nsg.ResolutionQuality=100\nsg.ViewDistanceQuality=3\nsg.AntiAliasingQuality=1\nsg.ShadowQuality=1\nsg.GlobalIlluminationQuality=0\nsg.ReflectionQuality=0\nsg.PostProcessQuality=1\nsg.TextureQuality=1\nsg.EffectsQuality=1\nsg.FoliageQuality=3\nsg.ShadingQuality=1\nsg.LandscapeQuality=3\n\n[/Script/LyraGame.LyraSettingsLocal]\nVersion=5\nbUseVSync=False\nResolutionSizeX=1280\nResolutionSizeY=720\nLastUserConfirmedResolutionSizeX=1280\nLastUserConfirmedResolutionSizeY=720\nFullscreenMode=2\nLastConfirmedFullscreenMode=2\nFrameRateLimit=60.000000\n';
+ await fs.writeFile(path.join(config,'GameUserSettings.ini'),graphics);report.graphicsHash=createHash('sha256').update(graphics).digest('hex');
+ child=spawn(exe,['/EtcCore/Maps/L_ETC_MainMenu','-dx12','-windowed','-ResX=1280','-ResY=720',`-UserDir=${gameData.replaceAll('\\','/')}/`,`-JevBridgeDir=${dir}`],{cwd:path.join(release,'content'),env:{...process.env,SteamAppId:'5272970',SteamGameId:'5272970'},windowsHide:false,stdio:'ignore'});await new Promise((res,rej)=>{child.once('spawn',res);child.once('error',rej)});
  report.pid=child.pid;report.exe=exe;report.sha256=digest;report.bridge=dir;console.log(JSON.stringify({pid:child.pid,out,bridge:dir}));
+ await fs.writeFile(path.join(out,'session-info.json'),JSON.stringify({pid:child.pid,bridge:dir,candidate:report.candidate,sha256:digest}));
  const deadline=Date.now()+90000;let o,focused=false;
- while(Date.now()<deadline&&child.exitCode===null){o=await control.observe(child.pid);if(o?.foreground&&o.executor)break;
+ while(Date.now()<deadline&&child.exitCode===null){o=await control.observe(child.pid);
   if(o?.executor&&!focused){focused=true;execFileSync('powershell.exe',['-NoProfile','-File',path.join(__dirname,'focus-etc-candidate.ps1'),'-SmokeProcessId',String(child.pid),'-ExpectedExe',exe],{windowsHide:true,stdio:'ignore'});}
+  if(o?.foreground&&o.executor)break;
   await sleep(100)}
  if(!o?.foreground||!o.executor)throw Error('no_focused_shared_executor');
  let epoch=1;await control.change('auto',epoch);const started=Date.now();let sampleAt=0,stalls=0,lastFresh=Date.now(),savedSamples=0;
@@ -42,7 +51,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
    if(o.mode==='manual'&&o.epoch===epoch){const recovery=control.recovery.poll(o,epoch,Date.now());if(recovery==='wait'){await sleep(40);continue;}if(recovery!=='resume'){report.stopReason='native_stop';report.events.push({at:Date.now(),native:o.executor,recovery,phase:o.phase,foreground:o.foreground,ageMs:Date.now()-o.timestamp,held:o.diagnostics.heldInputs,recoveryState:{...control.recovery}});break;}report.events.push({at:Date.now(),native:o.executor,recovery});await control.resumeControl(++epoch);}
    await control.tick(settings,epoch);lastFresh=Date.now();
    if(Date.now()-sampleAt>500){sampleAt=Date.now();report.samples.push({at:sampleAt,phase:o.phase,position:o.self.position,room:o.self.room,hp:o.self.health,magazine:o.self.magazine,shots:o.diagnostics.shots,action:o.diagnostics.lastAction,executor:o.executor,held:o.diagnostics.heldInputs,self:o.self,enemies:o.enemies,actions:o.actions});if(report.samples.length%20===0)console.log(JSON.stringify({at:sampleAt,phase:o.phase,room:o.self.room,hp:o.self.health,mag:o.self.magazine,shots:o.diagnostics.shots,enemies:o.enemies.length,offers:o.actions.reduce((a,x)=>(a[x.kind]=(a[x.kind]??0)+1,a),{}),action:o.diagnostics.lastAction,executor:o.executor}));}
-   if(control.summary.matches>0){report.stopReason='official_result';break;}
+   if(control.summary.matches>0){report.stopReason='official_result';report.officialResult={...o.result,matchId:o.matchId,frame:o.frame,phase:o.phase};break;}
    if(report.samples.length>=savedSamples+20){savedSamples=report.samples.length;await fs.writeFile(path.join(out,'live.json'),JSON.stringify({pid:child.pid,candidate:report.candidate,summary:control.summary,cloudStats:control.stats,samples:report.samples.slice(-20),cloudCalls:report.cloudCalls.slice(-4)},null,2));}
    if(report.cloudCalls.length>=requestBudget){report.stopReason='request_budget';break;}
   }else if(Date.now()-lastFresh>15000){report.stopReason='no_fresh_state';break;}

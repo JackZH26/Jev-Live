@@ -11,6 +11,7 @@ export const etcActionSchema = z.object({
   kind: z.enum(['wait','scan','engage','cover','loot','pickup','portal','reload','heal','equip','new_match']),
   distance: finite.nonnegative(), target: z.string().max(160).optional(),
   safe: z.boolean(), destination: z.number().int().optional(), rank: finite.optional(),
+  destinationRisk:z.number().int().min(0).max(4).optional(),
 });
 export const etcObservationSchema = z.object({
   version: z.literal(ETC_PROTOCOL), appId: z.literal(ETC_APP_ID),

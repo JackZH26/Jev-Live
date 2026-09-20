@@ -32,3 +32,12 @@ it('limits recovery storms and clears ownership on explicit mode changes',()=>{
   o.timestamp=at+50;o.frame++;expect(r.poll(o,1,o.timestamp)).toBe('stop');
   r.reset();expect(r.poll(o,1,o.timestamp)).toBe('stop');
 });
+it('accepts steady 5 Hz observations while requiring the same 250 ms freshness',()=>{
+  const {r,o}=leaseStop();
+  for(let i=1;i<=4;i++){o.frame++;o.timestamp=1000+i*200;expect(r.poll(o,1,o.timestamp)).toBe(i===4?'resume':'wait');}
+});
+it('a frame crossing the freshness deadline cannot rearm or contribute stability',()=>{
+  const {r,o}=leaseStop();o.timestamp=1050;o.frame++;expect(r.poll(o,1,1050)).toBe('wait');
+  expect(r.poll(o,1,1301)).toBe('wait');
+  o.timestamp=1350;o.frame++;expect(r.poll(o,1,1350)).toBe('wait');
+});

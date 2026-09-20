@@ -56,9 +56,14 @@ FString PreviousWeapon;
 TWeakObjectPtr<APawn> OwnedPawn;
 TWeakObjectPtr<UWorld> ObservedWorld;
 bool SawLiving=false;
+float ObservedHealth=-1, SearchYaw=0;
+double SearchUntil=0;
+bool HasVisibleEnemy=false;
+struct FRememberedThreat { FVector Eye; double Until=0; TWeakObjectPtr<APawn> Pawn; };
+TArray<FRememberedThreat> RememberedThreats;
 struct FAction {
   FString Id,Kind;TWeakObjectPtr<AActor> Target;FVector Goal=FVector::ZeroVector;
-  float Distance=0;bool Safe=true;int32 Destination=-1,Rank=0,Slot=-1;
+  float Distance=0;bool Safe=true;int32 Destination=-1,Rank=0,Slot=-1,Risk=0;
 };
 TArray<FAction> Offered;FAction Active;
 double Now(){const FDateTime T=FDateTime::UtcNow();return double(T.ToUnixTimestamp())*1000.0+T.GetMillisecond();}
@@ -121,9 +126,9 @@ FLoadout Loadout(APlayerController* PC){
   const auto Slots=Q->GetSlots();L.Slot=Q->GetActiveSlotIndex();if(!Slots.IsValidIndex(L.Slot))return L;
   auto* Item=Slots[L.Slot];L.Magazine=Stat(Item,TEXT("Lyra.ShooterGame.Weapon.MagazineAmmo"));L.Reserve=Stat(Item,TEXT("Lyra.ShooterGame.Weapon.SpareAmmo"));L.Weapon=WeaponName(Item);return L;
 }
-void Offer(const FString& Id,const FString& Kind,APawn* P,AActor* Target=nullptr,FVector Goal=FVector::ZeroVector,bool Safe=true,int32 Dest=-1,int32 R=0,int32 Slot=-1){
+void Offer(const FString& Id,const FString& Kind,APawn* P,AActor* Target=nullptr,FVector Goal=FVector::ZeroVector,bool Safe=true,int32 Dest=-1,int32 R=0,int32 Slot=-1,int32 Risk=0){
   FAction A;A.Id=Id;A.Kind=Kind;A.Target=Target;A.Goal=Goal;A.Safe=Safe;A.Destination=Dest;A.Rank=R;A.Slot=Slot;
-  A.Distance=P&&!Goal.IsNearlyZero()?FVector::Dist(P->GetActorLocation(),Goal):0;Offered.Add(A);
+  A.Risk=Risk;A.Distance=P&&!Goal.IsNearlyZero()?FVector::Dist(P->GetActorLocation(),Goal):0;Offered.Add(A);
 }
 bool Threatened(EEtcRoomDisplayState S){return S==EEtcRoomDisplayState::Warned||S==EEtcRoomDisplayState::Imminent||S==EEtcRoomDisplayState::Collapsed||S==EEtcRoomDisplayState::Upcoming;}
 void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
@@ -141,9 +146,12 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   auto* Map=W?W->GetSubsystem<UEtcMapAssemblySubsystem>():nullptr;
   auto* Rooms=W?W->GetSubsystem<UEtcRoomStateSubsystem>():nullptr;
   const int32 Slot=Map&&P?Map->GetRoomSlotAtLocation(P->GetActorLocation()):-1;
-  if(Slot!=LastRoom){Release(TEXT("room_changed"));LastRoom=Slot;}
-  TArray<FEtcRoomView> Views;if(Rooms)Rooms->GetRoomViews(Views);TSet<int32> Unsafe;bool Danger=false;float Evac=-1;
-  for(const auto& V:Views){if(Threatened(V.State))Unsafe.Add(V.SlotIndex);if(V.SlotIndex==Slot){Evac=V.EvacuationSecondsLeft;Danger=Threatened(V.State)||Evac>0;}}
+  if(Slot!=LastRoom){Release(TEXT("room_changed"));LastRoom=Slot;RememberedThreats.Reset();ObservedHealth=-1;SearchUntil=0;}
+  if(Health>0&&ObservedHealth>=0&&Health<ObservedHealth-.5f&&Time>SearchUntil){SearchUntil=Time+2000;SearchYaw=PC?PC->GetControlRotation().Yaw:0;}
+  ObservedHealth=Health;
+  RememberedThreats.RemoveAll([Time](const FRememberedThreat& T){return T.Until<Time;});
+  TArray<FEtcRoomView> Views;if(Rooms)Rooms->GetRoomViews(Views);TMap<int32,int32> Risks;bool Danger=false;float Evac=-1;
+  for(const auto& V:Views){Risks.Add(V.SlotIndex,V.State==EEtcRoomDisplayState::Safe?0:V.State==EEtcRoomDisplayState::Upcoming?1:V.State==EEtcRoomDisplayState::Collapsed?4:2);if(V.SlotIndex==Slot){Evac=V.EvacuationSecondsLeft;Danger=Threatened(V.State)||Evac>0;}}
   const auto L=Loadout(PC);
   if(L.Weapon==PreviousWeapon&&L.Slot==PreviousSlot&&PreviousMagazine>=0&&L.Magazine>=0&&L.Magazine<PreviousMagazine)Shots+=PreviousMagazine-L.Magazine;
   PreviousMagazine=L.Magazine;PreviousWeapon=L.Weapon;PreviousSlot=L.Slot;
@@ -164,16 +172,23 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
     for(TActorIterator<APawn> It(W);It&&Seen.Num()<31;++It)if(EnemyVisible(P,*It)){
       Seen.Add(*It);auto E=MakeShared<FJsonObject>();E->SetStringField(TEXT("id"),It->GetName());Vector(E,TEXT("position"),It->GetActorLocation());Vector(E,TEXT("velocity"),It->GetVelocity());E->SetNumberField(TEXT("distance"),FVector::Dist(P->GetActorLocation(),It->GetActorLocation()));Enemies.Add(MakeShared<FJsonValueObject>(E));
       Offer(TEXT("engage_")+It->GetName(),TEXT("engage"),P,*It,It->GetActorLocation());
+      RememberedThreats.RemoveAll([&It](const FRememberedThreat& T){return T.Pawn.Get()==*It;});
+      RememberedThreats.Add({It->GetPawnViewLocation(),Time+5000,*It});
     }
+    HasVisibleEnemy=!Seen.IsEmpty();if(HasVisibleEnemy)SearchUntil=0;
     if(Map&&Slot>=0){
       for(auto* D:Map->GetDoorsForRoom(Slot))if(D&&D->LinkedPortal&&!D->bCollapsed&&!D->LinkedPortal->bCollapsed){
         const int32 Dest=D->LinkedPortal->OwnerRoomSlot;
-        Offer(TEXT("portal_")+D->GetName(),TEXT("portal"),P,D,D->GetActorLocation()+D->GetActorForwardVector()*190.f,!Unsafe.Contains(Dest),Dest);
+        // A yellow map warning is a risk, not a physically closed door. A dead
+        // end must still be able to evacuate through an endangered neighbour.
+        const int32 Risk=Risks.FindRef(Dest);
+        Offer(TEXT("portal_")+D->GetName(),TEXT("portal"),P,D,D->GetActorLocation()+D->GetActorForwardVector()*190.f,Risk<4,Dest,0,-1,Risk);
       }
       int32 I=0;for(const auto& C:Map->GetCoverPointsForRoom(Slot)){
-        if(++I>16||Seen.IsEmpty())break;const FVector G=C.Transform.GetLocation();
-        bool Covered=true;for(auto* E:Seen){FHitResult Hit;FCollisionQueryParams Q(SCENE_QUERY_STAT(JevCover),false,P);Q.AddIgnoredActor(E);
-          if(!W->LineTraceSingleByChannel(Hit,E->GetPawnViewLocation(),G+FVector(0,0,65),ECC_Visibility,Q)){Covered=false;break;}}
+        if(++I>16||RememberedThreats.IsEmpty())break;const FVector G=C.Transform.GetLocation();
+        // Last-seen snapshots only: never update an offscreen opponent's position.
+        bool Covered=true;for(const auto& T:RememberedThreats){FHitResult Hit;FCollisionQueryParams Q(SCENE_QUERY_STAT(JevCover),false,P);if(T.Pawn.IsValid())Q.AddIgnoredActor(T.Pawn.Get());
+          if(!W->LineTraceSingleByChannel(Hit,T.Eye,G+FVector(0,0,65),ECC_Visibility,Q)){Covered=false;break;}}
         if(Covered)Offer(FString::Printf(TEXT("cover_%d"),I),TEXT("cover"),P,nullptr,G);
       }
       for(const auto& Weak:Map->GetChestsForRoom(Slot)){auto* C=Cast<AEtcLootChest>(Weak.Get());if(C&&!C->IsOpened()&&(C->ShouldShowOnMap()||Visible(P,C))&&Offered.Num()<90)Offer(TEXT("loot_")+C->GetName(),TEXT("loot"),P,C,C->GetActorLocation());}
@@ -186,7 +201,7 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   auto O=MakeShared<FJsonObject>();O->SetNumberField(TEXT("version"),3);O->SetStringField(TEXT("appId"),TEXT("5272970"));O->SetStringField(TEXT("session"),Session);O->SetStringField(TEXT("matchId"),MatchId);
   O->SetNumberField(TEXT("timestamp"),Time);O->SetNumberField(TEXT("frame"),++Frame);O->SetNumberField(TEXT("processId"),FPlatformProcess::GetCurrentProcessId());O->SetStringField(TEXT("phase"),Phase);O->SetStringField(TEXT("mode"),Mode);O->SetNumberField(TEXT("epoch"),Epoch);O->SetNumberField(TEXT("ack"),Ack);O->SetBoolField(TEXT("foreground"),FApp::HasFocus());O->SetStringField(TEXT("map"),W?W->GetMapName():TEXT("none"));
   auto S=MakeShared<FJsonObject>();Vector(S,TEXT("position"),P?P->GetActorLocation():FVector::ZeroVector);S->SetNumberField(TEXT("health"),FMath::Max(0.f,Health));S->SetNumberField(TEXT("maxHealth"),MaxHealth);S->SetNumberField(TEXT("magazine"),L.Magazine);S->SetNumberField(TEXT("reserve"),L.Reserve);S->SetStringField(TEXT("weapon"),L.Weapon);S->SetBoolField(TEXT("protected"),Protected(W,P));S->SetBoolField(TEXT("traveling"),Traveling(W,P));S->SetBoolField(TEXT("healing"),Items&&Items->IsCasting());S->SetNumberField(TEXT("room"),Slot);S->SetBoolField(TEXT("danger"),Danger);S->SetNumberField(TEXT("evacuationSeconds"),Evac);S->SetNumberField(TEXT("kills"),PC?UEtcMatchResultSubsystem::GetEliminationCount(PC->PlayerState):0);O->SetObjectField(TEXT("self"),S);O->SetArrayField(TEXT("enemies"),Enemies);
-  TArray<TSharedPtr<FJsonValue>> Actions;for(const auto& A:Offered){auto J=MakeShared<FJsonObject>();J->SetStringField(TEXT("id"),A.Id);J->SetStringField(TEXT("kind"),A.Kind);J->SetNumberField(TEXT("distance"),A.Distance);J->SetBoolField(TEXT("safe"),A.Safe);J->SetNumberField(TEXT("destination"),A.Destination);J->SetNumberField(TEXT("rank"),A.Rank);if(A.Target.IsValid())J->SetStringField(TEXT("target"),A.Target->GetName());Actions.Add(MakeShared<FJsonValueObject>(J));}O->SetArrayField(TEXT("actions"),Actions);
+  TArray<TSharedPtr<FJsonValue>> Actions;for(const auto& A:Offered){auto J=MakeShared<FJsonObject>();J->SetStringField(TEXT("id"),A.Id);J->SetStringField(TEXT("kind"),A.Kind);J->SetNumberField(TEXT("distance"),A.Distance);J->SetBoolField(TEXT("safe"),A.Safe);J->SetNumberField(TEXT("destination"),A.Destination);J->SetNumberField(TEXT("rank"),A.Rank);J->SetNumberField(TEXT("destinationRisk"),A.Risk);if(A.Target.IsValid())J->SetStringField(TEXT("target"),A.Target->GetName());Actions.Add(MakeShared<FJsonValueObject>(J));}O->SetArrayField(TEXT("actions"),Actions);
   const int32 Placement=Result?Result->GetLocalPlacement():-1;
   if(Result&&Placement>0&&(Phase==TEXT("dead")||Phase==TEXT("ended"))){auto R=MakeShared<FJsonObject>();R->SetNumberField(TEXT("placement"),Placement);R->SetBoolField(TEXT("won"),Result->HasMatchEnded()&&PC&&Result->GetWinnerPlayerState()==PC->PlayerState);O->SetObjectField(TEXT("result"),R);}else O->SetField(TEXT("result"),MakeShared<FJsonValueNull>());
   auto D=MakeShared<FJsonObject>();D->SetNumberField(TEXT("heldInputs"),SharedBrain.IsValid()?SharedBrain->GetExternalHeldInputs():0);D->SetNumberField(TEXT("shots"),Shots);D->SetBoolField(TEXT("stuck"),SharedBrain.IsValid()&&SharedBrain->GetExternalStatus()==TEXT("blocked"));D->SetNumberField(TEXT("observationMs"),(FPlatformTime::Seconds()-Started)*1000);D->SetStringField(TEXT("lastAction"),LastAction);O->SetObjectField(TEXT("diagnostics"),D);
@@ -252,6 +267,14 @@ bool HasControlLease(const APawn* Pawn){
   return Pawn&&OwnedPawn.Get()==Pawn&&Pawn->GetNetMode()==NM_Standalone&&FApp::HasFocus()
     &&Mode==TEXT("auto")&&Time<=Lease&&Time<=SessionUntil&&Brain
     &&Brain->IsComponentTickEnabled()&&Brain->GetExternalStatus()==TEXT("running");
+}
+void UpdateAwarenessLook(APawn* Pawn,float DeltaTime){
+  if(!HasControlLease(Pawn)||HasVisibleEnemy||Now()>SearchUntil||Active.Kind==TEXT("engage"))return;
+  auto* PC=Cast<APlayerController>(Pawn->GetController());if(!PC)return;
+  // Damage supplies no omniscient bearing. Search a bounded full circle while
+  // PathFollowing continues retreat in world space, through normal player view.
+  SearchYaw+=180.f*FMath::Clamp(DeltaTime,0.f,.1f);
+  PC->SetControlRotation(FRotator(0,SearchYaw,0));
 }
 void Install(){
   if(IsRunningCommandlet()||IsRunningDedicatedServer()||Handle.IsValid())return;

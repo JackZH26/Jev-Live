@@ -1,7 +1,9 @@
 param([int]$SmokeProcessId,[string]$ExpectedExe)
 $ErrorActionPreference='Stop'
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class JevCandidateTitle { [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern bool SetWindowText(IntPtr h,string title); }'
 $smoke=Get-Process -Id $SmokeProcessId
 if($smoke.Path -ne $ExpectedExe){throw 'Unexpected candidate process'}
+[JevCandidateTitle]::SetWindowText($smoke.MainWindowHandle,'JEV Hybrid Acceptance')|Out-Null
 Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class JevCandidateFocus { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint id); [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId(); [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a,uint b,bool join); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h,int n); }'
 [uint32]$focusProcessId=0
 $focusThread=[JevCandidateFocus]::GetWindowThreadProcessId([JevCandidateFocus]::GetForegroundWindow(),[ref]$focusProcessId)

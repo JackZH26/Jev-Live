@@ -10,7 +10,7 @@ ETC 开发者把原生接入编译进游戏；玩家仍从 Steam 库启动 Enter
 ./Tools/Build.bat LyraGame Shipping
 ```
 
-安装器先检查 `shared-controller.patch` 和 `room-control.patch`，复用现有 Bot Brain / Aim 及房间逐帧移动，再复制 Bridge、控制器适配层和测试源码到 EtcCore。重复安装会检测已应用补丁；源码冲突时停止，要求人工审查。保留模块 Install/Uninstall hook。旧版 Steam v3 桥接不具备 `shared-bot-v1` 能力时，Studio 继续使用原策略，不会假装新执行器已部署。
+安装器先检查 `shared-controller.patch`、`room-control.patch`、`awareness.patch` 和 `pendulum-path.patch`，复用现有 Bot Brain / Aim 及房间逐帧移动，再复制 Bridge、控制器适配层和测试源码到 EtcCore。重复安装会检测已应用补丁；源码冲突时停止，要求人工审查。保留模块 Install/Uninstall hook。旧版 Steam v3 桥接不具备 `shared-bot-v1` 能力时，Studio 继续使用原策略，不会假装新执行器已部署。
 
 玩家保持 PlayerController、镜头和 HUD，共用 UE PathFollowing 与 Bot 的武器、危险处理、无位移检测。Jev 负责带有效期的战术目标。本机约 20 Hz 续期；相同目标不重启路径。原有 Bot 的战略逻辑仍保持独立。
 
@@ -27,4 +27,8 @@ npm run build
 npx electron scripts/validate-hybrid-local.cjs --candidate <含artifact.json的候选目录> --jev --seconds 1800 --requests 1200
 ```
 
-此脚本校验游戏可执行文件哈希、启动独立游戏窗口及桥接，读取本机加密保存的 Jev Key。首次将自己的游戏窗口置前，之后失焦即停止；不会绑定 OBS。每局记录在被 Git 忽略的 `test-results`。只有正式结算才算完成，超时或调用预算耗尽返回退出码 2。单局最多一小时、2400 次调用；省略 `--jev` 使用本地规则基线。
+此脚本校验游戏可执行文件哈希、启动独立游戏窗口及桥接，读取本机加密保存的 Jev Key。首次将自己的游戏窗口置前，之后失焦即停止；不会绑定 OBS。每局记录在被 Git 忽略的 `test-results`。只有正式结算才算完成，超时或调用预算耗尽返回非零退出码。单局最多一小时、2400 次调用；省略 `--jev` 使用本地规则基线。
+
+受伤后保留 5 秒威胁记忆，避免丢失视野时反复停下治疗；原生镜头进行有界搜索，掩体仅参考曾经可见的位置快照。测试使用独立的 Saved 配置和普通低光影画质，保留原视距，不修改用户的 Steam 设置或 Bot 数值。
+
+`node scripts/hybrid-streak.cjs` 从所有本地记录按时间重建连续胜利账本，写入忽略目录 `test-results/hybrid-streak.json`。必须同一原生程序、策略、画质及验收程序版本连续两场正式第一名，并确认 Jev 参与和手动释放；失败、中断和版本变化清零。`destinationRisk` 来自正常小地图状态：0 安全、1 预警、2 已有危险、4 已关闭；关闭出口不可执行，其他风险由战术与撤离规则判断。

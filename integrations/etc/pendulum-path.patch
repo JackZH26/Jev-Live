@@ -1,0 +1,19 @@
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom007PendulumHazard.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom007PendulumHazard.cpp
+@@ -1,6 +1,7 @@
+ #include "Rooms/EtcRoom007PendulumHazard.h"
+ #include "Rooms/EtcRoom007Navigation.h"
+ #include "AIController.h"
++#include "Development/EtcJevController.h"
+ #include "NavigationSystem.h"
+ #include "Navigation/PathFollowingComponent.h"
+ #include "GameFramework/CharacterMovementComponent.h"
+@@ -358,6 +359,8 @@
+                 const int32 Index=Following->GetCurrentPathIndex()+1;
+                 if(Points.IsValidIndex(Index)) G=Transform.InverseTransformPosition(Points[Index].Location);
+             }
++    if(C->IsPlayerControlled() && EtcJevController::MayDrivePawn(C))
++        G=Transform.InverseTransformPosition(EtcJevController::NextPathCorner(C->GetController(),Goal));
+     G.Z=P.Z;
+     const FVector End=EtcRoom007::CrossingEnd(Balls,P,G,Speed,Radius);
+     const bool bCanWait=EtcRoom007::PathIsSafe(Balls,P,P,Time,Speed,Radius+35,Half,0.,1.35);
