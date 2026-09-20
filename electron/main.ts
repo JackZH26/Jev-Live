@@ -43,7 +43,7 @@ function handler(name:string,fn:(arg:any)=>Promise<any>,operation?:string) {
 }
 function allowedExternal(raw:string) {
   const u=new URL(raw);
-  if(u.protocol!=='https:' || u.port || u.username || u.password || !['www.youtube.com','studio.youtube.com','www.twitch.tv','dev.twitch.tv','console.cloud.google.com','docs.typesafe.ai','developers.google.com','x.com'].includes(u.hostname))throw new Error(message('error.external'));
+  if(u.protocol!=='https:' || u.port || u.username || u.password || !['www.youtube.com','studio.youtube.com','www.twitch.tv','dev.twitch.tv','console.cloud.google.com','docs.typesafe.ai','developers.google.com','x.com','studio.x.com'].includes(u.hostname))throw new Error(message('error.external'));
   return u.href;
 }
 

@@ -3,7 +3,7 @@ import { Store } from './storage';
 import { message } from '../shared/i18n';
 import type { XSourceSummary } from '../shared/types';
 
-export const xStudioUrl='https://x.com/i/live-studio';
+export const xStudioUrl='https://studio.x.com/live';
 // Only X's ingest hosts. Never pass arbitrary user-supplied URLs to an encoder.
 export function validXServer(value:string) {
   try {

@@ -44,3 +44,8 @@ models/
 host-assets/
 host-audio/
 host.json
+__pycache__/
+*.py[cod]
+*.safetensors
+voice-models/
+.venv/

@@ -6,12 +6,12 @@ import { OAuth } from './oauth';
 import { Chat } from './chat';
 import { Speech } from './speech';
 import { generateHostText, warmHostModel } from './host-model';
-import { hostConfigSchema, type HostConfig, type HostSnapshot, type ChatMessage, type Utterance, type OverlayState } from '../shared/hosting';
+import { hostConfigSchema, blankOverlay, type HostConfig, type HostSnapshot, type ChatMessage, type Utterance, type OverlayState } from '../shared/hosting';
 import { providers, type Provider } from '../shared/types';
 export class Hosting {
  config=hostConfigSchema.parse({});running=false;warming=false;error='';utterance:Utterance|null=null;
  readonly chat:Chat;readonly speech:Speech;voices:HostSnapshot['voices']=[];
- readonly stats={startedAt:0,generated:0,spoken:0,replies:0,failures:0};readonly overlay=Object.fromEntries(providers.map(p=>[p,{lastSeen:0,audioStarted:0,audioErrors:0}])) as HostSnapshot['overlay'];
+ readonly stats={startedAt:0,generated:0,spoken:0,replies:0,failures:0};readonly overlay=Object.fromEntries(providers.map(p=>[p,blankOverlay()])) as HostSnapshot['overlay'];
  private controller?:AbortController;private timer?:ReturnType<typeof setInterval>;private pending:ChatMessage[]=[];private history:string[]=[];private hourly:number[]=[];private lastComment=0;private lastReply=0;private busy=false;
  readonly assets:string;private audio=new Map<string,Buffer>();
  constructor(private store:Store,auth:OAuth,private context:()=>string,private youtubeId:()=>string|undefined){this.assets=join(store.directory,'host-assets');this.speech=new Speech(join(store.directory,'host-audio'));this.chat=new Chat(auth,m=>{if(this.running&&Date.now()-m.at<60000){this.pending.push(m);if(this.pending.length>12)this.pending.shift();}});}

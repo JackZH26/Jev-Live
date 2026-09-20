@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Hosting } from './hosting';
 import { providers, type Provider } from '../shared/types';
+import { recordOverlayEvent } from '../shared/overlay-health';
 export class OverlayServer {
  private server?:Server;private token=randomBytes(24).toString('hex');private origin='';
  constructor(private host:Hosting,private dist:string){}
@@ -15,7 +16,7 @@ export class OverlayServer {
   if(['avatar','audio'].includes(parts[1])&&req.method==='GET'&&['null','http://127.0.0.1:5173'].includes(req.headers.origin??'')){res.setHeader('Access-Control-Allow-Origin',req.headers.origin!);res.setHeader('Vary','Origin');}
   if(parts[1]==='view'&&providers.includes(p)&&req.method==='GET'){res.setHeader('Content-Type','text/html; charset=utf-8');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'");res.end((await readFile(join(this.dist,'overlay.html'),'utf8')).replaceAll('./assets/','/assets/'));return;}
   if(parts[1]==='state'&&providers.includes(p)&&req.method==='GET'){this.host.overlay[p].lastSeen=Date.now();res.setHeader('Content-Type','application/json');res.end(JSON.stringify(this.host.forOutput(p)));return;}
-  if(parts[1]==='ack'&&providers.includes(p)&&req.method==='POST'){if(req.headers.origin!==this.origin)return fail(403);if(url.searchParams.get('kind')==='error')this.host.overlay[p].audioErrors++;else this.host.overlay[p].audioStarted++;res.end('{}');return;}
+  if(parts[1]==='ack'&&providers.includes(p)&&req.method==='POST'){if(req.headers.origin!==this.origin)return fail(403);const kind=url.searchParams.get('kind')??'started';if(!recordOverlayEvent(this.host.overlay[p],kind==='error'?'audioError':kind,url.searchParams.get('code')??'legacy'))return fail(400);res.end('{}');return;}
   if(parts[1]==='audio'&&/^[a-f0-9]{32}\.wav$/.test(parts[2])&&req.method==='GET'){const data=this.host.audioData(parts[2]);if(!data)return fail(404);res.setHeader('Content-Type','audio/wav');res.end(data);return;}
   if(parts[1]==='avatar'&&parts[2]===this.host.config.avatar.asset&&parts[2]&&req.method==='GET'){res.setHeader('Content-Type',parts[2].endsWith('.vrm')?'model/gltf-binary':parts[2].endsWith('.png')?'image/png':parts[2].endsWith('.webp')?'image/webp':'image/jpeg');res.end(await readFile(join(this.host.assets,parts[2])));return;}
   fail(404);
