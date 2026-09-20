@@ -4,6 +4,8 @@
 
 2026-09-20 · 0.1.0 developer preview.
 
+> This preserves historical Phase 1 evidence. Test counts, X frame rate, the old autoplay path and statements that avatars are future work have since changed; they do not describe all current functionality. See [overall progress](REMAINING_WORK.en.md), [hosting acceptance](HOSTING.en.md) and [ETC autoplay](ETC_AUTOPLAY.en.md). Historical platform-ingest evidence still applies only to the recorded build and scope.
+
 The current flow is **add/select from Steam → installed Steam game → select YouTube / Twitch / X outputs**. First target: Enter the Cube Playtest, AppID 5272970, installed candidate build 25364079. No development project or editor is required.
 
 | Check | Result |

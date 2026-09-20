@@ -91,7 +91,7 @@ Tests cover OAuth callbacks, concurrent refresh, encrypted X source validation, 
 - [Early interactive prototype](prototype/index.html), a concept demo without real streaming
 - [GitHub research snapshot](research/github-snapshot-2026-09-20.json)
 - [Localization guide](docs/I18N.en.md): maintain Chinese and English documentation and all five UI languages with each feature
-- Next: evaluate AIRI avatar/voice integration, automatic commentary/chat, independent overlays and 24-hour recovery testing
+- [Overall progress and remaining work](docs/REMAINING_WORK.en.md): actual platform interaction, endurance findings, natural speech, unattended recovery, simple onboarding and more destinations.
 
 ## License and copyright
 

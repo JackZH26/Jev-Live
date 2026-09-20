@@ -91,7 +91,7 @@ node scripts/smoke-i18n.cjs
 - [早期交互原型](prototype/index.html)（概念演示，不连接真实直播）
 - [GitHub 调研快照](research/github-snapshot-2026-09-20.json)
 - [多语言开发说明](docs/I18N.md)：所有说明文档维护中英两版；新增功能同步提供五语言资源。
-- 后续：AIRI 角色与语音评估、自动解说及评论互动、独立聊天叠加、24 小时故障恢复验收。
+- [整体进展与未完成工作](docs/REMAINING_WORK.md)：真实平台互动验收、长测问题、自然语音、无人值守恢复、简单配置及更多平台。
 
 ## 许可证与版权
 
