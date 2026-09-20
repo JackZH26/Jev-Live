@@ -58,7 +58,13 @@ npm run build
 node scripts/benchmark-local-model.mjs qwen3.5:4b cpu
 ```
 
-Choose another dedicated directory if E does not exist. The setup script refuses to modify an existing server. Weights are not included in the desktop distribution. Restart the service after reboot; this version does not install a Windows service or startup task.
+Choose another dedicated directory if E does not exist. The setup script refuses to modify an existing server. Weights are not included in the desktop distribution. This version does not install a Windows service or startup task. After reboot, use this launcher to start the local service and desktop together:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-studio.ps1 -RuntimeDirectory 'E:\JevRuntime'
+```
+
+The launcher does not start broadcasting or terminate another open build. Exit an older build through its tray menu before launching. The 2026-09-20 build on this PC is `E:\Jev\release\hosting\win-unpacked\JEV Studio.exe`; packaged hosting UI, real CPU model warmup and preservation of manual gameplay have been checked. All 82 tests passed after merging the source branches. Existing accounts remain in the original user-data directory and are never distributed with the package or Git.
 
 In Avatar & automatic host, select Ollama, the loopback endpoint, primary model and CPU. Set persona, language and an installed voice, then save. Starting the host warms the model before connecting chat. Initial GPU warmup allows 120 seconds and can be cancelled; normal requests time out after 45 seconds. Manual and automatic gameplay share this hosting module.
 

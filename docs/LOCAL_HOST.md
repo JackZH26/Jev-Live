@@ -60,7 +60,13 @@ npm run build
 node scripts/benchmark-local-model.mjs qwen3.5:4b cpu
 ```
 
-没有 E 盘时换成自己的专用目录。模型服务已在运行时，安装脚本不会擅自修改该进程。模型不随桌面安装包分发；重启电脑后需重新启动服务。当前版本没有安装系统服务或开机计划任务。
+没有 E 盘时换成自己的专用目录。模型服务已在运行时，安装脚本不会擅自修改该进程。模型不随桌面安装包分发。当前版本没有安装系统服务或开机计划任务；重启电脑后可以使用下面的启动入口，同时启动本地服务和桌面程序：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-studio.ps1 -RuntimeDirectory 'E:\JevRuntime'
+```
+
+启动入口不会自动开播，也不会终止正在运行的旧版。旧窗口打开时，从托盘菜单退出旧版，再运行启动入口。2026-09-20 本机新构建位于 `E:\Jev\release\hosting\win-unpacked\JEV Studio.exe`，已验证打包后的主持页面、真实 CPU 模型预热与手动模式保持；源码合并后 82 项测试通过。旧版账号仍保留在原用户数据目录，不随安装包或 Git 分发。
 
 在“角色与自动主持”设置：Ollama、本机地址、主模型名称、CPU；填写角色性格和语言，选本机声音，保存。点击“启动自动主持”会先预热，完成后开始聊天连接和主持。首次 GPU 预热最多等待 120 秒，可取消；常规生成超时 45 秒。手动玩与自动玩使用同一主持模块。
 
