@@ -49,8 +49,8 @@
       "package.json"
     ],
     "extraResources": [
-      {"from":"LICENSE","to":"licenses/Jev-Live-LICENSE"},
-      {"from":"LICENSE.zh-CN.md","to":"licenses/Jev-Live-LICENSE.zh-CN.md"},
+      {"from":"LICENSE","to":"licenses/LICENSE"},
+      {"from":"LICENSE.zh-CN.md","to":"licenses/LICENSE.zh-CN.md"},
       {"from":"THIRD_PARTY_NOTICES.md","to":"licenses/THIRD_PARTY_NOTICES.md"},
       {"from":"THIRD_PARTY_NOTICES.zh-CN.md","to":"licenses/THIRD_PARTY_NOTICES.zh-CN.md"},
       {"from":"dist-native","to":"dist-native","filter":["**/*","!**/*.pdb"]},

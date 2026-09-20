@@ -52,7 +52,7 @@ class Program
         if(c.op=="enable"){Release();epoch=c.epoch;enabled=true;return;}
         if(c.op=="focus"){if(window!=IntPtr.Zero)SetForegroundWindow(window);return;}
         if(c.op!="action"||!enabled||c.epoch!=epoch||!Foreground())return;
-        Release();deadline=Now()+Math.Clamp(c.duration,20,400);
+        Release();deadline=Environment.TickCount64+Math.Clamp(c.duration,20,400);
         switch(c.action){
           case "forward":Hold(0x57);break;case "back":Hold(0x53);break;
           case "left":Mouse(1,-120,0);break;case "right":Mouse(1,120,0);break;
@@ -65,7 +65,7 @@ class Program
         }
         Interlocked.Increment(ref actionCount);lastAction=c.action;
     }
-    static void InputLoop(){while(running){while(commands.TryDequeue(out var c))Apply(c);if(held.Count>0&&(!Foreground()||Now()>=deadline))Release();Thread.Sleep(10);}Release();}
+    static void InputLoop(){while(running){while(commands.TryDequeue(out var c))Apply(c);if(held.Count>0&&(!Foreground()||Environment.TickCount64>=deadline))Release();Thread.Sleep(10);}Release();}
     static void FindWindow(){
         if(processId!=0){try{var old=Process.GetProcessById(processId);if(!old.HasExited&&old.MainWindowHandle!=IntPtr.Zero){window=old.MainWindowHandle;return;}}catch{}}
         window=IntPtr.Zero;processId=0;
