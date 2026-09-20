@@ -1,4 +1,8 @@
 export const hosting=[
+ ['health.framesStalled','输出帧数已停止增长，请检查 OBS。','輸出影格數已停止增加，請檢查 OBS。','出力フレーム数が停止しています。OBS を確認してください。','출력 프레임 수가 멈췄습니다. OBS를 확인하세요.','Output frames stopped advancing. Check OBS.'],
+ ['health.overlayStale','主持叠加层暂时失去连接。','主持疊加層暫時失去連線。','司会オーバーレイが応答していません。','진행자 오버레이 연결이 끊겼습니다.','Host overlay stopped responding.'],
+ ['health.blackFrame','游戏画面持续接近全黑，请检查采集窗口。','遊戲畫面持續接近全黑，請檢查擷取視窗。','ゲーム映像が暗い状態が続いています。キャプチャを確認してください。','게임 화면이 계속 검게 표시됩니다. 캡처 창을 확인하세요.','Game capture remains almost black. Check the selected window.'],
+ ['health.frozenFrame','游戏画面长时间未变化，可能已暂停或采集冻结。','遊戲畫面長時間未變化，可能已暫停或擷取凍結。','ゲーム映像が長時間変化していません。一時停止またはキャプチャ停止の可能性があります。','게임 화면이 오랫동안 바뀌지 않았습니다. 일시 정지 또는 캡처 정지일 수 있습니다.','Game picture has not changed for a while. It may be paused or capture may have frozen.'],
  ['recover.waiting','等待输出恢复','等待輸出恢復','出力復旧を待機中','출력 복구 대기 중','Waiting for output recovery'],
  ['recover.recovering','正在恢复本路输出','正在恢復本路輸出','この出力を復旧中','이 출력 복구 중','Recovering this output'],
  ['recover.failed','重试已暂停，请检查连接后停止并重新开播','重試已暫停，請檢查連線後停止並重新開播','再試行を中断しました。接続を確認し、配信を停止して再開してください','재시도를 중단했습니다. 연결을 확인한 후 방송을 중지하고 다시 시작하세요','Retries paused. Check the connection, then stop and restart the broadcast'],

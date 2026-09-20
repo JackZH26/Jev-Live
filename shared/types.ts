@@ -39,6 +39,7 @@ export interface Snapshot {
   auth: Partial<Record<Provider, string>>; logs: {at:string; message:string}[];
   broadcast: { youtubeUrl?: string; twitchUrl?: string; state: string };
   recovery?:Partial<Record<Provider,{state:'healthy'|'waiting'|'recovering'|'failed';attempts:number;nextAt:number}>>;
+  health?:Partial<Record<Provider,import('./session-health').HealthIssue[]>>;
 }
 export interface StudioAPI extends HostingAPI {
   preflight():Promise<import('./readiness').ReadinessReport>;

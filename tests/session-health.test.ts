@@ -1,0 +1,6 @@
+import {describe,it,expect} from 'vitest';import {SessionHealth} from '../shared/session-health';import {blankOverlay} from '../shared/hosting';
+const output={active:true,connected:true,ready:true,reconnecting:false,frames:1,skipped:0,bytes:0};
+describe('non-invasive output warnings',()=>{
+ it('detects sustained black, frozen and stalled outputs but clears when stopped',()=>{const monitor=new SessionHealth(),overlay=blankOverlay();monitor.sample('x',output,overlay,false,1000,{signature:'black',black:true});monitor.sample('x',output,overlay,false,40000,{signature:'black',black:true});expect(monitor.issues.x).toEqual(['framesStalled','blackFrame']);monitor.sample('x',{...output,frames:2},overlay,false,190000,{signature:'black',black:true});expect(monitor.issues.x).toEqual(['blackFrame','frozenFrame']);monitor.sample('x',{...output,active:false},overlay,false,191000);expect(monitor.issues.x).toBeUndefined();});
+ it('does not treat a stopped host or native network reconnect as a stall',()=>{const monitor=new SessionHealth();monitor.sample('x',output,blankOverlay(),false,0);monitor.sample('x',{...output,reconnecting:true},blankOverlay(),false,50000);expect(monitor.issues.x).toEqual([]);});
+});

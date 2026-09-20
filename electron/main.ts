@@ -16,6 +16,8 @@ import { OverlayServer } from './overlay-server';
 import {streamChecks,type ReadinessReport} from '../shared/readiness';
 import {neuralHealth} from './neural-speech';
 import {access} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {SessionHealth} from '../shared/session-health';
 import { providers } from '../shared/types';
 import type { Snapshot } from '../shared/types';
 
@@ -26,6 +28,7 @@ if(!app.requestSingleInstanceLock()) app.quit();
 let window:BrowserWindow, tray:Tray, closing=false, busy='',lastError='';
 let store:Store,auth:OAuth,obs:Obs,game:Game,broadcast:Broadcast,xLive:XLive;
 let hosting:Hosting,overlay:OverlayServer;
+const health=new SessionHealth();let healthBusy=false;
 let currentLocale:Locale='zh-CN';
 const logs:Snapshot['logs']=[];
 const log=(message:string)=>{logs.unshift({at:new Date().toISOString(),message});logs.splice(0,logs.length,...logs.slice(0,100));};
@@ -66,7 +69,7 @@ app.whenReady().then(async()=>{
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
   window.webContents.session.setPermissionCheckHandler(()=>false);
-  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,recovery:broadcast.recovery.status,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
+  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,recovery:broadcast.recovery.status,health:health.issues,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
   const gameId=z.string().regex(/^\d+$/).max(12);
   const requireGameIdle=()=>{if(broadcast.state.state!=='idle'||game.gate.mode==='auto')throw new Error(message('error.gameSelectionBusy'));};
   handler('scanSteam',()=>steam.scan(),message('steam.scan'));
@@ -143,6 +146,7 @@ app.whenReady().then(async()=>{
   window.on('close',event=>{if(!closing){event.preventDefault();window.hide();}});
   globalShortcut.register('CommandOrControl+Alt+M',()=>{void game.setMode('manual');window.show();});
   setInterval(()=>{void obs.poll().then(()=>broadcast.monitor());},2000).unref();
+  setInterval(()=>{if(healthBusy)return;healthBusy=true;void (async()=>{for(const p of providers){let picture:{signature:string;black:boolean}|undefined;try{if(obs.states[p].active&&obs.states[p].connected){const image=nativeImage.createFromDataURL(await obs.gamePreview(p)).resize({width:48,height:27}).toBitmap();let sum=0,max=0;for(let i=0;i<image.length;i+=4){const value=(image[i]+image[i+1]+image[i+2])/3;sum+=value;max=Math.max(max,value);}picture={signature:createHash('sha256').update(image).digest('hex'),black:sum/Math.max(1,image.length/4)<3&&max<12};}}catch{}health.sample(p,obs.states[p],hosting.overlay[p],hosting.running,Date.now(),picture);}})().finally(()=>{healthBusy=false;});},10000).unref();
   setInterval(()=>{void auth.validateTwitch().catch(()=>log(message('event.twitchCheck')));},55*60*1000).unref();
   void auth.validateTwitch().catch(()=>log(message('event.twitchStartup')));
   log(message('event.started'));

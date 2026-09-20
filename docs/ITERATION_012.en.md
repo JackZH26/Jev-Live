@@ -46,3 +46,5 @@ The service binds loopback only, rejects external Host/browser Origin headers, d
 `npm run check`, `npm test`, `npm run build`; `node scripts/smoke-overlay-recovery.cjs`, `node scripts/smoke-hosting.cjs`, `node scripts/smoke-setup.cjs`, `node scripts/smoke-recovery.cjs`.
 
 Speech: install isolated dependencies using `scripts/install-local-voice.ps1`; run `services/local_voice.py --model <model-directory> --device cpu` or `cuda:0`. Measure performance and listen before selecting Qwen3-TTS in Studio.
+
+See the [later acceptance update](ACCEPTANCE_2026-09-20.en.md) for platform 1080p60 evidence and the completed older run.

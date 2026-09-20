@@ -46,3 +46,5 @@ CUDA 12.8 / PyTorch 2.10.0 在同时运行旧三路长测及真实 X 输出的�
 `npm run check`、`npm test`、`npm run build`；`node scripts/smoke-overlay-recovery.cjs`、`node scripts/smoke-hosting.cjs`、`node scripts/smoke-setup.cjs`、`node scripts/smoke-recovery.cjs`。
 
 语音：`scripts/install-local-voice.ps1` 安装独立依赖；启动 `services/local_voice.py --model <模型目录> --device cpu` 或 `cuda:0`。先跑性能/听音验收，再在角色与自动主持页面选择 Qwen3-TTS。
+
+[2026-09-20](ACCEPTANCE_2026-09-20.md)
