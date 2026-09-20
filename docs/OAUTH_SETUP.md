@@ -1,5 +1,7 @@
 # 官方 OAuth 一次性配置
 
+[简体中文](OAUTH_SETUP.md) · [English](OAUTH_SETUP.en.md)
+
 软件开发者配置应用，主播通过官方网页登录。不要在聊天或 Git 中发送 Client Secret、Token、Cookie、推流密钥或 OAuth JSON。
 
 ## Google / YouTube

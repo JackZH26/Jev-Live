@@ -1,5 +1,9 @@
 # ETC 本机游戏桥接
 
+[简体中文](README.md) · [English](README.en.md)
+
+**仅为可选开发者集成示例。** 正式工作台通过 Steam 游戏库添加、选择并启动游戏，普通主播不需要游戏源码、编辑器或此 Bridge。该目录保留原型研究代码，当前桌面控制器已改用游戏窗口观察与输入，不再启动开发工程。
+
 Enter the Cube 开发工程的可选集成，使用现有 EtcCoreRuntime / Lyra 接口，不包含游戏内容或 Unreal 源码。
 
 `install.ps1 -Project <工程目录>` 复制 `EtcJevBridge` 两个文件到 `Private/Development`，在模块启动 / 退出各添加一个 hook。只修改这三个集成位置，不改地图。关闭编辑器后，经工程 `Tools/Build.bat` 编译。
