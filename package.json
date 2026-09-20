@@ -1,0 +1,59 @@
+{
+  "name": "jev-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first game automation and dual-platform streaming studio",
+  "license": "MIT",
+  "author": {"name": "JackZH26", "url": "https://github.com/JackZH26"},
+  "repository": {"type": "git", "url": "git+https://github.com/JackZH26/Jev-Live.git"},
+  "homepage": "https://github.com/JackZH26/Jev-Live#readme",
+  "bugs": {"url": "https://github.com/JackZH26/Jev-Live/issues"},
+  "main": "dist-main/electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc -p tsconfig.main.json && vite build",
+    "check": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
+    "test": "vitest run",
+    "start": "electron .",
+    "pack": "npm run build && electron-builder --win dir"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "0.6.0",
+    "obs-websocket-js": "5.0.8",
+    "vue": "3.5.43",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "electron": "44.4.3",
+    "electron-builder": "^26.0.12",
+    "playwright": "^1.63.0",
+    "typescript": "^5.9.3",
+    "vite": "8.3.0",
+    "vitest": "^4.0.0",
+    "vue-tsc": "^3.1.0"
+  },
+  "build": {
+    "appId": "dev.jevstudio.desktop",
+    "productName": "JEV Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-main/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "integrations/etc",
+        "to": "etc"
+      }
+    ],
+    "win": {
+      "target": "dir",
+      "signAndEditExecutable": false
+    }
+  }
+}
