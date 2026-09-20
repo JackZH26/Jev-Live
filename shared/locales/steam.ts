@@ -15,7 +15,7 @@ export const steam=[
  ['steam.experimental','自动游玩 · 实验适配','自動遊玩 · 實驗適配','自動操作 · 実験版','자동 플레이 · 실험적 지원','Autoplay · Experimental'],
  ['steam.manualOnly','手动游玩 · 自动适配待支持','手動遊玩 · 自動適配待支援','手動プレイ · 自動操作は未対応','수동 플레이 · 자동화 미지원','Manual play · Autoplay not yet supported'],
  ['steam.notDetected','未检测到已安装游戏，请先在 Steam 中安装。','未偵測到已安裝遊戲，請先在 Steam 中安裝。','インストール済みゲームがありません。Steam でインストールしてください。','설치된 게임이 없습니다. Steam에서 먼저 설치하세요.','No installed games found. Install a game in Steam first.'],
- ['steam.screenControl','Steam 安装版 · 画面观察与键鼠控制','Steam 安裝版 · 畫面觀察與鍵鼠控制','Steam 版 · 画面観察と入力操作','Steam 설치 버전 · 화면 관찰 및 입력 제어','Steam installation · Screen observation and input control'],
+ ['steam.screenControl','Steam 安装版 · 等待游戏状态','Steam 安裝版 · 等待遊戲狀態','Steam 版 · ゲームの状態を待機','Steam 설치 버전 · 게임 상태 대기','Steam installation · Waiting for game state'],
  ['steam.controlHint','实验自动模式需要游戏位于前台。切出窗口后暂停输入；Ctrl + Alt + M 切回手动。','實驗自動模式需要遊戲位於前景。切換視窗後暫停輸入；Ctrl + Alt + M 切回手動。','実験的な自動操作にはゲームを最前面にしてください。他のウィンドウでは入力を停止。Ctrl + Alt + M で手動に戻れます。','실험적 자동 플레이는 게임이 전면에 있어야 합니다. 창 전환 시 입력이 중단됩니다. Ctrl + Alt + M으로 수동 전환하세요.','Experimental autoplay requires the game in the foreground. Input pauses when focus changes; Ctrl + Alt + M takes over.'],
  ['steam.foreground','请切到游戏窗口，自动操作等待前台焦点','請切到遊戲視窗，自動操作等待前景焦點','ゲーム画面に切り替えてください。自動操作は待機中です','게임 창으로 전환하세요. 자동 입력 대기 중','Switch to the game window; automatic input is waiting for focus'],
  ['steam.observing','正在观察 Steam 游戏画面','正在觀察 Steam 遊戲畫面','Steam ゲーム画面を観察中','Steam 게임 화면 관찰 중','Observing the Steam game window'],

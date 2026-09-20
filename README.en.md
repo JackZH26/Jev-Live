@@ -7,7 +7,7 @@
 
 An open-source virtual streaming studio for your **Steam library**: add installed games, select one to stream, launch through Steam, choose manual or automatic play, and connect YouTube / Twitch through official OAuth or X through an official Live Studio source for OBS multistreaming. The first test game is **Enter the Cube Playtest (Steam AppID 5272970)**, using its Steam installation. Built with Electron, Vue and TypeScript for Windows.
 
-**Status: 0.1.0 developer preview.** The desktop app, Steam library scanning/selection, official OAuth, experimental screen observation/input control and independent OBS outputs are implemented. Real authorization and platform ingestion still need developer applications and streaming accounts. The goal is to progressively support any capturable game; being able to add and stream a game does not establish autonomous gameplay support. Arbitrary-game automation, 24-hour acceptance and a complete virtual host are not claimed.
+**Status: 0.1.0 developer preview.** The current focus is **ETC-specific autoplay**: a native game API, local real-time tactics and optional JEV advice, independent of streaming. The interface is implemented but must ship in a compatible game build before Steam match acceptance. General-purpose autoplay is deferred; esports-level skill, guaranteed wins and 24-hour acceptance are not claimed. Other games retain manual play and streaming.
 
 ## Current features
 
@@ -19,7 +19,7 @@ An open-source virtual streaming studio for your **Steam library**: add installe
 | X streaming | Official Live Studio RTMPS source, encrypted locally; manage livestream events and visibility on X |
 | Credential protection | Windows DPAPI / safeStorage; saved tokens and keys are never returned to the renderer; manually entered X keys clear after submission |
 | Game selection | Scan local Steam libraries; add, select and remove streamed games; launch through Steam |
-| Game control | Experimental Playtest screen-text observation and bounded input, with JEV or a local baseline |
+| Game control | ETC structured observations, real-time player control, local tactics and optional JEV advice; compatible game build required, win rate unmeasured |
 | Manual handover | Mode switching, stale-action rejection and Ctrl + Alt + M takeover |
 | OBS outputs | Any combination of YouTube / Twitch / X; separate game/process-audio capture, 1080p60 for the first two and 1080p30 for X |
 | Stream orchestration | Checks only selected platforms and prepares them before starting; stop/recovery owns only those outputs |
@@ -64,7 +64,7 @@ Google development projects require test users. Channels must have streaming acc
 5. Configure selected destinations, check title and visibility, and start streaming. **YouTube defaults to private; Twitch is public; X visibility and event startup are managed in X Live Studio.** First-time YouTube activation can take 24 hours. Browser sign-in is separate from granting the application OAuth access.
 6. End streaming to stop this session's outputs; if X was selected, also confirm the event has ended on X. Closing the window sends the app to the tray; quitting first stops automatic input and software outputs.
 
-Automation uses the selected installation's game window, Windows OCR and bounded inputs without modifying game files or launching an editor. Keep the game in the foreground; focus loss pauses input, unknown screens wait, and Ctrl + Alt + M takes over. OCR is not complete visual understanding: reliable enemy aiming, obstacle avoidance and arbitrary-game completion are not established. `integrations/etc` remains an optional developer integration example, unnecessary for ordinary streamers.
+Autoplay now targets ETC offline bot matches through a built-in game API and normal player actions. Users still launch from Steam without a source project or editor. Keep the game in the foreground; Ctrl + Alt + M takes over. The old OCR single-action controller is no longer the automatic control path. ETC developers compile `integrations/etc` into the game build; missing API support displays a clear message. See [ETC autoplay design and acceptance](docs/ETC_AUTOPLAY.en.md).
 
 ## Data and security
 

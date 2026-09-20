@@ -4,11 +4,12 @@ import { ui } from '../shared/locales/ui';
 import { runtime } from '../shared/locales/runtime';
 import { steam } from '../shared/locales/steam';
 import { x } from '../shared/locales/x';
+import { etc } from '../shared/locales/etc';
 import { settingsSchema } from '../electron/storage';
 
 describe('five-language contract',()=>{
   it('has unique keys, complete translations and identical interpolation fields',()=>{
-    const rows=[...ui,...runtime,...steam,...x];
+    const rows=[...ui,...runtime,...steam,...x,...etc];
     expect(new Set(rows.map(r=>r[0])).size).toBe(rows.length);
     for(const row of rows){
       expect(row).toHaveLength(locales.length+1);

@@ -33,6 +33,7 @@ export interface Snapshot {
   decision: string; busy: string; lastError: string; hasJevKey: boolean;
   steamGames:SteamGame[]; selectedGame:SteamGame|null;
   decisionStats:{jevRequests:number;jevResponses:number};
+  autoplay:import('./etc').EtcSummary;
   gameInput:{foreground:boolean;heldInputs:number};
   auth: Partial<Record<Provider, string>>; logs: {at:string; message:string}[];
   broadcast: { youtubeUrl?: string; twitchUrl?: string; state: string };

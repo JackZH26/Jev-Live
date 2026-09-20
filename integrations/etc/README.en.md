@@ -1,23 +1,17 @@
-# ETC local game bridge
+# ETC autoplay API v3
 
-[简体中文](README.md) · [English](README.en.md)
+[简体中文](README.md)
 
-**Optional developer integration example only.** The studio adds/selects games from Steam and launches them through Steam. Streamers do not need source code, an editor or this bridge. This directory preserves research prototype code; the current desktop controller observes game windows and sends bounded input instead of launching a development project.
+ETC developers compile this integration into a game build. Players continue adding and launching Enter the Cube Playtest through Steam; no source project or editor is required.
 
-An optional integration for the Enter the Cube development project, using existing EtcCoreRuntime / Lyra interfaces. No game content or Unreal source is included.
+```powershell
+./integrations/etc/install.ps1 -Project <ETC-project-root>
+# In ETC, with the editor closed, follow its build rules
+./Tools/Build.bat LyraGame Shipping
+```
 
-`install.ps1 -Project <project directory>` copies the two `EtcJevBridge` files into `Private/Development` and adds one hook to module startup and shutdown. Only these three integration locations change; maps are untouched. Close the editor and build through the project's `Tools/Build.bat`.
+The installer copies Bridge, Motor and native test files into `EtcCoreRuntime/Private/Development`, retaining module Install/Uninstall hooks. It does not modify maps, assets, weapon data or the Steam installation, and does not publish a Steam update. Package and release through ETC's existing Steam candidate/release workflow.
 
-The studio resolves the engine through `Tools/Engine.bat`, then launches a standalone game with `-game -JevBridgeDir=<user data directory>`. Network matches do not expose control.
+Once included in the installed game, the bridge reads JEV's short-lived session under `%LOCALAPPDATA%/JevLive/etc-bridge`, bound to the actual game PID. JEV targets 20 Hz structured observation/tactical commands; the game executes every frame. Offline bot matches only. Manual mode, focus loss, disconnects and expired commands release automatic input. Never commit session files or tokens.
 
-Protocol v1 uses local JSON mailboxes, all excluded from Git:
-
-- `session.json`: session ID and random authentication token.
-- `state.json`: observations, position, health, phase, candidate actions and acknowledgements, updated approximately every 200 ms.
-- `command.json`: sequence number, epoch, mode, expiry, an action chosen from candidates and authentication information.
-
-Manual handover increases the epoch, cancels JEV requests and releases automatic input. Old epochs, duplicate sequence numbers, expired commands, wrong sessions and non-candidate actions are rejected. Individual actions last at most 1.8 seconds; a missing controller cannot hold movement or firing indefinitely. Expected map transitions suspend decisions until fresh observations return.
-
-Actions include observing, navigation, turning, approaching/opening supply chests, entering revealed portals, shooting visible opponents, reloading, jumping and starting a local bot match. Enemy observations use field-of-view and line-of-sight checks.
-
-Limits: basic tactics; not yet complete for hazardous-room avoidance, post-loot weapon optimization, win-rate benchmarks, online multiplayer or injection into Steam releases. JEV uses the official SDK and abandons timed-out decisions. The keyless local policy provides baseline validation, not a substitute for JEV quality evaluation.
+Native constraints test: `Project.ETC.Jev.PlayerMotor`. See [design and acceptance](../../docs/ETC_AUTOPLAY.en.md) for limitations and testing. Steam Build 25364079 did not connect to v3 during probing; compilation does not establish publication or full-match acceptance.

@@ -5,7 +5,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $root 'Lyra.uproject'))) { throw 'Se
 $module = Join-Path $root 'Plugins\GameFeatures\EtcCore\Source\EtcCoreRuntime'
 $entry = Join-Path $module 'Private\EtcCoreRuntimeModule.cpp'
 $source = [IO.File]::ReadAllText($entry)
-foreach ($file in @('EtcJevBridge.cpp','EtcJevBridge.h')) {
+foreach ($file in @('EtcJevBridge.cpp','EtcJevBridge.h','EtcJevMotor.h','EtcJevMotorTest.cpp')) {
     $dest = Join-Path $module ('Private\Development\' + $file)
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $dest -Force
 }
@@ -18,4 +18,5 @@ if (-not $source.Contains('#include "Development/EtcJevBridge.h"')) {
     if (-not $source.Contains('EtcJevBridge::Install();') -or -not $source.Contains('EtcJevBridge::Uninstall();')) { throw 'Module format changed. Apply the two hooks manually.' }
     [IO.File]::WriteAllText($entry, $source, [Text.UTF8Encoding]::new($false))
 }
+if (-not $source.Contains('EtcJevBridge::Install();') -or -not $source.Contains('EtcJevBridge::Uninstall();')) { throw 'Bridge module hooks are missing. Apply both hooks before building.' }
 Write-Output 'ETC bridge installed. Build through Tools/Build.bat with the editor closed.'

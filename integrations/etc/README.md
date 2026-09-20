@@ -1,23 +1,17 @@
-# ETC 本机游戏桥接
+# ETC 自动玩接口 v3
 
-[简体中文](README.md) · [English](README.en.md)
+[English](README.en.md)
 
-**仅为可选开发者集成示例。** 正式工作台通过 Steam 游戏库添加、选择并启动游戏，普通主播不需要游戏源码、编辑器或此 Bridge。该目录保留原型研究代码，当前桌面控制器已改用游戏窗口观察与输入，不再启动开发工程。
+此目录供 ETC 开发者把原生接口编译进游戏版本。普通玩家从 Steam 库添加并启动 Enter the Cube Playtest，不安装源码或使用编辑器。
 
-Enter the Cube 开发工程的可选集成，使用现有 EtcCoreRuntime / Lyra 接口，不包含游戏内容或 Unreal 源码。
+```powershell
+./integrations/etc/install.ps1 -Project <ETC工程目录>
+# 在 ETC 工程内，关闭编辑器后按工程规则编译
+./Tools/Build.bat LyraGame Shipping
+```
 
-`install.ps1 -Project <工程目录>` 复制 `EtcJevBridge` 两个文件到 `Private/Development`，在模块启动 / 退出各添加一个 hook。只修改这三个集成位置，不改地图。关闭编辑器后，经工程 `Tools/Build.bat` 编译。
+安装器复制 Bridge、Motor 和原生测试文件到 `EtcCoreRuntime/Private/Development`，并保留模块的 Install/Uninstall hook。它不修改游戏地图、资产、武器数据或 Steam 安装文件，也不发布 Steam 更新。游戏版本的打包、Steam 测试分支与发布沿用 ETC 原有发布流程。
 
-软件通过工程 `Tools/Engine.bat` 选择引擎，以 `-game -JevBridgeDir=<用户数据目录>` 启动独立游戏。网络对局不提供控制。
+Steam 安装版包含该接口后，会读取 `%LOCALAPPDATA%/JevLive/etc-bridge` 中 JEV 创建的短期会话，校验实际游戏 PID。JEV 默认 20 Hz 读取结构化状态、发送战术目标，游戏逐帧执行。仅支持本地人机对战；手动、失焦、断线、过期指令均释放自动输入。会话文件和令牌不得入库。
 
-协议 v1 使用本机 JSON 信箱（全部禁止提交）：
-
-- `session.json`：会话 ID 与随机认证令牌。
-- `state.json`：约每 200ms 更新观察状态、位置、生命值、阶段、候选动作和 ACK。
-- `command.json`：序号、epoch、模式、有效期、从候选选择的动作与认证信息。
-
-手动接管增加 epoch、取消 JEV 请求、释放自动输入。旧 epoch、重复序号、过期命令、错误会话和非候选动作不执行。单次动作上限 1.8 秒；控制端消失后不会无限移动或射击。预期地图切换期间暂停决策，恢复新观察后继续。
-
-动作包括观察、导航探索、转向、靠近补给箱并打开、进入已发现传送门、对可见目标射击、装填、跳跃、开始本机人机对战。敌人观察使用视野和视线检查。
-
-边界：基础战术，尚未完成所有危险房间规避、拾取后武器优化、对局胜率基准、网络多人或 Steam 成品自动注入。JEV 使用官方 SDK；超时放弃本轮。无密钥的本地策略用于基本验证，不替代 JEV 质量评测。
+原生约束测试：`Project.ETC.Jev.PlayerMotor`。完整技术设计、限制和验收方法见 [ETC 自动玩设计](../../docs/ETC_AUTOPLAY.md)。当前 Steam Build 25364079 的兼容性探测未连接 v3，不能把本目录的编译成功当作已发布或已完成对局验收。
