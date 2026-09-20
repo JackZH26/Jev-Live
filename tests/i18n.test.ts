@@ -5,11 +5,12 @@ import { runtime } from '../shared/locales/runtime';
 import { steam } from '../shared/locales/steam';
 import { x } from '../shared/locales/x';
 import { etc } from '../shared/locales/etc';
+import { hosting } from '../shared/locales/hosting';
 import { settingsSchema } from '../electron/storage';
 
 describe('five-language contract',()=>{
   it('has unique keys, complete translations and identical interpolation fields',()=>{
-    const rows=[...ui,...runtime,...steam,...x,...etc];
+    const rows=[...ui,...runtime,...steam,...x,...etc,...hosting];
     expect(new Set(rows.map(r=>r[0])).size).toBe(rows.length);
     for(const row of rows){
       expect(row).toHaveLength(locales.length+1);

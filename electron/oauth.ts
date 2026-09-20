@@ -5,7 +5,8 @@ import { Store } from './storage';
 import { ApiError, delay, form, jsonRequest } from './http';
 import type { Account, OAuthProvider as Provider } from '../shared/types';
 
-const scopes = { youtube: 'https://www.googleapis.com/auth/youtube.force-ssl', twitch: 'channel:read:stream_key channel:manage:broadcast' };
+const twitchBaseScopes='channel:read:stream_key channel:manage:broadcast';
+const scopes = { youtube: 'https://www.googleapis.com/auth/youtube.force-ssl', twitch: twitchBaseScopes+' user:read:chat user:write:chat' };
 export interface Credentials { access_token:string; refresh_token:string; expiresAt:number; scope?:string[] | string; clientId:string; account:Account }
 export function createPKCE() {
   const verifier = randomBytes(48).toString('base64url');
@@ -115,7 +116,7 @@ export class OAuth {
       return {id:data.items[0].id,name:data.items[0].snippet.title,connected:true};
     }
     const validated=await jsonRequest('https://id.twitch.tv/oauth2/validate',{headers:{Authorization:`OAuth ${c.access_token}`}});
-    if(validated.client_id!==c.clientId || !scopes.twitch.split(' ').every(s=>validated.scopes?.includes(s))) throw new Error(message('error.twitchScope'));
+    if(validated.client_id!==c.clientId || !twitchBaseScopes.split(' ').every(s=>validated.scopes?.includes(s))) throw new Error(message('error.twitchScope'));
     return {id:validated.user_id,name:validated.login,connected:true};
   }
   async credentials(provider:Provider):Promise<Credentials> {

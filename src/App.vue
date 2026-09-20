@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import HostPanel from './HostPanel.vue';
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
 import { providers, providerNames, type Snapshot, type Settings, type Provider, type OAuthProvider } from '../shared/types';
 import { t as translate, translateMessage, normalizeLocale, type Locale, type MessageKey } from '../shared/i18n';
 const api=window.studio;
 const showLibrary=ref(false),librarySearch=ref('');
-const s=ref<Snapshot>(),edit=ref<Settings>(),page=ref<'studio'|'settings'>('studio');
+const s=ref<Snapshot>(),edit=ref<Settings>(),page=ref<'studio'|'settings'|'host'>('studio');
 const locale=ref<Locale>('zh-CN');
 const languages=[{value:'zh-CN',name:'简体中文'},{value:'zh-TW',name:'繁體中文'},{value:'ja',name:'日本語'},{value:'ko',name:'한국어'},{value:'en',name:'English'}];
 const addedGames=computed(()=>s.value?.steamGames.filter(g=>s.value?.settings.addedSteamGames.includes(g.appId))??[]);
@@ -53,18 +54,19 @@ onUnmounted(()=>clearInterval(timer));
    <div class="workspace"><span class="workspace-icon">✦</span><div>{{t('app.workspace')}}<small>{{t('app.localWorkspace')}}</small></div><span class="chevron">⌄</span></div>
    <div class="nav-label">{{t('nav.workspace')}}</div>
    <button class="nav-item" :class="{chosen:page==='studio'}" @click="page='studio'"><span>▣</span>{{t('nav.studio')}}</button>
+   <button class="nav-item" :class="{chosen:page==='host'}" @click="page='host'"><span>✧</span>{{t('host.title')}}</button>
    <button class="nav-item" :class="{chosen:page==='settings'}" @click="page='settings'"><span>⚙</span>{{t('nav.settings')}}</button>
    <div class="sidebar-bottom"><button class="author-card" @click="open('https://x.com/jackzhj')"><span class="author-x">𝕏</span><span><b>{{t('author.label')}}</b><small>{{t('author.invite')}}</small></span></button><span class="dot"></span>{{t('app.phase')}}<small>{{t('app.features')}}</small><div class="version">JEV STUDIO <span>v0.1.0</span></div></div>
   </aside>
   <main>
-   <header><div class="breadcrumb">{{t('nav.workspace')}} <span>/</span> {{t(page==='studio'?'nav.studio':'nav.settings')}}</div><div class="header-actions"><select id="language" class="language-select" :aria-label="t('app.language')" v-model="locale" @change="changeLocale"><option v-for="item in languages" :value="item.value" :key="item.value">{{item.name}}</option></select><div class="local-badge"><span class="dot"></span>{{t('app.localSecure')}}</div></div></header>
+   <header><div class="breadcrumb">{{t('nav.workspace')}} <span>/</span> {{t(page==='host'?'host.title':page==='studio'?'nav.studio':'nav.settings')}}</div><div class="header-actions"><select id="language" class="language-select" :aria-label="t('app.language')" v-model="locale" @change="changeLocale"><option v-for="item in languages" :value="item.value" :key="item.value">{{item.name}}</option></select><div class="local-badge"><span class="dot"></span>{{t('app.localSecure')}}</div></div></header>
    <div v-if="notice" class="notice" role="alert"><span>{{tr(notice)}}</span><button v-if="youtubeLiveBlocked" class="notice-action" @click="open('https://studio.youtube.com')">{{t('live.youtubeStudio')}}</button><button :aria-label="t('common.closeNotice')" @click="notice=''">×</button></div>
    <template v-if="s">
-    <section class="page-heading"><div><p class="eyebrow">{{t(page==='studio'?'eyebrow.studio':'eyebrow.settings')}}</p><h1>{{t(page==='studio'?'heading.studio':'heading.settings')}}</h1><p class="subtitle">{{t(page==='studio'?'heading.studioSubtitle':'heading.settingsSubtitle')}}</p></div><div v-if="page==='studio'" class="session-status"><span class="dot" :class="{on:active}"></span>{{streamState}}</div></section>
+    <section class="page-heading"><div><p class="eyebrow">{{t(page==='host'?'host.localModel':page==='studio'?'eyebrow.studio':'eyebrow.settings')}}</p><h1>{{t(page==='host'?'host.title':page==='studio'?'heading.studio':'heading.settings')}}</h1><p class="subtitle">{{t(page==='host'?'host.subtitle':page==='studio'?'heading.studioSubtitle':'heading.settingsSubtitle')}}</p></div><div v-if="page==='studio'" class="session-status"><span class="dot" :class="{on:active}"></span>{{streamState}}</div></section>
     <template v-if="page==='studio'">
      <div class="studio-grid"><div class="primary-column">
       <section class="card preview-card">
-       <div class="card-toolbar"><div class="segmented"><button v-for="p in providers" :key="p" :class="{selected:output===p}" @click="output=p;preview='';previewAt=0"><span :class="p">{{icons[p]}}</span> {{providerNames[p]}}</button></div><span class="meta">1920 × 1080 <span>{{output==='x'?30:60}} FPS</span></span></div>
+       <div class="card-toolbar"><div class="segmented"><button v-for="p in providers" :key="p" :class="{selected:output===p}" @click="output=p;preview='';previewAt=0"><span :class="p">{{icons[p]}}</span> {{providerNames[p]}}</button></div><span class="meta">1920 × 1080 <span>{{60}} FPS</span></span></div>
        <div class="preview"><img v-if="preview" :src="preview" :alt="t('preview.alt')"><div v-else class="preview-empty"><div class="cube-icon">◇</div><h2>{{t('preview.title')}}</h2><p>{{t('preview.description')}}</p><button class="light-button" :disabled="!!s.busy" @click="run('obs',()=>api.setupOBS())">{{s.busy?tr(s.busy):t('obs.prepare')}}</button></div><div class="preview-label">{{t(preview?'preview.live':'preview.wait')}} <span>{{output.toUpperCase()}}</span></div></div>
        <div class="capture-row"><select :aria-label="t('capture.select')" v-model="selected"><option value="">{{t('capture.select')}}</option><option v-if="selected&&!windows.some(w=>w.value===selected)" :value="selected">{{selected}}</option><option v-for="w in windows" :key="w.value" :value="w.value">{{w.label}}</option></select><button :disabled="!captureReady" @click="refreshWindows">{{t('common.refresh')}}</button><button :disabled="!selected||!!s.busy" @click="run('capture',()=>api.setCapture(selected))">{{t('common.apply')}}</button></div>
       </section>
@@ -88,6 +90,7 @@ onUnmounted(()=>clearInterval(timer));
      </div></div>
      <section class="card activity-card"><div class="section-title"><h2>{{t('activity.title')}}</h2><span class="meta">{{t('activity.note')}}</span></div><div v-for="(item,i) in s.logs.slice(0,5)" :key="i" class="log-line"><time>{{new Date(item.at).toLocaleTimeString(locale)}}</time><span>{{tr(item.message)}}</span></div></section><p class="phase-note">{{t('app.scope')}}</p>
     </template>
+    <HostPanel v-else-if="page==='host'" :locale="locale"/>
     <div v-else-if="edit" class="settings-grid">
      <section class="card settings-card"><p class="eyebrow">{{t('eyebrow.accounts')}}</p><h2>{{t('settings.accounts')}}</h2><p>{{t('settings.accountHint')}}</p><label>Google Desktop Client ID<input v-model="edit.googleClientId" placeholder="…apps.googleusercontent.com" autocomplete="off"></label><div class="inline-buttons"><button @click="importGoogle">{{t('settings.googleImport')}}</button><button class="text-button" @click="open('https://console.cloud.google.com/apis/credentials')">{{t('settings.googleConsole')}}</button></div><label>Twitch Public Client ID<input v-model="edit.twitchClientId" :placeholder="t('settings.clientPlaceholder')" autocomplete="off"></label><button class="text-button" @click="open('https://dev.twitch.tv/console/apps')">{{t('settings.twitchRegister')}}</button><div class="info-box">{{t('settings.oauthHint')}}</div></section>
      <section id="x-settings" class="card settings-card x-settings"><p class="eyebrow">𝕏 LIVE STUDIO</p><h2>{{t('x.configure')}}</h2><p>{{t('x.setupHint')}}</p><button class="text-button" @click="open('https://x.com/i/live-studio')">{{t('x.openStudio')}}</button><div v-if="s.xSource.configured" class="info-box">{{s.xSource.name}} · {{t('x.savedStatus')}}</div><label>{{t('x.sourceName')}}<input v-model="xName" maxlength="80" autocomplete="off"></label><label>{{t('x.server')}}<input v-model="xServer" type="text" autocomplete="off" spellcheck="false" placeholder="rtmps://…"></label><label>{{t('x.key')}}<input v-model="xKey" type="password" autocomplete="new-password" spellcheck="false" :placeholder="t('x.keyPlaceholder')"></label><div class="inline-buttons"><button class="primary-button" :disabled="active||!!pending||!!s.busy||!xName.trim()||!xServer.trim()||!xKey" @click="saveX">{{t('x.save')}}</button><button v-if="s.xSource.configured" class="text-button" :disabled="active||!!pending||!!s.busy" @click="run('xRemove',()=>api.removeXSource())">{{t('x.remove')}}</button></div><small>{{t('x.localOnly')}}</small></section>

@@ -41,7 +41,7 @@ const assert=require('node:assert/strict');
    assert.deepEqual(next.outputs,initial.outputs);
    await page.locator('[role=alert] button').click();
    await page.screenshot({path:path.join(root,'test-results',`language-${locale}.png`),fullPage:true});
-   await page.locator('.nav-item').nth(1).click();
+   await page.locator('.nav-item').nth(2).click();
    await page.waitForSelector('.settings-grid');
    const save=await page.locator('.next-card .primary-button').innerText();
    assert(!save.includes('settings.'));

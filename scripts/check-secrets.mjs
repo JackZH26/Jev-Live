@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const git=(...args)=>execFileSync('git',args,{encoding:'utf8',maxBuffer:32*1024*1024});
-const blocked=/(^|\/)(\.env(?:\..*)?|client[_-]secret[^/]*\.json|credentials[^/]*\.json|secrets[^/]*\.json|vault\.bin|oauth[^/]*\.json|tokens?[^/]*\.json|session\.json|command\.json|state\.json|service\.json(?:\.bak)?|\.local|runtime|recordings|game-session|obs|node_modules|dist-main|release)(\/|$)|\.(pem|p12|pfx|key|keystore|token|dmp)$/i;
+const blocked=/(^|\/)(\.env(?:\..*)?|client[_-]secret[^/]*\.json|credentials[^/]*\.json|secrets[^/]*\.json|vault\.bin|oauth[^/]*\.json|tokens?[^/]*\.json|session\.json|command\.json|state\.json|service\.json(?:\.bak)?|\.local|runtime|models|host-assets|host-audio|host\.json|recordings|game-session|obs|node_modules|dist-main|release)(\/|$)|\.(pem|p12|pfx|key|keystore|token|dmp|gguf)$/i;
 const patterns=[
   /\bgh[pousr]_[A-Za-z0-9]{30,}\b/,
   /\bgithub_pat_[A-Za-z0-9_]{30,}\b/,

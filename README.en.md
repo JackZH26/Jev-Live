@@ -11,7 +11,7 @@ An open-source virtual streaming studio for your **Steam library**: add installe
 
 ## Current features
 
-| Module | Phase 1 implementation |
+| Module | Current developer preview |
 | --- | --- |
 | Desktop studio | Actual OBS previews, platform accounts, game modes, output metrics and activity |
 | YouTube sign-in | Official Google browser authorization, PKCE, random-port loopback callback and offline refresh |
@@ -21,12 +21,12 @@ An open-source virtual streaming studio for your **Steam library**: add installe
 | Game selection | Scan local Steam libraries; add, select and remove streamed games; launch through Steam |
 | Game control | ETC structured observations, real-time player control, local tactics and optional JEV advice; compatible game build required, win rate unmeasured |
 | Manual handover | Mode switching, stale-action rejection and Ctrl + Alt + M takeover |
-| OBS outputs | Any combination of YouTube / Twitch / X; separate game/process-audio capture, 1080p60 for the first two and 1080p30 for X |
+| OBS outputs | Any combination of YouTube / Twitch / X; separate game/process-audio capture, 1080p60 for all three |
 | Stream orchestration | Checks only selected platforms and prepares them before starting; stop/recovery owns only those outputs |
 | Leak prevention | Git exclusions, commit/push scans and GitHub Actions checks |
 | Five languages | 简体中文, 繁體中文, 日本語, 한국어 and English across UI, notices, logs and tray |
 
-Avatars, automatic commentary, chat replies, editable per-platform chat overlays and additional platforms come later. **Autoplay and manual play differ only in who controls the game; both will share automatic voice and text interaction.**
+Original avatars / VRM, per-platform layout editing, local model commentary, local speech and YouTube / Twitch chat connectors are implemented. **Manual and automatic play share the host; only game control differs.** Real platform chat and complete endurance acceptance remain separate checks. See [hosting](docs/HOSTING.en.md) and [local model selection and measurements](docs/LOCAL_HOST.en.md).
 
 ## Run locally
 

@@ -2,12 +2,20 @@
   "name": "jev-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "Open-source virtual streaming studio for Steam libraries, manual or JEV-assisted gameplay and YouTube/Twitch/X multistreaming",
+  "description": "Open-source Steam streaming studio with local AI hosting, editable avatars and YouTube/Twitch/X OBS outputs",
   "license": "MIT",
-  "author": {"name": "JackZH26", "url": "https://x.com/jackzhj"},
-  "repository": {"type": "git", "url": "git+https://github.com/JackZH26/Jev-Live.git"},
+  "author": {
+    "name": "JackZH26",
+    "url": "https://x.com/jackzhj"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JackZH26/Jev-Live.git"
+  },
   "homepage": "https://github.com/JackZH26/Jev-Live#readme",
-  "bugs": {"url": "https://github.com/JackZH26/Jev-Live/issues"},
+  "bugs": {
+    "url": "https://github.com/JackZH26/Jev-Live/issues"
+  },
   "main": "dist-main/electron/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -19,13 +27,18 @@
     "pack": "npm run build && npm run build:native && electron-builder --win dir"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.5",
+    "@grpc/proto-loader": "^0.8.1",
+    "@pixiv/three-vrm": "^3.5.5",
     "@typesafe-ai/sdk": "0.6.0",
     "obs-websocket-js": "5.0.8",
+    "three": "^0.186.0",
     "vue": "3.5.43",
     "zod": "^4.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-vue": "^6.0.0",
     "electron": "44.4.3",
     "electron-builder": "^26.0.12",
@@ -49,11 +62,30 @@
       "package.json"
     ],
     "extraResources": [
-      {"from":"LICENSE","to":"licenses/LICENSE"},
-      {"from":"LICENSE.zh-CN.md","to":"licenses/LICENSE.zh-CN.md"},
-      {"from":"THIRD_PARTY_NOTICES.md","to":"licenses/THIRD_PARTY_NOTICES.md"},
-      {"from":"THIRD_PARTY_NOTICES.zh-CN.md","to":"licenses/THIRD_PARTY_NOTICES.zh-CN.md"},
-      {"from":"dist-native","to":"dist-native","filter":["**/*","!**/*.pdb"]},
+      {
+        "from": "LICENSE",
+        "to": "licenses/LICENSE"
+      },
+      {
+        "from": "LICENSE.zh-CN.md",
+        "to": "licenses/LICENSE.zh-CN.md"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.zh-CN.md",
+        "to": "licenses/THIRD_PARTY_NOTICES.zh-CN.md"
+      },
+      {
+        "from": "dist-native",
+        "to": "dist-native",
+        "filter": [
+          "**/*",
+          "!**/*.pdb"
+        ]
+      },
       {
         "from": "integrations/etc",
         "to": "etc"

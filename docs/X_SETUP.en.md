@@ -24,7 +24,7 @@ Selecting Twitch starts a public stream. All selected destinations must prepare 
 
 ## Encoding and limits
 
-X uses separate OBS with H.264 High, 1920×1080 at 30 fps, AAC 128 kbps and a three-second keyframe interval. Video bitrate follows app settings (6000 kbps by default). This is a conservative preset based on the tested account's encoder panel, not a claim that X only supports 30 fps. Current official help also recommends 1080p60; check the account panel and current documentation for deployment.
+X uses separate OBS with H.264 High, 1920×1080 at 60 fps, AAC 128 kbps and a three-second keyframe interval. Video bitrate follows app settings (6000 kbps by default). The preset now follows current official Live Studio guidance at 60 fps. Stop output and prepare OBS again to update an existing source.
 
 Ordinary X OAuth is not used as a substitute for streaming-source access. Automatic creation/termination of X livestream events and 24-hour rotation are not implemented. X events last at most 24 hours, and timed-out events must be recreated. Short tests do not establish unattended 24-hour reliability.
 

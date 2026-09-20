@@ -11,6 +11,8 @@ import { Steam } from './steam';
 import { Platforms } from './platforms';
 import { Broadcast } from './broadcast';
 import { XLive } from './x-live';
+import { Hosting } from './hosting';
+import { OverlayServer } from './overlay-server';
 import { providers } from '../shared/types';
 import type { Snapshot } from '../shared/types';
 
@@ -20,6 +22,7 @@ if(process.env.JEV_TEST_DATA_DIR)app.setPath('userData',process.env.JEV_TEST_DAT
 if(!app.requestSingleInstanceLock()) app.quit();
 let window:BrowserWindow, tray:Tray, closing=false, busy='',lastError='';
 let store:Store,auth:OAuth,obs:Obs,game:Game,broadcast:Broadcast,xLive:XLive;
+let hosting:Hosting,overlay:OverlayServer;
 let currentLocale:Locale='zh-CN';
 const logs:Snapshot['logs']=[];
 const log=(message:string)=>{logs.unshift({at:new Date().toISOString(),message});logs.splice(0,logs.length,...logs.slice(0,100));};
@@ -34,7 +37,7 @@ function handler(name:string,fn:(arg:any)=>Promise<any>,operation?:string) {
     if(operation && busy) return {ok:false,error:message('error.busy')};
     if(operation)busy=operation;
     try { const data=await fn(arg);return {ok:true,data}; }
-    catch(e) { const errorText=e instanceof Error?e.message:message('error.generic');lastError=errorText.slice(0,500);log(lastError);return {ok:false,error:lastError}; }
+    catch(e) { let errorText=e instanceof Error?e.message:message('error.generic');if(errorText.startsWith('host.'))errorText='@jev:'+JSON.stringify({key:errorText});if(errorText==='speech.unavailable')errorText=message('host.speechError');lastError=errorText.slice(0,500);log(lastError);return {ok:false,error:lastError}; }
     finally {if(operation)busy='';}
   });
 }
@@ -52,6 +55,9 @@ app.whenReady().then(async()=>{
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
   broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log);await game.init();await broadcast.init();
+  hosting=new Hosting(store,auth,()=>JSON.stringify({game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,3000)??'':''}),()=>broadcast.state.youtubeId);
+  await hosting.init();overlay=new OverlayServer(hosting,join(__dirname,'../../dist'));await overlay.start();
+  const applyLayouts=async()=>{for(const p of (await store.settings()).enabledPlatforms)if(obs.states[p].ready)await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);};
   window=new BrowserWindow({width:1480,height:960,minWidth:1080,minHeight:720,backgroundColor:'#f2f3f8',title:'JEV Studio',autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
@@ -98,8 +104,16 @@ app.whenReady().then(async()=>{
   handler('disconnectAccount',async value=>{if(broadcast.state.state!=='idle')throw new Error(message('error.logoutDuringLive'));await auth.disconnect(oauthProvider.parse(value));});
   handler('saveXSource',async value=>{if(broadcast.state.state!=='idle'||obs.states.x.active)throw new Error(message('error.livePending'));await xLive.save(value);log(message('event.xSaved'));},message('busy.xSource'));
   handler('removeXSource',async()=>{if(broadcast.state.state!=='idle'||obs.states.x.active)throw new Error(message('error.livePending'));await obs.clearKey('x');await xLive.remove();},message('busy.xSource'));
-  handler('setupOBS',()=>obs.setup(),message('busy.obs'));
-  handler('windows',()=>obs.windows());handler('setCapture',value=>obs.capture(z.string().min(1).max(1000).parse(value)),message('busy.capture'));
+  handler('setupOBS',async()=>{await obs.setup();await applyLayouts();},message('busy.obs'));
+  handler('windows',()=>obs.windows());handler('setCapture',async value=>{await obs.capture(z.string().min(1).max(1000).parse(value));await applyLayouts();},message('busy.capture'));
+  handler('hostSnapshot',async()=>({...await hosting.snapshot(),assetUrl:overlay.assetURL()}));
+  handler('saveHostConfig',async value=>{await hosting.save(value);await applyLayouts();});
+  handler('saveHostLayouts',async value=>{await hosting.saveLayouts(value);await applyLayouts();});
+  handler('saveHostKey',value=>hosting.key(value));
+  handler('importAvatar',async()=>{if(hosting.running)throw new Error('host.stopFirst');const r=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'Avatar',extensions:['png','webp','jpg','jpeg','vrm']}]});if(r.canceled)return false;await hosting.importAsset(r.filePaths[0]);return true;});
+  handler('startHost',()=>hosting.start());handler('stopHost',async()=>hosting.stop());
+  handler('testHostVoice',async()=>{await hosting.testVoice();return overlay.audioURL();});
+  handler('applyHostLayout',applyLayouts);handler('gamePreview',value=>obs.gamePreview(provider.parse(value)));
   handler('preview',value=>obs.preview(provider.parse(value)));
   handler('launchGame',()=>game.launch(),message('busy.game'));
   handler('setMode',value=>game.setMode(mode.parse(value)));
@@ -123,7 +137,7 @@ app.on('second-instance',()=>{window?.show();window?.focus();});
 app.on('before-quit',event=>{
   if(closing)return;event.preventDefault();
   void (async()=>{
-    try {await game?.close();if(broadcast && broadcast.state.state!=='idle')await broadcast.stop();closing=true;app.quit();}
+    try {hosting?.stop();overlay?.close();await game?.close();if(broadcast && broadcast.state.state!=='idle')await broadcast.stop();closing=true;app.quit();}
     catch {window.show();await dialog.showMessageBox(window,{type:'warning',message:t(currentLocale,'error.quitStreaming')});}
   })();
 });

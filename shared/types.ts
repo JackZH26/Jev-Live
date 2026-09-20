@@ -1,3 +1,4 @@
+import type { HostingAPI } from './hosting';
 export const providers = ['youtube','twitch','x'] as const;
 export type Provider = typeof providers[number];
 export type OAuthProvider = Exclude<Provider,'x'>;
@@ -38,7 +39,7 @@ export interface Snapshot {
   auth: Partial<Record<Provider, string>>; logs: {at:string; message:string}[];
   broadcast: { youtubeUrl?: string; twitchUrl?: string; state: string };
 }
-export interface StudioAPI {
+export interface StudioAPI extends HostingAPI {
   setLocale(locale: import('./i18n').Locale): Promise<void>;
   scanSteam():Promise<SteamGame[]>;
   addSteamGame(appId:string):Promise<void>;

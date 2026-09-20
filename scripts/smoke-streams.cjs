@@ -48,7 +48,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
       const bytes=(await fs.stat(receiver.file)).size;
       const pixel=execFileSync('ffmpeg',['-v','error','-i',receiver.file,'-frames:v','1','-vf','scale=1:1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],{windowsHide:true});
       report.receivers.push({provider:receiver.provider,streams,bytes,pixel:[...pixel]});
-      if(!streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'&&s.width===1920&&s.height===1080&&s.r_frame_rate===(receiver.provider==='x'?'30/1':'60/1'))||!streams.some(s=>s.codec_name==='aac')||bytes<50000)throw new Error(`Insufficient local output: ${receiver.provider}`);
+      if(!streams.some(s=>s.codec_type==='video'&&s.codec_name==='h264'&&s.width===1920&&s.height===1080&&s.r_frame_rate==='60/1')||!streams.some(s=>s.codec_name==='aac')||bytes<50000)throw new Error(`Insufficient local output: ${receiver.provider}`);
       if(receiver.provider==='x'){
         const frames=JSON.parse(execFileSync('ffprobe',['-v','error','-select_streams','v:0','-skip_frame','nokey','-show_entries','frame=best_effort_timestamp_time','-of','json',receiver.file],{encoding:'utf8',windowsHide:true})).frames;
         const times=frames.map(f=>Number(f.best_effort_timestamp_time));const intervals=times.slice(1).map((v,i)=>v-times[i]);

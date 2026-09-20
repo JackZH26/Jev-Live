@@ -1,5 +1,9 @@
 # 第三方声明
 
+本地主持阶段增加：Three.js / three-vrm（MIT，VRM 渲染）、grpc-js / proto-loader（Apache-2.0，YouTube 持续聊天）、Google 文档中的直播聊天协议字段子集（Apache-2.0 示例）。来源分别为 [Three.js](https://github.com/mrdoob/three.js)、[three-vrm](https://github.com/pixiv/three-vrm)、[grpc-node](https://github.com/grpc/grpc-node)、[Google 协议示例](https://developers.google.com/youtube/v3/live/streaming-live-chat)。
+
+Ollama（MIT）与 Qwen3.5-4B / Qwen3-4B-Instruct-2507 权重（Apache-2.0）单独下载，不包含在桌面包内。来源：[Ollama](https://github.com/ollama/ollama)、[Qwen](https://huggingface.co/Qwen)。内置 SVG 角色为本项目原创，适用仓库许可证。导入头像和 VRM 保留各自授权，不上传 Git 或分发；Windows 语音由操作系统提供，不随本项目再分发。设计中讨论的神经 TTS 未打包，也不代表已经验证。
+
 [简体中文](THIRD_PARTY_NOTICES.zh-CN.md) · [English](THIRD_PARTY_NOTICES.md)
 
 Jev-Live / JEV Studio 是独立项目；集成名称表示兼容对象，不代表官方背书。

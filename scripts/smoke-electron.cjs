@@ -15,7 +15,7 @@ const fs = require('node:fs/promises');
     if(await page.evaluate(()=>typeof window.require!=='undefined'))throw new Error('Renderer exposes Node');
     await fs.mkdir(path.join(root,'test-results'),{recursive:true});
     await page.screenshot({path:path.join(root,'test-results','desktop.png'),fullPage:true});
-    await page.locator('.nav-item').nth(1).click();
+    await page.locator('.nav-item').nth(2).click();
     await page.waitForSelector('.settings-grid');
     await page.screenshot({path:path.join(root,'test-results','settings.png'),fullPage:true});
     if(process.argv.includes('--obs')) {

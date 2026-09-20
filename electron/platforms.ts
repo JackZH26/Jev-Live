@@ -4,10 +4,10 @@ import { ApiError, jsonRequest } from './http';
 
 export class Platforms {
   constructor(private auth:OAuth) {}
-  async youtube(path:string,method='GET',body?:unknown) {
+  async youtube(path:string,method='GET',body?:unknown,signal?:AbortSignal) {
     const c=await this.auth.credentials('youtube');
     try {
-      return await jsonRequest(`https://www.googleapis.com/youtube/v3/${path}`,{method,headers:{Authorization:`Bearer ${c.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+      return await jsonRequest(`https://www.googleapis.com/youtube/v3/${path}`,{method,signal,headers:{Authorization:`Bearer ${c.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
     } catch(e) {
       if(e instanceof ApiError && e.status===403 && ['livePermissionBlocked','liveStreamingNotEnabled'].includes(e.code))
         throw new Error(message('error.youtubeLiveUnavailable',{code:e.code}));

@@ -9,7 +9,7 @@ const path=require('node:path'),fs=require('node:fs/promises'),assert=require('n
   const page=await app.firstWindow();await page.waitForSelector('.studio-grid');
   assert.equal(await page.locator('.platform-toggle input').count(),3);
   await page.evaluate(()=>window.studio.selectPlatforms(['x']));
-  await page.locator('.nav-item').nth(1).click();
+  await page.locator('.nav-item').nth(2).click();
   const form=page.locator('#x-settings'),inputs=form.locator('input');
   assert.equal(await inputs.nth(2).getAttribute('type'),'password');
   await inputs.nth(0).fill('Fixture X source');await inputs.nth(1).fill('rtmps://example.org/invalid');await inputs.nth(2).fill('fixture-only-stream-key');

@@ -1,0 +1,5 @@
+import {afterEach,expect,it,vi} from 'vitest';
+import {Obs} from '../electron/obs';
+afterEach(()=>vi.useRealTimers());
+it('waits through starting/reconnecting before claiming an OBS stream is active',async()=>{vi.useFakeTimers();const obs=new Obs({} as any,()=>{});obs.states.twitch.connected=true;let polls=0;(obs as any).clients.twitch={call:vi.fn(async(name:string)=>name==='GetStreamStatus'?{outputActive:++polls>=2,outputReconnecting:polls===2}:undefined)};const start=obs.start('twitch');await vi.advanceTimersByTimeAsync(500);expect(obs.states.twitch.active).toBe(false);await vi.advanceTimersByTimeAsync(500);await start;expect(obs.states.twitch.active).toBe(true);expect(polls).toBe(3);});
+it('reports a timed-out encoder instead of returning a false success',async()=>{vi.useFakeTimers();const obs=new Obs({} as any,()=>{});obs.states.youtube.connected=true;(obs as any).clients.youtube={call:async()=>({outputActive:false,outputReconnecting:false})};const result=obs.start('youtube').catch(e=>e);await vi.advanceTimersByTimeAsync(30000);expect((await result).message).toContain('error.obsStart');expect(obs.states.youtube.active).toBe(false);});

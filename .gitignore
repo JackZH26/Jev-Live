@@ -39,3 +39,8 @@ playwright-report/
 *.dmp
 *.mp4
 *.mkv
+models/
+*.gguf
+host-assets/
+host-audio/
+host.json
