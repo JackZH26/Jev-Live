@@ -12,6 +12,7 @@ The current flow is **add/select from Steam → installed Steam game → select 
 | Production build | `npm run build` passed |
 | Core/security tests | 26 passed: OAuth, refresh, handover, single/dual-output recovery, historical secret scan, Steam manifests and five-language resources |
 | Platform selection | YouTube or Twitch alone needs no other account; stop/crash recovery retains the original selected outputs; five-language UI and selection persistence verified |
+| Local YouTube-only rehearsal | Packaged app loaded the bound account and captured actual Steam Playtest video; 13 accepted JEV decisions in 30 seconds, OBS game-audio peak approximately 0.562, followed by manual handover. Twitch OBS remained off; no output was sent to YouTube |
 | Electron UI | Actual process launch, studio/settings usable, renderer without Node, no page errors |
 | Isolated OBS | Both local OBS 32.2.2 WebSocket connections and window enumeration work |
 | Steam library / selection | Four eligible installed games detected locally; Playtest launches through Steam and binds to the Shipping process; account-owner fields are excluded |

@@ -12,6 +12,7 @@
 | 生产构建 | `npm run build` 通过 |
 | 核心及安全测试 | 26 项通过；OAuth、续期、手动接管、单／双路失败恢复、历史密钥扫描、Steam 清单和五语言资源 |
 | 平台选择 | YouTube 或 Twitch 单路无需另一平台账号；停止与崩溃恢复保留本次所选输出范围；五语言界面与选择持久化已验证 |
+| YouTube 单路本机预演 | 打包程序加载已绑定账号，Steam Playtest 实际画面采集，30 秒内完成 13 次 JEV 有效决策；OBS 游戏音频峰值约 0.562，结束后回到手动。Twitch OBS 未启动；此项没有向 YouTube 推流 |
 | Electron 界面 | 真实进程启动，工作台与设置可用，renderer 无 Node，无页面错误 |
 | 两套隔离 OBS | 本机 OBS 32.2.2 双路 WebSocket 已连接，窗口枚举正常 |
 | Steam 库与选择 | 本机检测到 4 个可添加的已安装游戏；Playtest 从 Steam 正式启动，识别 Shipping 游戏进程；不读取账号所有者字段 |
