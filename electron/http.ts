@@ -1,5 +1,6 @@
+import { message } from '../shared/i18n';
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string) { super(`服务请求失败 (${status}: ${code})`); }
+  constructor(readonly status: number, readonly code: string) { super(message('error.api',{status,code})); }
 }
 export async function jsonRequest<T = any>(url: string, init: RequestInit = {}): Promise<T> {
   const timeout = AbortSignal.timeout(20000);
@@ -15,8 +16,8 @@ export async function jsonRequest<T = any>(url: string, init: RequestInit = {}):
 }
 export function form(values: Record<string,string>) { return { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams(values) }; }
 export const delay = (ms:number, signal?:AbortSignal) => new Promise<void>((resolve,reject) => {
-  if(signal?.aborted) { reject(new Error('操作已取消')); return; }
-  const abort = () => { clearTimeout(timer); reject(new Error('操作已取消')); };
+  if(signal?.aborted) { reject(new Error(message('error.operationCancelled'))); return; }
+  const abort = () => { clearTimeout(timer); reject(new Error(message('error.operationCancelled'))); };
   const timer=setTimeout(()=>{ signal?.removeEventListener('abort',abort); resolve(); },ms);
   signal?.addEventListener('abort',abort,{once:true});
 });

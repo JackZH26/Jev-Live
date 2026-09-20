@@ -2,9 +2,9 @@
   "name": "jev-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first game automation and dual-platform streaming studio",
+  "description": "Open-source virtual streaming studio for Steam libraries, manual or JEV-assisted gameplay and YouTube/Twitch multistreaming",
   "license": "MIT",
-  "author": {"name": "JackZH26", "url": "https://github.com/JackZH26"},
+  "author": {"name": "JackZH26", "url": "https://x.com/jackzhj"},
   "repository": {"type": "git", "url": "git+https://github.com/JackZH26/Jev-Live.git"},
   "homepage": "https://github.com/JackZH26/Jev-Live#readme",
   "bugs": {"url": "https://github.com/JackZH26/Jev-Live/issues"},
@@ -15,7 +15,8 @@
     "check": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
     "test": "vitest run",
     "start": "electron .",
-    "pack": "npm run build && electron-builder --win dir"
+    "build:native": "node scripts/build-native.mjs",
+    "pack": "npm run build && npm run build:native && electron-builder --win dir"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "0.6.0",
@@ -35,8 +36,10 @@
     "vue-tsc": "^3.1.0"
   },
   "build": {
+    "electronDist": "node_modules/electron/dist",
     "appId": "dev.jevstudio.desktop",
     "productName": "JEV Studio",
+    "copyright": "Copyright (c) 2026 JackZH26 and contributors",
     "directories": {
       "output": "release"
     },
@@ -46,6 +49,7 @@
       "package.json"
     ],
     "extraResources": [
+      {"from":"dist-native","to":"dist-native","filter":["**/*","!**/*.pdb"]},
       {
         "from": "integrations/etc",
         "to": "etc"
@@ -53,7 +57,7 @@
     ],
     "win": {
       "target": "dir",
-      "signAndEditExecutable": false
+      "signExecutable": false
     }
   }
 }

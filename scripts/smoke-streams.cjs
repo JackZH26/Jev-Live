@@ -53,6 +53,12 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     console.log(JSON.stringify(report));
   } finally {
     for(const r of receivers){if(r.child.exitCode===null)r.child.kill();}
-    if(app){await app.evaluate(({app})=>app.exit(0));await app.close().catch(()=>{});}
+    if(app){await app.evaluate(({app})=>app.quit());await app.close().catch(()=>{});}
+    // Playwright's job closes child OBS before its deferred scene save may finish.
+    // Remove only our named fixture from the dedicated test profiles, including backups.
+    for(const provider of ['youtube','twitch'])for(const file of ['JEV.json','JEV.json.bak']){
+      const target=path.join(env.JEV_TEST_DATA_DIR,'obs',provider,'config','obs-studio','basic','scenes',file);
+      try{const data=JSON.parse(await fs.readFile(target,'utf8'));data.sources=data.sources.filter(s=>s.name!=='Local RTMP Acceptance');for(const source of data.sources)if(source.settings?.items)source.settings.items=source.settings.items.filter(i=>i.name!=='Local RTMP Acceptance');await fs.writeFile(target,JSON.stringify(data));}catch(e){if(e.code!=='ENOENT')throw e;}
+    }
   }
 })().catch(e=>{console.error(e.message);process.exitCode=1;});

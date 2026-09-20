@@ -9,6 +9,6 @@ async function request(method,path,body){
   if(!r.ok)throw new Error(`GitHub repository update returned ${r.status}`);
   return r.json();
 }
-const updated=await request('PATCH','',{description:'Open-source desktop studio for AI gameplay and multistreaming: JEV control, official YouTube/Twitch OAuth, and isolated OBS outputs. Windows-first early alpha.',homepage:'https://github.com/JackZH26/Jev-Live#readme'});
-await request('PUT','/topics',{names:['ai-gaming','electron','jev','live-streaming','multistreaming','obs-studio','twitch','typescript','vtuber','windows','youtube']});
+const updated=await request('PATCH','',{description:'Open-source virtual streaming studio for your Steam library: add/select games, manual or JEV-assisted play, and YouTube/Twitch streaming. Windows alpha; game support varies.',homepage:'https://github.com/JackZH26/Jev-Live#readme'});
+await request('PUT','/topics',{names:['ai-gaming','electron','jev','live-streaming','multistreaming','obs-studio','steam','twitch','typescript','vtuber','windows','youtube']});
 console.log(JSON.stringify({repository:updated.full_name,description:updated.description,updated:true}));

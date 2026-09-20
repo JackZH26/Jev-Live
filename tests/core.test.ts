@@ -22,7 +22,7 @@ describe('credential boundaries',()=>{
   });
   it('never falls back to plaintext if OS encryption is unavailable',async()=>{
     const base=await storage();const store=new Store(base.directory,{isEncryptionAvailable:()=>false,encryptString:()=>Buffer.alloc(0),decryptString:()=>''});
-    await expect(store.set('secret','fixture')).rejects.toThrow('安全存储');
+    await expect(store.set('secret','fixture')).rejects.toThrow('error.secureStore');
   });
   it('uses a fresh valid PKCE challenge and rejects mismatched state',()=>{
     const a=createPKCE(),b=createPKCE();expect(a.verifier.length).toBeGreaterThanOrEqual(43);expect(a.verifier).not.toBe(b.verifier);
@@ -68,7 +68,7 @@ describe('manual handover',()=>{
 });
 describe('dual-output transaction',()=>{
   async function fixture(){
-    const store=await storage();await store.saveSettings({...await store.settings(),gameWindow:'fixture-window'});
+    const store=await storage();await store.saveSettings({...await store.settings(),gameWindow:'fixture-window',steamAppId:'5272970',addedSteamGames:['5272970']});
     const calls:string[]=[];
     const obs:any={states:{youtube:{connected:true,ready:true,active:false},twitch:{connected:true,ready:true,active:false}},poll:async()=>{},windows:async()=>[{value:'fixture-window'}],service:async(p:string)=>{calls.push(`service:${p}`);},start:async(p:string)=>{calls.push(`start:${p}`);},stop:vi.fn(async(p:string)=>{calls.push(`stop:${p}`);}),clearKey:async()=>{}};
     const auth:any={accounts:async()=>({youtube:{},twitch:{}}),validateTwitch:async()=>{}};
@@ -88,5 +88,8 @@ describe('dual-output transaction',()=>{
   });
   it('does not touch a pre-existing stream when preflight fails',async()=>{
     const f=await fixture();f.obs.states.twitch.active=true;await expect(f.broadcast.start()).rejects.toThrow();expect(f.obs.stop).not.toHaveBeenCalled();expect(f.platforms.finish).not.toHaveBeenCalled();
+  });
+  it('requires a selected library game before creating any broadcast resources',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),steamAppId:''});await expect(f.broadcast.start()).rejects.toThrow('error.steamSelection');expect(f.calls).toEqual([]);
   });
 });

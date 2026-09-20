@@ -20,3 +20,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm run build:native

@@ -1,3 +1,4 @@
+import { message, t, type Locale } from '../shared/i18n';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { Store } from './storage';
@@ -16,12 +17,12 @@ export function equalState(expected:string, actual:string|null) {
 export function officialAuthUrl(raw:string, provider:Provider) {
   const u = new URL(raw);
   const allowed = provider === 'youtube' ? ['accounts.google.com'] : ['www.twitch.tv','id.twitch.tv'];
-  if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.username || u.password || u.port) throw new Error('平台返回了非官方授权地址。');
+  if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.username || u.password || u.port) throw new Error(message('error.authOrigin'));
   return u.href;
 }
 
 /** A fresh random loopback port and single-use state for each Google login. */
-export async function googleCode(clientId:string, open:(url:string)=>Promise<void>, signal:AbortSignal) {
+export async function googleCode(clientId:string, open:(url:string)=>Promise<void>, signal:AbortSignal, locale:Locale='en') {
   const pkce = createPKCE();
   let accept!:(code:string)=>void, decline!:(error:Error)=>void;
   const result = new Promise<string>((resolve,reject)=>{ accept=resolve; decline=reject; });
@@ -33,23 +34,23 @@ export async function googleCode(clientId:string, open:(url:string)=>Promise<voi
     res.setHeader('Content-Type','text/plain; charset=utf-8');
     res.setHeader('Cache-Control','no-store'); res.setHeader('Referrer-Policy','no-referrer');
     if (req.method !== 'GET' || url.pathname !== '/oauth/callback') { res.writeHead(404).end('Not found'); return; }
-    if(used || !equalState(pkce.state,url.searchParams.get('state'))) { res.writeHead(400).end('Invalid login session. Return to JEV Studio.'); return; }
+    if(used || !equalState(pkce.state,url.searchParams.get('state'))) { res.writeHead(400).end(t(locale,'auth.callbackInvalid')); return; }
     used=true;
-    if(url.searchParams.has('error')) { res.end('Login cancelled. You may close this tab.'); decline(new Error('YouTube 授权已取消。')); return; }
+    if(url.searchParams.has('error')) { res.end(t(locale,'auth.callbackCancelled')); decline(new Error(message('error.youtubeCancelled'))); return; }
     const code=url.searchParams.get('code');
-    if(!code || code.length > 4096) { res.writeHead(400).end('Missing code.'); decline(new Error('授权响应缺少有效 code。')); return; }
-    res.end('Authorization received. Return to JEV Studio to finish. You may close this tab.'); accept(code);
+    if(!code || code.length > 4096) { res.writeHead(400).end('Missing code.'); decline(new Error(message('error.authCode'))); return; }
+    res.end(t(locale,'auth.callbackDone')); accept(code);
   });
-  const abort=()=>decline(new Error('登录已取消或超时。'));
+  const abort=()=>decline(new Error(message('error.authExpired')));
   signal.addEventListener('abort',abort,{once:true});
   try {
     await new Promise<void>((resolve,reject)=>{ server.once('error',reject); server.listen(0,'127.0.0.1',resolve); });
     const address=server.address();
-    if(!address || typeof address === 'string') throw new Error('无法创建本机登录回调。');
+    if(!address || typeof address === 'string') throw new Error(message('error.callback'));
     const redirect=`http://127.0.0.1:${address.port}/oauth/callback`;
     const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.search=new URLSearchParams({client_id:clientId,redirect_uri:redirect,response_type:'code',scope:scopes.youtube,state:pkce.state,code_challenge:pkce.challenge,code_challenge_method:'S256',access_type:'offline',prompt:'consent'}).toString();
-    if(signal.aborted) throw new Error('登录已取消。');
+    if(signal.aborted) throw new Error(message('error.cancelled'));
     await open(officialAuthUrl(url.href,'youtube'));
     return {code:await result, redirect, verifier:pkce.verifier};
   } finally { signal.removeEventListener('abort',abort); server.close(); server.closeAllConnections(); }
@@ -66,23 +67,23 @@ export class OAuth {
   }
   cancel(provider:Provider) { this.pending.get(provider)?.abort(); }
   async login(provider:Provider) {
-    if(this.pending.has(provider)) throw new Error('该平台已有一个登录窗口，请完成或取消后再试。');
+    if(this.pending.has(provider)) throw new Error(message('error.authPending'));
     const settings=await this.store.settings();
     const clientId=provider==='youtube'?settings.googleClientId:settings.twitchClientId;
-    if(!clientId) throw new Error(`请先在开发者设置中配置 ${provider==='youtube'?'Google Desktop':'Twitch Public'} Client ID。`);
+    if(!clientId) throw new Error(message('error.clientNeeded',{provider:provider==='youtube'?'Google Desktop':'Twitch Public'}));
     const controller=new AbortController(); this.pending.set(provider,controller);
     const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(10*60*1000)]);
-    this.status[provider]='等待在官方网页完成授权';
+    this.status[provider]=message('auth.waiting');
     try {
       let tokens:any;
       if(provider==='youtube') {
-        const code=await googleCode(clientId,this.open,signal);
+        const code=await googleCode(clientId,this.open,signal,settings.locale);
         const secret=await this.store.get<string>('google.clientSecret');
         tokens=await jsonRequest('https://oauth2.googleapis.com/token',{...form({client_id:clientId,...(secret?{client_secret:secret}:{}),code:code.code,code_verifier:code.verifier,redirect_uri:code.redirect,grant_type:'authorization_code'}),signal});
       } else {
         const device=await jsonRequest('https://id.twitch.tv/oauth2/device',{...form({client_id:clientId,scopes:scopes.twitch}),signal});
         const url=officialAuthUrl(device.verification_uri,'twitch');
-        this.status.twitch=`在官方网页授权；验证码 ${String(device.user_code).slice(0,20)}`;
+        this.status.twitch=message('auth.code',{code:String(device.user_code).slice(0,20)});
         await this.open(url);
         const deadline=Date.now()+Math.min(Number(device.expires_in)*1000,600000);
         let interval=Math.max(5,Number(device.interval)||5)*1000;
@@ -96,30 +97,30 @@ export class OAuth {
             throw error;
           }
         }
-        if(!tokens) throw new Error('Twitch 授权超时，请重新登录。');
+        if(!tokens) throw new Error(message('error.twitchTimeout'));
       }
       signal.throwIfAborted();
-      if(!tokens.access_token || !tokens.refresh_token) throw new Error('平台没有授予离线续期权限，请重新授权。');
+      if(!tokens.access_token || !tokens.refresh_token) throw new Error(message('error.offlineAccess'));
       const credential:Credentials={...tokens,expiresAt:Date.now()+Number(tokens.expires_in)*1000,clientId,account:{id:'',name:'',connected:true}};
       credential.account=await this.identify(provider,credential);
       signal.throwIfAborted();
       await this.store.set(`oauth.${provider}`,credential);
-      this.log(`${provider==='youtube'?'YouTube':'Twitch'} 官方授权完成。`);
+      this.log(message('event.authorized',{provider:provider==='youtube'?'YouTube':'Twitch'}));
     } finally { this.pending.delete(provider); delete this.status[provider]; }
   }
   private async identify(provider:Provider, c:Credentials):Promise<Account> {
     if(provider==='youtube') {
       const data=await jsonRequest('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:`Bearer ${c.access_token}`}});
-      if(!data.items?.length) throw new Error('该 Google 账号没有 YouTube 频道，请先创建频道再登录。');
+      if(!data.items?.length) throw new Error(message('error.noChannel'));
       return {id:data.items[0].id,name:data.items[0].snippet.title,connected:true};
     }
     const validated=await jsonRequest('https://id.twitch.tv/oauth2/validate',{headers:{Authorization:`OAuth ${c.access_token}`}});
-    if(validated.client_id!==c.clientId || !scopes.twitch.split(' ').every(s=>validated.scopes?.includes(s))) throw new Error('Twitch 授权应用或权限不匹配，请重新登录。');
+    if(validated.client_id!==c.clientId || !scopes.twitch.split(' ').every(s=>validated.scopes?.includes(s))) throw new Error(message('error.twitchScope'));
     return {id:validated.user_id,name:validated.login,connected:true};
   }
   async credentials(provider:Provider):Promise<Credentials> {
     const c=await this.store.get<Credentials>(`oauth.${provider}`);
-    if(!c) throw new Error(`请先登录 ${provider}。`);
+    if(!c) throw new Error(message('error.loginNeeded',{provider}));
     if(c.expiresAt>Date.now()+120000) return c;
     const existing=this.refreshing.get(provider); if(existing) return existing;
     const work=(async()=>{
@@ -136,7 +137,7 @@ export class OAuth {
     if(!await this.store.get('oauth.twitch')) return;
     const c=await this.credentials('twitch');
     try { await this.identify('twitch',c); }
-    catch(e) { if(e instanceof ApiError && e.status===401) { await this.store.set('oauth.twitch',undefined); this.log('Twitch 授权已失效，请重新登录。'); } else throw e; }
+    catch(e) { if(e instanceof ApiError && e.status===401) { await this.store.set('oauth.twitch',undefined); this.log(message('event.twitchInvalid')); } else throw e; }
   }
   async disconnect(provider:Provider) {
     this.cancel(provider);
@@ -148,8 +149,8 @@ export class OAuth {
       const endpoint=provider==='youtube'?'https://oauth2.googleapis.com/revoke':'https://id.twitch.tv/oauth2/revoke';
       try {
         const response=await fetch(endpoint,{...form({token:provider==='youtube'?c.refresh_token:c.access_token,...(provider==='twitch'?{client_id:c.clientId}:{})}),signal:AbortSignal.timeout(10000),redirect:'error'});
-        if(!response.ok) this.log('平台撤销授权未完成；本机凭证已清除，可在平台账号设置中撤销访问。');
-      } catch { this.log('平台暂时无法连接；本机凭证已清除，可在平台账号设置中撤销访问。'); }
+        if(!response.ok) this.log(message('event.revokeFailed'));
+      } catch { this.log(message('event.revokeOffline')); }
     }
     await this.store.set(`oauth.${provider}`,undefined);
   }

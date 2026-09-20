@@ -1,3 +1,4 @@
+import { message } from '../shared/i18n';
 import OBSWebSocket from 'obs-websocket-js';
 import { cp, mkdir, access, readFile } from 'node:fs/promises';
 import { join, resolve, relative } from 'node:path';
@@ -22,11 +23,11 @@ export class Obs {
       if(this.states[provider].connected && this.states[provider].ready) continue;
       if(this.states[provider].connected) await this.clients[provider]?.disconnect();
       const root=join(this.store.directory,'obs',provider);
-      if(!relative(source,root).startsWith('..') || source===root) throw new Error('OBS 来源目录不能包含 JEV 数据目录。');
+      if(!relative(source,root).startsWith('..') || source===root) throw new Error(message('error.obsPath'));
       const exe=join(root,'bin','64bit','obs64.exe');
       try { await access(join(root,'jev-copy.complete')); }
       catch {
-        this.log(`正在准备 ${provider} 的隔离 OBS，首次需要复制约 470 MB。`);
+        this.log(message('event.obsCopy',{provider}));
         await mkdir(root,{recursive:true});
         // Only the distribution directories, never the user's existing profiles.
         for(const folder of ['bin','data','obs-plugins']) await cp(join(source,folder),join(root,folder),{recursive:true});
@@ -61,7 +62,7 @@ export class Obs {
           if(launchError) break;await delay(1000);
           try { await client.connect(`ws://127.0.0.1:${port}`,password);connected=true;break; } catch {}
         }
-        if(!connected) throw new Error(`${provider} OBS 未连接，请检查端口 ${port} 或隔离 OBS 日志。`);
+        if(!connected) throw new Error(message('error.obsConnect',{provider,port}));
       }
       this.clients[provider]=client;this.states[provider].connected=true;
       // OBS WebSocket accepts connections before frontend FINISHED_LOADING.
@@ -69,9 +70,9 @@ export class Obs {
       for(let attempt=0;attempt<40;attempt++) {
         try { stream=await client.call('GetStreamStatus');break; } catch {await delay(500);}
       }
-      if(!stream) {this.states[provider].connected=false;throw new Error(`${provider} OBS 初始化未完成，请稍后重试。`);}
+      if(!stream) {this.states[provider].connected=false;throw new Error(message('error.obsInitializing',{provider}));}
       this.states[provider].active=stream.outputActive;
-      if(stream.outputActive) { this.states[provider].ready=true;this.log(`${provider} OBS 已在推流，已恢复监控。`);continue; }
+      if(stream.outputActive) { this.states[provider].ready=true;this.log(message('event.obsResumed',{provider}));continue; }
       const scenes=await client.call('GetSceneList');
       if(!scenes.scenes.some(s=>s.sceneName==='JEV Program')) await client.call('CreateScene',{sceneName:'JEV Program'});
       await client.call('SetCurrentProgramScene',{sceneName:'JEV Program'});
@@ -82,18 +83,18 @@ export class Obs {
       if(!inputs.inputs.some(i=>i.inputName==='ETC Audio')) await client.call('CreateInput',{sceneName:'JEV Program',inputName:'ETC Audio',inputKind:'wasapi_process_output_capture',inputSettings:{window:settings.gameWindow,priority:2},sceneItemEnabled:true});
       await this.fit(provider);
       this.states[provider].ready=true;
-      this.log(`${provider} OBS 已就绪，输出 1080p60。`);
+      this.log(message('event.obsReady',{provider}));
     }
   }
   private client(provider:Provider) {
-    const client=this.clients[provider];if(!client || !this.states[provider].connected) throw new Error(`${provider} OBS 尚未连接。`);return client;
+    const client=this.clients[provider];if(!client || !this.states[provider].connected) throw new Error(message('error.obsDisconnected',{provider}));return client;
   }
   async windows() {
     const result=await this.client('youtube').call('GetInputPropertiesListPropertyItems',{inputName:'ETC Game',propertyName:'window'});
     return result.propertyItems.filter(i=>i.itemEnabled).map(i=>({label:String(i.itemName),value:String(i.itemValue)}));
   }
   async capture(value:string) {
-    if(!(await this.windows()).some(w=>w.value===value)) throw new Error('该游戏窗口已关闭，请刷新后重新选择。');
+    if(!(await this.windows()).some(w=>w.value===value)) throw new Error(message('error.windowGone'));
     for(const provider of ['youtube','twitch'] as const) {
       const client=this.client(provider);
       for(const inputName of ['ETC Game','ETC Audio']) await client.call('SetInputSettings',{inputName,inputSettings:{window:value,priority:2},overlay:true});
@@ -108,7 +109,7 @@ export class Obs {
   }
   async preview(provider:Provider) { return (await this.client(provider).call('GetSourceScreenshot',{sourceName:'JEV Program',imageFormat:'jpg',imageWidth:960,imageCompressionQuality:65})).imageData; }
   async service(provider:Provider,server:string,key:string) {
-    if(!/^rtmps?:\/\//.test(server)) throw new Error('平台未返回有效推流地址。');
+    if(!/^rtmps?:\/\//.test(server)) throw new Error(message('error.destination'));
     await this.client(provider).call('SetStreamServiceSettings',{streamServiceType:'rtmp_custom',streamServiceSettings:{server,key,use_auth:false}});
   }
   async start(provider:Provider) { await this.client(provider).call('StartStream');this.states[provider].active=true; }
@@ -116,7 +117,7 @@ export class Obs {
     const c=this.client(provider); const s=await c.call('GetStreamStatus');
     if(s.outputActive) await c.call('StopStream');
     for(let i=0;i<20;i++) { if(!(await c.call('GetStreamStatus')).outputActive) { this.states[provider].active=false;return; } await delay(500); }
-    throw new Error(`${provider} OBS 还未确认停止，请在 OBS 中检查。`);
+    throw new Error(message('error.obsStop',{provider}));
   }
   async clearKey(provider:Provider) {
     if(this.states[provider].connected && !this.states[provider].active) await this.client(provider).call('SetStreamServiceSettings',{streamServiceType:'rtmp_custom',streamServiceSettings:{server:'rtmp://localhost/disabled',key:'',use_auth:false}});
@@ -127,7 +128,7 @@ export class Obs {
       await Promise.allSettled((['youtube','twitch'] as const).map(async p=>{
         if(!this.states[p].connected)return;
         try { const s=await this.client(p).call('GetStreamStatus');Object.assign(this.states[p],{active:s.outputActive,reconnecting:s.outputReconnecting,frames:s.outputTotalFrames,skipped:s.outputSkippedFrames,bytes:s.outputBytes,error:undefined}); }
-        catch { this.states[p].error='OBS 状态暂时不可用'; }
+        catch { this.states[p].error=message('error.obsStatus'); }
       }));
     } finally { this.polling=false; }
   }

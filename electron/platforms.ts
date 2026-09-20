@@ -1,3 +1,4 @@
+import { message } from '../shared/i18n';
 import { OAuth } from './oauth';
 import { jsonRequest } from './http';
 
@@ -11,14 +12,14 @@ export class Platforms {
     const c=await this.auth.credentials('twitch');
     if(method==='PATCH') {
       const r=await fetch(`https://api.twitch.tv/helix/${path}`,{method,headers:{Authorization:`Bearer ${c.access_token}`,'Client-Id':c.clientId,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000),redirect:'error'});
-      if(!r.ok) throw new Error(`Twitch 频道更新失败 (${r.status})。`);return {};
+      if(!r.ok) throw new Error(message('error.twitchUpdate',{status:r.status}));return {};
     }
     return jsonRequest(`https://api.twitch.tv/helix/${path}`,{method,headers:{Authorization:`Bearer ${c.access_token}`,'Client-Id':c.clientId,'Content-Type':'application/json'}});
   }
   async twitchDestination(title:string) {
     const c=await this.auth.credentials('twitch');
     const result=await this.twitch(`streams/key?broadcaster_id=${encodeURIComponent(c.account.id)}`);
-    if(!result.data?.[0]?.stream_key)throw new Error('Twitch 尚未提供直播推流权限。');
+    if(!result.data?.[0]?.stream_key)throw new Error(message('error.twitchAccess'));
     await this.twitch(`channels?broadcaster_id=${encodeURIComponent(c.account.id)}`,'PATCH',{title});
     return {server:'rtmp://live.twitch.tv/app',key:result.data[0].stream_key,url:`https://www.twitch.tv/${encodeURIComponent(c.account.name)}`};
   }
@@ -37,7 +38,7 @@ export class Platforms {
     else {
       const c=await this.auth.credentials('youtube');
       const r=await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${encodeURIComponent(broadcast)}`,{method:'DELETE',headers:{Authorization:`Bearer ${c.access_token}`},signal:AbortSignal.timeout(20000),redirect:'error'});
-      if(!r.ok && r.status!==404)throw new Error('YouTube 未开始的直播清理失败。');
+      if(!r.ok && r.status!==404)throw new Error(message('error.youtubeCleanup'));
     }
   }
 }

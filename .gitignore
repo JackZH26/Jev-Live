@@ -1,6 +1,9 @@
 node_modules/
 dist/
 dist-main/
+dist-native/
+native/**/bin/
+native/**/obj/
 release/
 .local/
 *.log
