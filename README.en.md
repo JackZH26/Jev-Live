@@ -11,6 +11,8 @@ An open-source virtual streaming studio for your **Steam library**: add installe
 
 ## Current features
 
+Cloud Jev has completed two exploratory Steam runs: API access and target adoption work, while game navigation still prevents complete-match acceptance. See the [cloud validation report](docs/CLOUD_JEV_VALIDATION.en.md).
+
 | Module | Current developer preview |
 | --- | --- |
 | Desktop studio | Actual OBS previews, platform accounts, game modes, output metrics and activity |
