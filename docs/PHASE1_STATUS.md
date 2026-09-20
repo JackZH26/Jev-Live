@@ -22,7 +22,7 @@
 | 五语言与作者入口 | 真实 Electron 验证五语界面／错误、持久化、控制状态不变、1080px 设置页及 X 链接 |
 | Windows 打包 | 生成独立运行目录，实际 exe 内通过界面添加／选择 Playtest 并连接本机观察程序；renderer 无 Node |
 | 本地双路 RTMP | 两路同时发送到本机 FFmpeg 接收器：均为 H.264 1920×1080 60fps + AAC，OBS 两路丢帧均为 0，分别接收约 8.9 / 9.3 MB；不同颜色测试证明画布独立。此测试不证明真实平台收流 |
-| Google / Twitch 实际授权 | Google Desktop OAuth 已完成一次真实授权，并在打包程序重启后读取到绑定频道；Twitch 待实际授权 |
+| Google / Twitch 实际授权 | Google Desktop OAuth 与 Twitch Public Device Code OAuth 均已完成真实授权；Twitch 令牌及推流密钥读取权限验证通过。打包程序重启后两张账号卡片均加载成功，YouTube 私密设置、原有输出勾选及 Steam 游戏选择保留；账号绑定没有启动直播 |
 | YouTube / Twitch 实际接收 | 未完成。YouTube 测试频道处于首次直播开通的约 24 小时等待；未将本地准备或 OAuth 成功当作平台收流验收 |
 | 自动画面理解 | OCR 仅提供文字与菜单坐标，尚无完整敌人定位、可靠瞄准、避障和多局成功率基准；自动支持明确标为实验 |
 | 24 小时稳定性 | 未执行 |

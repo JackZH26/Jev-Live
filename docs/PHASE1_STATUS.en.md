@@ -22,7 +22,7 @@ The current flow is **add/select from Steam → installed Steam game → select 
 | Languages / author | Real Electron checks for all five UI/error languages, persistence, unchanged controls, 1080px settings and the X link |
 | Windows package | Standalone application directory built; its exe adds/selects Playtest through the UI and connects the native observer; renderer remains isolated |
 | Local dual RTMP | Simultaneous FFmpeg loopback receivers: H.264 1920×1080 60fps + AAC on both outputs, zero OBS drops, about 8.9 / 9.3 MB received. Different test colors establish separate canvases, not real-platform ingestion |
-| Actual Google / Twitch authorization | One real Google Desktop OAuth grant completed, with the bound channel loaded after restarting the packaged application; Twitch authorization remains pending |
+| Actual Google / Twitch authorization | Real Google Desktop OAuth and Twitch Public Device Code OAuth grants completed; Twitch token validation and stream-key read permission verified. Both account cards loaded after restarting the packaged app, preserving YouTube Private visibility, the existing output selection and the Steam game selection. Account binding did not start a broadcast |
 | Actual YouTube / Twitch ingestion | Not completed. The YouTube test channel is in the initial approximately 24-hour streaming activation wait; local preparation and OAuth success are not platform-ingestion acceptance |
 | Automatic perception | OCR provides text/menu coordinates only; no complete enemy localization, reliable aiming, obstacle avoidance or multi-match success benchmark. Autoplay is explicitly experimental |
 | 24-hour endurance | Not performed |
