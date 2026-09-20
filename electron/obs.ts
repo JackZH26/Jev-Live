@@ -19,7 +19,7 @@ export class Obs {
     const settings=await this.store.settings();
     const source=resolve(settings.obsDirectory);
     await access(join(source,'bin','64bit','obs64.exe'));
-    for(const provider of ['youtube','twitch'] as const) {
+    for(const provider of settings.enabledPlatforms) {
       if(this.states[provider].connected && this.states[provider].ready) continue;
       if(this.states[provider].connected) await this.clients[provider]?.disconnect();
       const root=join(this.store.directory,'obs',provider);
@@ -90,17 +90,20 @@ export class Obs {
     const client=this.clients[provider];if(!client || !this.states[provider].connected) throw new Error(message('error.obsDisconnected',{provider}));return client;
   }
   async windows() {
-    const result=await this.client('youtube').call('GetInputPropertiesListPropertyItems',{inputName:'ETC Game',propertyName:'window'});
+    const settings=await this.store.settings();
+    const provider=settings.enabledPlatforms.find(p=>this.states[p].connected)??settings.enabledPlatforms[0];
+    const result=await this.client(provider).call('GetInputPropertiesListPropertyItems',{inputName:'ETC Game',propertyName:'window'});
     return result.propertyItems.filter(i=>i.itemEnabled).map(i=>({label:String(i.itemName),value:String(i.itemValue)}));
   }
   async capture(value:string) {
     if(!(await this.windows()).some(w=>w.value===value)) throw new Error(message('error.windowGone'));
-    for(const provider of ['youtube','twitch'] as const) {
+    const settings=await this.store.settings();
+    for(const provider of settings.enabledPlatforms) {
       const client=this.client(provider);
       for(const inputName of ['ETC Game','ETC Audio']) await client.call('SetInputSettings',{inputName,inputSettings:{window:value,priority:2},overlay:true});
       await this.fit(provider);
     }
-    const settings=await this.store.settings(); await this.store.saveSettings({...settings,gameWindow:value});
+    await this.store.saveSettings({...settings,gameWindow:value});
   }
   private async fit(provider:Provider) {
     const client=this.client(provider);

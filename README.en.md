@@ -20,8 +20,8 @@ An open-source virtual streaming studio for your **Steam library**: add installe
 | Game selection | Scan local Steam libraries; add, select and remove streamed games; launch through Steam |
 | Game control | Experimental Playtest screen-text observation and bounded input, with JEV or a local baseline |
 | Manual handover | Mode switching, stale-action rejection and Ctrl + Alt + M takeover |
-| Dual OBS | Two isolated instances capture the game window and its process audio at 1080p60 |
-| Stream orchestration | Retrieves stream settings, prepares both destinations before starting, records recovery state |
+| OBS outputs | Select YouTube only, Twitch only, or both; isolated OBS captures game video and process audio at 1080p60 |
+| Stream orchestration | Checks only selected platforms and prepares them before starting; stop/recovery owns only those outputs |
 | Leak prevention | Git exclusions, commit/push scans and GitHub Actions checks |
 | Five languages | 简体中文, 繁體中文, 日本語, 한국어 and English across UI, notices, logs and tray |
 
@@ -57,10 +57,10 @@ Google development projects require test users. Channels must have streaming acc
 
 1. Install the desired game in Steam. Scanning reads installed games on this computer, not passwords, cookies or the full cloud purchase history.
 2. Under Streamed game, click “Add from Steam library,” add/select **Enter the Cube Playtest**, then “Launch through Steam.” Experimental autoplay becomes available when its window is detected; initial tests use BOT MATCH. Other installed games can be added for manual streaming; automation depends on adaptation status.
-3. Click “Prepare both OBS outputs.” The initial copy uses approximately 1 GB for isolated runtime files without overwriting your original OBS configuration.
-4. Refresh the window list, select the game and click Apply. Check both previews and game-audio meters in the isolated OBS instances.
-5. Sign in to both platforms, check title and visibility, and click “Start both streams.” **YouTube defaults to private; Twitch streams publicly.**
-6. Stop both outputs with “End both streams.” Closing the window sends the app to the tray; “End streams and quit” first stops automatic input and streaming.
+3. Select at least one platform using the channel checkboxes, then click “Prepare selected OBS outputs.” YouTube alone needs no Twitch account. Preparing both outputs initially uses approximately 1 GB of isolated files without overwriting your original OBS configuration.
+4. Refresh the window list, select the game and click Apply. Check the selected previews and game-audio meters. Reapply capture after enabling an additional output.
+5. Sign in to selected platforms, check title and visibility, and click “Start streaming.” **YouTube defaults to private; selecting Twitch broadcasts publicly.** First-time YouTube activation can take 24 hours. Browser sign-in is separate from granting the application OAuth access.
+6. Stop this session’s selected outputs with “End streaming.” Closing the window sends the app to the tray; “End streams and quit” first stops automatic input and streaming.
 
 Automation uses the selected installation's game window, Windows OCR and bounded inputs without modifying game files or launching an editor. Keep the game in the foreground; focus loss pauses input, unknown screens wait, and Ctrl + Alt + M takes over. OCR is not complete visual understanding: reliable enemy aiming, obstacle avoidance and arbitrary-game completion are not established. `integrations/etc` remains an optional developer integration example, unnecessary for ordinary streamers.
 

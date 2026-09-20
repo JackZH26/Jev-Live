@@ -4,13 +4,14 @@
 
 2026-09-20 · 0.1.0 developer preview.
 
-The current flow is **add/select from Steam → installed Steam game → dual OBS outputs**. First target: Enter the Cube Playtest, AppID 5272970, installed candidate build 25364079. No development project or editor is required.
+The current flow is **add/select from Steam → installed Steam game → select one or both OBS outputs**. First target: Enter the Cube Playtest, AppID 5272970, installed candidate build 25364079. No development project or editor is required.
 
 | Check | Result |
 | --- | --- |
 | TypeScript / Vue | `npm run check` passed |
 | Production build | `npm run build` passed |
-| Core/security tests | 22 passed: OAuth, refresh, handover, output recovery, historical secret scan, Steam manifests and five-language resources |
+| Core/security tests | 26 passed: OAuth, refresh, handover, single/dual-output recovery, historical secret scan, Steam manifests and five-language resources |
+| Platform selection | YouTube or Twitch alone needs no other account; stop/crash recovery retains the original selected outputs; five-language UI and selection persistence verified |
 | Electron UI | Actual process launch, studio/settings usable, renderer without Node, no page errors |
 | Isolated OBS | Both local OBS 32.2.2 WebSocket connections and window enumeration work |
 | Steam library / selection | Four eligible installed games detected locally; Playtest launches through Steam and binds to the Shipping process; account-owner fields are excluded |
@@ -20,8 +21,8 @@ The current flow is **add/select from Steam → installed Steam game → dual OB
 | Languages / author | Real Electron checks for all five UI/error languages, persistence, unchanged controls, 1080px settings and the X link |
 | Windows package | Standalone application directory built; its exe adds/selects Playtest through the UI and connects the native observer; renderer remains isolated |
 | Local dual RTMP | Simultaneous FFmpeg loopback receivers: H.264 1920×1080 60fps + AAC on both outputs, zero OBS drops, about 8.9 / 9.3 MB received. Different test colors establish separate canvases, not real-platform ingestion |
-| Actual Google / Twitch authorization | Pending developer applications and official user authorization |
-| Actual YouTube / Twitch ingestion | Not performed; local tests do not automatically publish streams |
+| Actual Google / Twitch authorization | One real Google Desktop OAuth grant completed, with the bound channel loaded after restarting the packaged application; Twitch authorization remains pending |
+| Actual YouTube / Twitch ingestion | Not completed. The YouTube test channel is in the initial approximately 24-hour streaming activation wait; local preparation and OAuth success are not platform-ingestion acceptance |
 | Automatic perception | OCR provides text/menu coordinates only; no complete enemy localization, reliable aiming, obstacle avoidance or multi-match success benchmark. Autoplay is explicitly experimental |
 | 24-hour endurance | Not performed |
 | Avatar, voice and chat | Subsequent phases; not enabled in this preview |

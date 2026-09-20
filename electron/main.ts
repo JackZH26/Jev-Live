@@ -13,6 +13,8 @@ import { Broadcast } from './broadcast';
 import type { Snapshot } from '../shared/types';
 
 app.setName('JEV Studio');
+// Keep an isolated test workspace from claiming the installed application's lock.
+if(process.env.JEV_TEST_DATA_DIR)app.setPath('userData',process.env.JEV_TEST_DATA_DIR);
 if(!app.requestSingleInstanceLock()) app.quit();
 let window:BrowserWindow, tray:Tray, closing=false, busy='',lastError='';
 let store:Store,auth:OAuth,obs:Obs,game:Game,broadcast:Broadcast;
@@ -66,7 +68,9 @@ app.whenReady().then(async()=>{
     if(next.googleClientId!==old.googleClientId) {await store.set('oauth.youtube',undefined);await store.set('google.clientSecret',undefined);}
     if(next.twitchClientId!==old.twitchClientId)await store.set('oauth.twitch',undefined);
     // Selection is changed only by the validated Steam library handlers.
-    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,gameWindow:old.gameWindow});
+    // Newly enabled outputs must capture the selected window before broadcasting.
+    const addedOutput=next.enabledPlatforms.some(p=>!old.enabledPlatforms.includes(p));
+    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,gameWindow:addedOutput?'':old.gameWindow});
     currentLocale=next.locale;updateTray();
   });
   handler('setLocale',async value=>{const locale=z.enum(locales).parse(value);await store.saveSettings({...await store.settings(),locale});currentLocale=locale;updateTray();});

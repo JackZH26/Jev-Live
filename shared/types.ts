@@ -6,6 +6,7 @@ export interface Settings {
   googleClientId: string; twitchClientId: string;
   obsDirectory: string; gameWindow: string; steamAppId:string; addedSteamGames:string[];
   title: string; youtubePrivacy: 'private' | 'unlisted' | 'public';
+  enabledPlatforms: Provider[];
   decisionProvider: 'rules' | 'jev'; decisionIntervalMs: number;
   autoRestart: boolean; bitrate: number;
 }

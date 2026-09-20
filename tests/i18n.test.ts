@@ -33,5 +33,8 @@ describe('five-language contract',()=>{
     for(const locale of locales)expect(settingsSchema.parse({locale}).locale).toBe(locale);
     expect(settingsSchema.safeParse({locale:'de'}).success).toBe(false);
     expect(normalizeLocale('de')).toBe('zh-CN');
+    expect(settingsSchema.parse({}).enabledPlatforms).toEqual(['youtube','twitch']);
+    expect(settingsSchema.safeParse({enabledPlatforms:[]}).success).toBe(false);
+    expect(settingsSchema.safeParse({enabledPlatforms:['youtube','youtube']}).success).toBe(false);
   });
 });

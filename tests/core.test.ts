@@ -73,7 +73,7 @@ describe('dual-output transaction',()=>{
     const obs:any={states:{youtube:{connected:true,ready:true,active:false},twitch:{connected:true,ready:true,active:false}},poll:async()=>{},windows:async()=>[{value:'fixture-window'}],service:async(p:string)=>{calls.push(`service:${p}`);},start:async(p:string)=>{calls.push(`start:${p}`);},stop:vi.fn(async(p:string)=>{calls.push(`stop:${p}`);}),clearKey:async()=>{}};
     const auth:any={accounts:async()=>({youtube:{},twitch:{}}),validateTwitch:async()=>{}};
     const platforms:any={twitchDestination:async()=>({server:'rtmp://fixture',key:'test',url:'https://www.twitch.tv/fixture'}),createYouTubeBroadcast:async()=>({id:'broadcast'}),createYouTubeStream:async()=>({id:'stream',cdn:{ingestionInfo:{ingestionAddress:'rtmp://fixture',streamName:'test'}}}),bind:async()=>{},finish:vi.fn(async()=>{})};
-    return {store,obs,platforms,calls,broadcast:new Broadcast(store,obs,auth,platforms,()=>{})};
+    return {store,obs,auth,platforms,calls,broadcast:new Broadcast(store,obs,auth,platforms,()=>{})};
   }
   it('prepares both destinations before starting and never confuses pushing with platform confirmation',async()=>{
     const f=await fixture();await f.broadcast.start();expect(f.calls.slice(0,4)).toEqual(['service:youtube','service:twitch','start:youtube','start:twitch']);expect(f.broadcast.state.state).toBe('sending');
@@ -91,5 +91,31 @@ describe('dual-output transaction',()=>{
   });
   it('requires a selected library game before creating any broadcast resources',async()=>{
     const f=await fixture();await f.store.saveSettings({...await f.store.settings(),steamAppId:''});await expect(f.broadcast.start()).rejects.toThrow('error.steamSelection');expect(f.calls).toEqual([]);
+  });
+  it('streams YouTube alone without Twitch credentials and leaves a separate Twitch stream untouched',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube']});
+    f.auth.accounts=async()=>({youtube:{},twitch:null});f.auth.validateTwitch=vi.fn(()=>{throw new Error('must not validate Twitch');});
+    f.platforms.twitchDestination=vi.fn(()=>{throw new Error('must not access Twitch');});f.obs.states.twitch.active=true;
+    await f.broadcast.start();expect(f.calls).toEqual(['service:youtube','start:youtube']);
+    expect(f.broadcast.state.platforms).toEqual(['youtube']);expect(f.auth.validateTwitch).not.toHaveBeenCalled();
+    await f.broadcast.stop();expect(f.obs.stop).toHaveBeenCalledTimes(1);expect(f.obs.stop).toHaveBeenCalledWith('youtube');expect(f.platforms.twitchDestination).not.toHaveBeenCalled();
+  });
+  it('supports Twitch alone without creating YouTube resources',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['twitch']});
+    f.auth.accounts=async()=>({youtube:null,twitch:{}});f.obs.states.youtube.ready=false;
+    f.platforms.createYouTubeBroadcast=vi.fn(()=>{throw new Error('must not access YouTube');});
+    await f.broadcast.start();expect(f.calls).toEqual(['service:twitch','start:twitch']);await f.broadcast.stop();
+    expect(f.platforms.createYouTubeBroadcast).not.toHaveBeenCalled();expect(f.platforms.finish).not.toHaveBeenCalled();expect(f.obs.stop).toHaveBeenCalledWith('twitch');
+  });
+  it('recovers the original selected outputs even if settings change after a crash',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube']});await f.broadcast.start();
+    await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['twitch']});
+    const recovered=new Broadcast(f.store,f.obs,f.auth,f.platforms,()=>{});await recovered.init();await recovered.stop();
+    expect(f.obs.stop).toHaveBeenCalledTimes(1);expect(f.obs.stop).toHaveBeenCalledWith('youtube');
+  });
+  it('rolls back only selected outputs and leaves idle stop harmless',async()=>{
+    const f=await fixture();await f.broadcast.stop();expect(f.obs.stop).not.toHaveBeenCalled();
+    await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube']});f.obs.start=async()=>{throw new Error('startup-failed');};
+    await expect(f.broadcast.start()).rejects.toThrow('startup-failed');expect(f.obs.stop).toHaveBeenCalledTimes(1);expect(f.obs.stop).toHaveBeenCalledWith('youtube');
   });
 });

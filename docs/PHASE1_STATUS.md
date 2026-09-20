@@ -4,13 +4,14 @@
 
 2026-09-20 · 0.1.0 开发预览。
 
-当前用户流程为 **Steam 库添加／选择 → Steam 安装版游戏 → OBS 双路**。首测 Enter the Cube Playtest，AppID 5272970，已安装 candidate 构建 25364079；不需要开发工程或编辑器。
+当前用户流程为 **Steam 库添加／选择 → Steam 安装版游戏 → 选择一个或两个 OBS 输出**。首测 Enter the Cube Playtest，AppID 5272970，已安装 candidate 构建 25364079；不需要开发工程或编辑器。
 
 | 检查 | 结果 |
 | --- | --- |
 | TypeScript / Vue | `npm run check` 通过 |
 | 生产构建 | `npm run build` 通过 |
-| 核心及安全测试 | 22 项通过；OAuth、续期、手动接管、双路失败恢复、历史密钥扫描、Steam 清单和五语言资源 |
+| 核心及安全测试 | 26 项通过；OAuth、续期、手动接管、单／双路失败恢复、历史密钥扫描、Steam 清单和五语言资源 |
+| 平台选择 | YouTube 或 Twitch 单路无需另一平台账号；停止与崩溃恢复保留本次所选输出范围；五语言界面与选择持久化已验证 |
 | Electron 界面 | 真实进程启动，工作台与设置可用，renderer 无 Node，无页面错误 |
 | 两套隔离 OBS | 本机 OBS 32.2.2 双路 WebSocket 已连接，窗口枚举正常 |
 | Steam 库与选择 | 本机检测到 4 个可添加的已安装游戏；Playtest 从 Steam 正式启动，识别 Shipping 游戏进程；不读取账号所有者字段 |
@@ -20,8 +21,8 @@
 | 五语言与作者入口 | 真实 Electron 验证五语界面／错误、持久化、控制状态不变、1080px 设置页及 X 链接 |
 | Windows 打包 | 生成独立运行目录，实际 exe 内通过界面添加／选择 Playtest 并连接本机观察程序；renderer 无 Node |
 | 本地双路 RTMP | 两路同时发送到本机 FFmpeg 接收器：均为 H.264 1920×1080 60fps + AAC，OBS 两路丢帧均为 0，分别接收约 8.9 / 9.3 MB；不同颜色测试证明画布独立。此测试不证明真实平台收流 |
-| Google / Twitch 实际授权 | 待开发者应用与用户官方网页授权 |
-| YouTube / Twitch 实际接收 | 未执行；本机测试不自动公开开播 |
+| Google / Twitch 实际授权 | Google Desktop OAuth 已完成一次真实授权，并在打包程序重启后读取到绑定频道；Twitch 待实际授权 |
+| YouTube / Twitch 实际接收 | 未完成。YouTube 测试频道处于首次直播开通的约 24 小时等待；未将本地准备或 OAuth 成功当作平台收流验收 |
 | 自动画面理解 | OCR 仅提供文字与菜单坐标，尚无完整敌人定位、可靠瞄准、避障和多局成功率基准；自动支持明确标为实验 |
 | 24 小时稳定性 | 未执行 |
 | 虚拟人、语音、聊天 | 后续阶段，界面标注未启用 |

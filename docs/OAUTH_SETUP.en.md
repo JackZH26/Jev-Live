@@ -16,6 +16,8 @@ The implementation uses Authorization Code + PKCE S256, random state and a new r
 
 The channel needs streaming access. Testing status, unverified applications and refresh-token lifetime follow Google's current rules. Public distribution requires the branding, privacy policy and verification requested by the console; test-user results cannot establish production readiness.
 
+For a YouTube-only test, select only YouTube in the studio, keep visibility Private, prepare the selected OBS output and apply the Steam game window. No Twitch account is needed. On a channel's first activation, follow the wait countdown in YouTube Studio; successful OAuth binding does not bypass activation. End the test after verifying received video and audio.
+
 ## Twitch
 
 1. Register a **Public** application in the [Twitch developer console](https://dev.twitch.tv/console/apps).
