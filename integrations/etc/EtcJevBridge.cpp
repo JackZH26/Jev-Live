@@ -1,6 +1,8 @@
 // ETC player-visible API v3. Local offline matches only; no gameplay/stat overrides.
 #include "Development/EtcJevBridge.h"
 #include "Development/EtcJevMotor.h"
+#include "Development/EtcJevController.h"
+#include "AI/EtcBotBrainComponent.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -47,18 +49,13 @@ namespace EtcJevBridge {
 namespace {
 FTSTicker::FDelegateHandle Handle;
 FString Directory,Token,Session,MatchId,Mode=TEXT("manual"),LastAction;
+TWeakObjectPtr<UEtcBotBrainComponent> SharedBrain;
 double Epoch=0,Ack=0,Lease=0,NextState=0,NextSession=0,SessionUntil=0,Frame=0;
-double NextPath=0,NextFire=0,FireRelease=0,NextReload=0,FirstSeen=0,ProgressAt=0;
 int32 Shots=0,PreviousMagazine=-1,PreviousSlot=-1,LastRoom=-1;
 FString PreviousWeapon;
 TWeakObjectPtr<APawn> OwnedPawn;
 TWeakObjectPtr<UWorld> ObservedWorld;
-TWeakObjectPtr<AActor> AimTarget;
-FVector ProgressLocation=FVector::ZeroVector,PathGoal=FVector::ZeroVector;
-TArray<FVector> PathPoints;
-int32 PathIndex=1;
-bool SawLiving=false,Stuck=false,AutoCrouched=false;
-TSet<FName> Held;
+bool SawLiving=false;
 struct FAction {
   FString Id,Kind;TWeakObjectPtr<AActor> Target;FVector Goal=FVector::ZeroVector;
   float Distance=0;bool Safe=true;int32 Destination=-1,Rank=0,Slot=-1;
@@ -75,19 +72,18 @@ double Num(const TSharedPtr<FJsonObject>& O,const TCHAR* Key){double V=-1;if(O)O
 void Vector(const TSharedPtr<FJsonObject>& O,const TCHAR* Key,const FVector& V){
   TArray<TSharedPtr<FJsonValue>> A;for(double N:{V.X,V.Y,V.Z})A.Add(MakeShared<FJsonValueNumber>(N));O->SetArrayField(Key,A);
 }
-ULyraAbilitySystemComponent* ASC(APawn* P){return P?Cast<ULyraAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(P)):nullptr;}
-void Input(APawn* P,FName Name,bool Press){
-  const auto Tag=FGameplayTag::RequestGameplayTag(Name,false);auto* A=ASC(P);if(!A||!Tag.IsValid())return;
-  if(Press&&!Held.Contains(Name)){A->AbilityInputTagPressed(Tag);Held.Add(Name);}
-  if(!Press&&Held.Contains(Name)){A->AbilityInputTagReleased(Tag);Held.Remove(Name);}
+void Release(const FString& Reason=TEXT("invalidated")){
+  if(auto* Brain=SharedBrain.Get())Brain->StopExternalControl(Reason);
+  Active=FAction();
 }
-void ReleaseInputs(){
-  const bool AutoJump=Held.Contains(FName(TEXT("InputTag.Jump")));
-  if(auto* A=ASC(OwnedPawn.Get()))for(const FName& Name:Held)A->AbilityInputTagReleased(FGameplayTag::RequestGameplayTag(Name,false));
-  Held.Empty();if(auto* C=Cast<ACharacter>(OwnedPawn.Get())){if(AutoJump)C->StopJumping();if(AutoCrouched)C->UnCrouch();}AutoCrouched=false;
+UEtcBotBrainComponent* Executor(APlayerController* PC){
+  if(!PC)return nullptr;
+  auto* Brain=PC->FindComponentByClass<UEtcBotBrainComponent>();
+  if(!Brain){Brain=NewObject<UEtcBotBrainComponent>(PC);Brain->SetComponentTickEnabled(false);Brain->RegisterComponentWithWorld(PC->GetWorld());}
+  auto* Aim=PC->FindComponentByClass<UEtcBotAimComponent>();
+  if(!Aim){Aim=NewObject<UEtcBotAimComponent>(PC);Aim->SetDifficulty(EEtcBotTier::Pro);Aim->RegisterComponentWithWorld(PC->GetWorld());}
+  SharedBrain=Brain;return Brain;
 }
-void Crouch(ACharacter* C,bool Wanted){if(!C)return;if(Wanted&&!AutoCrouched){C->Crouch();AutoCrouched=true;}else if(!Wanted&&AutoCrouched){C->UnCrouch();AutoCrouched=false;}}
-void Release(){ReleaseInputs();Active=FAction();AimTarget.Reset();FirstSeen=0;PathPoints.Reset();NextPath=0;Stuck=false;}
 bool Protected(UWorld* W,APawn* P){auto* S=W?W->GetSubsystem<UEtcSpawnProtectionSubsystem>():nullptr;return S&&P&&S->IsProtected(P);}
 bool Traveling(UWorld* W,APawn* P){auto* S=W?W->GetSubsystem<UEtcPortalTravelSubsystem>():nullptr;return S&&P&&S->IsTraveling(P);}
 UWorld* World(){if(GEngine)for(const FWorldContext& C:GEngine->GetWorldContexts())if(C.World()&&C.World()->IsGameWorld()&&C.World()->GetFirstPlayerController())return C.World();return nullptr;}
@@ -132,7 +128,7 @@ void Offer(const FString& Id,const FString& Kind,APawn* P,AActor* Target=nullptr
 bool Threatened(EEtcRoomDisplayState S){return S==EEtcRoomDisplayState::Warned||S==EEtcRoomDisplayState::Imminent||S==EEtcRoomDisplayState::Collapsed||S==EEtcRoomDisplayState::Upcoming;}
 void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   const double Started=FPlatformTime::Seconds();
-  if(ObservedWorld.Get()!=W){Release();ObservedWorld=W;MatchId=FGuid::NewGuid().ToString(EGuidFormats::Digits);SawLiving=false;Shots=0;PreviousMagazine=-1;LastRoom=-1;}
+  if(ObservedWorld.Get()!=W){Release(TEXT("world_changed"));SharedBrain.Reset();ObservedWorld=W;MatchId=FGuid::NewGuid().ToString(EGuidFormats::Digits);SawLiving=false;Shots=0;PreviousMagazine=-1;LastRoom=-1;}
   Offered.Reset();FString Phase=TEXT("loading");float Health=0,MaxHealth=100;
   const bool Offline=W&&W->GetNetMode()==NM_Standalone;
   auto* Result=W?W->GetSubsystem<UEtcMatchResultSubsystem>():nullptr;
@@ -145,12 +141,11 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   auto* Map=W?W->GetSubsystem<UEtcMapAssemblySubsystem>():nullptr;
   auto* Rooms=W?W->GetSubsystem<UEtcRoomStateSubsystem>():nullptr;
   const int32 Slot=Map&&P?Map->GetRoomSlotAtLocation(P->GetActorLocation()):-1;
-  if(Slot!=LastRoom){Release();LastRoom=Slot;}
+  if(Slot!=LastRoom){Release(TEXT("room_changed"));LastRoom=Slot;}
   TArray<FEtcRoomView> Views;if(Rooms)Rooms->GetRoomViews(Views);TSet<int32> Unsafe;bool Danger=false;float Evac=-1;
   for(const auto& V:Views){if(Threatened(V.State))Unsafe.Add(V.SlotIndex);if(V.SlotIndex==Slot){Evac=V.EvacuationSecondsLeft;Danger=Threatened(V.State)||Evac>0;}}
   const auto L=Loadout(PC);
   if(L.Weapon==PreviousWeapon&&L.Slot==PreviousSlot&&PreviousMagazine>=0&&L.Magazine>=0&&L.Magazine<PreviousMagazine)Shots+=PreviousMagazine-L.Magazine;
-  if(L.Weapon!=PreviousWeapon||L.Slot!=PreviousSlot)ReleaseInputs();
   PreviousMagazine=L.Magazine;PreviousWeapon=L.Weapon;PreviousSlot=L.Slot;
   auto* Items=PC?PC->FindComponentByClass<UEtcConsumableComponent>():nullptr;
   TArray<TSharedPtr<FJsonValue>> Enemies;
@@ -194,7 +189,15 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   TArray<TSharedPtr<FJsonValue>> Actions;for(const auto& A:Offered){auto J=MakeShared<FJsonObject>();J->SetStringField(TEXT("id"),A.Id);J->SetStringField(TEXT("kind"),A.Kind);J->SetNumberField(TEXT("distance"),A.Distance);J->SetBoolField(TEXT("safe"),A.Safe);J->SetNumberField(TEXT("destination"),A.Destination);J->SetNumberField(TEXT("rank"),A.Rank);if(A.Target.IsValid())J->SetStringField(TEXT("target"),A.Target->GetName());Actions.Add(MakeShared<FJsonValueObject>(J));}O->SetArrayField(TEXT("actions"),Actions);
   const int32 Placement=Result?Result->GetLocalPlacement():-1;
   if(Result&&Placement>0&&(Phase==TEXT("dead")||Phase==TEXT("ended"))){auto R=MakeShared<FJsonObject>();R->SetNumberField(TEXT("placement"),Placement);R->SetBoolField(TEXT("won"),Result->HasMatchEnded()&&PC&&Result->GetWinnerPlayerState()==PC->PlayerState);O->SetObjectField(TEXT("result"),R);}else O->SetField(TEXT("result"),MakeShared<FJsonValueNull>());
-  auto D=MakeShared<FJsonObject>();D->SetNumberField(TEXT("heldInputs"),Held.Num());D->SetNumberField(TEXT("shots"),Shots);D->SetBoolField(TEXT("stuck"),Stuck);D->SetNumberField(TEXT("observationMs"),(FPlatformTime::Seconds()-Started)*1000);D->SetStringField(TEXT("lastAction"),LastAction);O->SetObjectField(TEXT("diagnostics"),D);
+  auto D=MakeShared<FJsonObject>();D->SetNumberField(TEXT("heldInputs"),SharedBrain.IsValid()?SharedBrain->GetExternalHeldInputs():0);D->SetNumberField(TEXT("shots"),Shots);D->SetBoolField(TEXT("stuck"),SharedBrain.IsValid()&&SharedBrain->GetExternalStatus()==TEXT("blocked"));D->SetNumberField(TEXT("observationMs"),(FPlatformTime::Seconds()-Started)*1000);D->SetStringField(TEXT("lastAction"),LastAction);O->SetObjectField(TEXT("diagnostics"),D);
+  auto X=MakeShared<FJsonObject>();X->SetStringField(TEXT("kind"),TEXT("shared-bot-v1"));
+  auto* Brain=SharedBrain.Get();
+  X->SetStringField(TEXT("objective"),Brain?Brain->GetExternalObjective():TEXT(""));
+  X->SetStringField(TEXT("status"),Brain?Brain->GetExternalStatus():TEXT("released"));
+  X->SetStringField(TEXT("reason"),Brain?Brain->GetExternalReason():TEXT("not_started"));
+  X->SetNumberField(TEXT("failures"),Brain?Brain->GetExternalFailures():0);
+  X->SetNumberField(TEXT("pathStatus"),static_cast<int32>(EtcJevController::Status(PC)));
+  O->SetObjectField(TEXT("executor"),X);
   FString Text;FJsonSerializer::Serialize(O,TJsonWriterFactory<>::Create(&Text));const FString File=Directory/TEXT("state.json"),Temp=File+TEXT(".tmp");if(FFileHelper::SaveStringToFile(Text,*Temp,FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))IFileManager::Get().Move(*File,*Temp,true,true,false,true);
 }
 void Receive(APawn* P,double Time){
@@ -204,106 +207,31 @@ void Receive(APawn* P,double Time){
   const double Id=Num(C,TEXT("id")),E=Num(C,TEXT("epoch")),Expires=Num(C,TEXT("expiresAt"));
   if(!EtcJevMotor::AcceptCommand(Id,Ack,E,Epoch,Expires,Time,Num(C,TEXT("frame")),Frame,Requested==TEXT("manual")))return;
   if(Requested==TEXT("auto")&&Mode==TEXT("manual")&&E<=Epoch)return;
-  if(E>Epoch||Requested!=Mode)Release();Epoch=E;Ack=Id;Mode=Requested;Lease=Expires;
-  if(Mode==TEXT("manual")){Release();return;}
+  if(E>Epoch||Requested!=Mode)Release(Requested==TEXT("manual")?TEXT("manual_takeover"):TEXT("control_epoch_changed"));Epoch=E;Ack=Id;Mode=Requested;Lease=Expires;
+  if(Mode==TEXT("manual")){Release(TEXT("manual_takeover"));return;}
   const FString IdAction=Str(C,TEXT("action"));const FAction* A=Offered.FindByPredicate([&](const FAction& V){return V.Id==IdAction&&V.Safe;});
-  if(!A){Release();return;}
-  if(A->Id!=Active.Id){Release();Active=*A;ProgressAt=Time;ProgressLocation=P?P->GetActorLocation():FVector::ZeroVector;}
-  else Active=*A;
+  if(!A){Release(TEXT("action_unavailable"));return;}
+  Active=*A;
   OwnedPawn=P;LastAction=Active.Id;
-}
-bool Hazard(UWorld* W,ACharacter* C,const FVector& Goal,EtcRoomHazard::FBotDirective& D){
-  if(!C)return false;
-  if(auto* H=W->GetSubsystem<UEtcRoomHazardSubsystem>();H&&H->QueryBotDirective(C,Goal,D))return true;
-  EtcRoom019Board::FBotDirective Board;
-  if(AEtcRoom019BoardHazard::QueryBotDirective(W,C,Goal,Board)){
-    D.AdjustedGoal=Board.AdjustedGoal;D.bOverrideGoal=Board.bOverrideGoal;D.bHoldPosition=Board.bHoldPosition;D.bWatchdogExempt=Board.bWatchdogExempt;return true;
-  }
-  EtcRoom016Rotor::FBotDirective Rotor;
-  if(AEtcRoom016RotorHazard::QueryBotDirective(W,C,Goal,Rotor)){
-    D.AdjustedGoal=Rotor.AdjustedGoal;D.bOverrideGoal=Rotor.bOverrideGoal;D.bWatchdogExempt=Rotor.bWatchdogExempt;
-    D.bRequestCrouch=Rotor.Action==EtcRoom016Rotor::EBotAction::DodgeHigh;
-    D.bRequestJump=Rotor.Action==EtcRoom016Rotor::EBotAction::DodgeLow;return true;
-  }
-  bool Wait=false;FVector Adjusted;
-  if(AEtcRoom015TrainHazard::AdjustBotNavigationGoal(W,C->GetActorLocation(),Goal,Adjusted,Wait)){
-    D.AdjustedGoal=Adjusted;D.bOverrideGoal=true;D.bHoldPosition=Wait;D.bWatchdogExempt=Wait;return true;
-  }
-  return false;
-}
-void Move(UWorld* W,APawn* P,FVector Goal,float Dt,double Time){
-  auto* C=Cast<ACharacter>(P);bool Direct=false,Hold=false;FVector G=Goal;
-  if(C){EtcRoomHazard::FBotDirective D;if(Hazard(W,C,Goal,D)){
-    if(D.bOverrideGoal)G=D.AdjustedGoal;Hold=D.bHoldPosition;Direct=D.bUseDirectMovement;
-    Input(P,TEXT("InputTag.Ability.Sprint"),D.bRequestSprint&&!Hold);Input(P,TEXT("InputTag.Jump"),D.bRequestTraversal||D.bRequestJump);
-    Crouch(C,D.bRequestCrouch);if(D.bWatchdogExempt)ProgressAt=Time;
-  }else{Input(P,TEXT("InputTag.Ability.Sprint"),false);Input(P,TEXT("InputTag.Jump"),false);Crouch(C,false);}}
-  if(Hold)return;
-  if(!Direct){
-    if(Time>=NextPath||FVector::DistSquared(G,PathGoal)>FMath::Square(100.f)){
-      NextPath=Time+200;PathGoal=G;PathPoints.Reset();PathIndex=1;
-      if(auto* Path=UNavigationSystemV1::FindPathToLocationSynchronously(W,P->GetActorLocation(),G,P);Path&&Path->IsValid()&&!Path->IsPartial())PathPoints=Path->PathPoints;
-    }
-    if(PathPoints.Num()<2){Stuck=Time-ProgressAt>1800;return;}
-    while(PathIndex<PathPoints.Num()-1&&FVector::Dist2D(P->GetActorLocation(),PathPoints[PathIndex])<65)++PathIndex;
-    G=PathPoints[PathIndex];
-  }
-  const FVector Direction=(G-P->GetActorLocation()).GetSafeNormal2D();P->AddMovementInput(Direction,1.f);
-  if(auto* PC=Cast<APlayerController>(P->GetController()))PC->SetControlRotation(EtcJevMotor::AimStep(PC->GetControlRotation(),Direction.Rotation(),Dt));
-  if(FVector::DistSquared(P->GetActorLocation(),ProgressLocation)>FMath::Square(70.f)){ProgressAt=Time;ProgressLocation=P->GetActorLocation();Stuck=false;}
-  else Stuck=Time-ProgressAt>1800;
 }
 void Execute(UWorld* W,APlayerController* PC,APawn* P,float Dt,double Time){
   if(Mode!=TEXT("auto"))return;
-  if(Time>Lease||Time>SessionUntil||!W||!PC||W->GetNetMode()!=NM_Standalone||!FApp::HasFocus()){Release();Mode=TEXT("manual");return;}
-  if(Active.Kind==TEXT("new_match")){Release();UGameplayStatics::OpenLevel(W,TEXT("/EtcCore/Maps/L_ETC_Match"),true,FString::Printf(TEXT("Experience=B_ETC_Experience_Room?MapGenSeed=%d?NumBots=19"),FMath::Rand()));return;}
+  if(Time>Lease||Time>SessionUntil||!W||!PC||W->GetNetMode()!=NM_Standalone||!FApp::HasFocus()){
+    const FString Reason=Time>SessionUntil?TEXT("session_expired"):Time>Lease?TEXT("lease_expired"):!FApp::HasFocus()?TEXT("focus_lost"):TEXT("unsupported_world");
+    Release(Reason);Mode=TEXT("manual");return;
+  }
+  if(Active.Kind==TEXT("new_match")){Release(TEXT("new_match"));UGameplayStatics::OpenLevel(W,TEXT("/EtcCore/Maps/L_ETC_Match"),true,FString::Printf(TEXT("Experience=B_ETC_Experience_Room?MapGenSeed=%d?NumBots=19"),FMath::Rand()));return;}
   const auto* Health=ULyraHealthComponent::FindHealthComponent(P);
-  if(W->IsPaused()||!P||!Health||Health->GetHealth()<=0||OwnedPawn.Get()!=P||Traveling(W,P)){Release();return;}
-  const bool Moving=Active.Kind==TEXT("portal")||Active.Kind==TEXT("loot")||Active.Kind==TEXT("pickup")||Active.Kind==TEXT("cover");
-  if(!Moving){EtcRoomHazard::FBotDirective D;
-    if(Hazard(W,Cast<ACharacter>(P),P->GetActorLocation(),D)&&(D.bOverrideGoal||D.bHoldPosition||D.bRequestCrouch||D.bRequestJump||D.bRequestTraversal)){
-      Input(P,TEXT("InputTag.Weapon.Fire"),false);Input(P,TEXT("InputTag.Weapon.FireAuto"),false);
-      Move(W,P,P->GetActorLocation(),Dt,Time);return;
-    }
-    Input(P,TEXT("InputTag.Ability.Sprint"),false);Input(P,TEXT("InputTag.Jump"),false);Crouch(Cast<ACharacter>(P),false);
+  if(W->IsPaused()||!P||!Health||Health->GetHealth()<=0||OwnedPawn.Get()!=P||Traveling(W,P)){
+    Release(Traveling(W,P)?TEXT("portal_travel"):W->IsPaused()?TEXT("paused"):TEXT("pawn_unavailable"));return;
   }
-  if(Active.Kind==TEXT("scan")){auto R=PC->GetControlRotation();R.Yaw+=70.f*Dt;PC->SetControlRotation(R);}
-  const FLoadout L=Loadout(PC);
-  if(Time>=FireRelease)Input(P,TEXT("InputTag.Weapon.Fire"),false);
-  if(Active.Kind==TEXT("reload")){
-    if(Time>=NextReload&&L.Reserve>0){Input(P,TEXT("InputTag.Weapon.Reload"),true);NextReload=Time+1200;}else Input(P,TEXT("InputTag.Weapon.Reload"),false);
-  }
+  if(Active.Id.IsEmpty())return;
+  if(Active.Kind==TEXT("engage")&&(!EnemyVisible(P,Cast<APawn>(Active.Target.Get()))||Protected(W,P))){Release(TEXT("target_not_visible"));return;}
+  auto* Brain=Executor(PC);if(!Brain)return;
+  Brain->SetExternalObjective(Active.Id,Active.Kind,Active.Target.Get(),Active.Goal,Lease);
+  // Healing and quickbar selection call the same public player actions; the brain owns all movement and weapon inputs.
   if(Active.Kind==TEXT("heal")){if(auto* I=PC->FindComponentByClass<UEtcConsumableComponent>();I&&!I->IsCasting())I->TryUse(static_cast<EEtcConsumableType>(Active.Slot));}
-  if(Active.Kind==TEXT("equip")){if(auto* Q=PC->FindComponentByClass<ULyraQuickBarComponent>())if(auto* F=Q->FindFunction(TEXT("SetActiveSlotIndex"))){struct FArgs{int32 NewIndex;} A{Active.Slot};Q->ProcessEvent(F,&A);}Release();}
-  if(Active.Kind==TEXT("engage")){
-    auto* E=Cast<APawn>(Active.Target.Get());if(!EnemyVisible(P,E)){Release();return;}
-    if(AimTarget.Get()!=E){AimTarget=E;FirstSeen=Time;}
-    FVector Camera;FRotator CameraRotation;PC->GetPlayerViewPoint(Camera,CameraRotation);
-    const FVector Point=E->GetActorLocation()+FVector(0,0,35),Delta=Point-Camera;
-    const float MotionTime=float(FMath::Fmod(Time,100000.0));
-    // Lyra player weapons use CameraTowardsFocus; aim from the actual camera, not the pawn eye.
-    FRotator Desired=PC->GetControlRotation()+(Delta.Rotation()-CameraRotation).GetNormalized();Desired.Yaw+=0.25f*FMath::Sin(MotionTime*0.003f);Desired.Pitch+=0.12f*FMath::Cos(MotionTime*0.004f);
-    const FRotator R=EtcJevMotor::AimStep(PC->GetControlRotation(),Desired,Dt);PC->SetControlRotation(R);
-    const float Error=FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(CameraRotation.Vector(),Delta.GetSafeNormal()),-1.f,1.f)));
-    const bool Fire=EtcJevMotor::CanFire(Time,FirstSeen,Error,true,Protected(W,P),L.Magazine);
-    Input(P,TEXT("InputTag.Weapon.FireAuto"),Fire);
-    if(Fire&&Time>=NextFire){Input(P,TEXT("InputTag.Weapon.Fire"),true);FireRelease=Time+60;NextFire=Time+180;}
-    const float Side=FMath::Sin(MotionTime*0.0015f)>0?1.f:-1.f;
-    const FVector Right=FRotationMatrix(FRotator(0,R.Yaw,0)).GetUnitAxis(EAxis::Y)*Side;
-    const FVector Goal=P->GetActorLocation()+Right*120.f;FNavLocation Projected;
-    auto* Nav=FNavigationSystem::GetCurrent<UNavigationSystemV1>(W);auto* Hazards=W->GetSubsystem<UEtcRoomHazardSubsystem>();
-    float Cost=0;const bool Blocked=Hazards&&Hazards->QueryTraversalPath(P->GetActorLocation(),Goal,Cost)&&Cost>=FLT_MAX;
-    if(!Blocked&&Nav&&Nav->ProjectPointToNavigation(Goal,Projected,FVector(35,35,100))&&FVector::Dist2D(Goal,Projected.Location)<40)P->AddMovementInput(Right,0.65f);
-  }
-  if(Active.Kind==TEXT("portal")||Active.Kind==TEXT("loot")||Active.Kind==TEXT("pickup")||Active.Kind==TEXT("cover")){
-    if(Active.Kind!=TEXT("cover")&&!Active.Target.IsValid()){Release();return;}
-    const float Distance=FVector::Dist2D(P->GetActorLocation(),Active.Goal);
-    if(auto* H=Cast<AEtcHeadgearPickup>(Active.Target.Get());H&&H->CanEquip(P)){H->TryEquip(P);Release();return;}
-    if(auto* D=Cast<AEtcPortalDoor>(Active.Target.Get());D&&Distance<250&&D->CanOfferTravelTo(P)){D->RequestTravel(P);Release();return;}
-    if(auto* C=Cast<AEtcLootChest>(Active.Target.Get());C&&Distance<190&&FMath::Abs(P->GetActorLocation().Z-C->GetActorLocation().Z)<180&&Visible(P,C)){C->TryOpen(P);Release();return;}
-    if(Active.Kind==TEXT("cover")&&Distance<80){ReleaseInputs();return;}
-    Move(W,P,Active.Goal,Dt,Time);
-  }
+  if(Active.Kind==TEXT("equip")){if(auto* Q=PC->FindComponentByClass<ULyraQuickBarComponent>();Q&&Q->GetActiveSlotIndex()!=Active.Slot)if(auto* F=Q->FindFunction(TEXT("SetActiveSlotIndex"))){struct FArgs{int32 NewIndex;} A{Active.Slot};Q->ProcessEvent(F,&A);}}
 }
 bool Tick(float Dt){
   const double Time=Now();
@@ -312,9 +240,9 @@ bool Tick(float Dt){
       if(Session!=Str(C,TEXT("session"))){Release();Session=Str(C,TEXT("session"));Token=Str(C,TEXT("token"));Epoch=0;Ack=0;Frame=0;Mode=TEXT("manual");}SessionUntil=Num(C,TEXT("expiresAt"));
     }
   }
-  if(Session.IsEmpty()||Time>SessionUntil){Release();Mode=TEXT("manual");return true;}
+  if(Session.IsEmpty()||Time>SessionUntil){Release(TEXT("session_expired"));Mode=TEXT("manual");return true;}
   UWorld* W=World();auto* PC=W?W->GetFirstPlayerController():nullptr;APawn* P=PC?PC->GetPawn():nullptr;
-  if(OwnedPawn.Get()!=P){Release();OwnedPawn=P;}
+  if(OwnedPawn.Get()!=P){Release(TEXT("pawn_changed"));OwnedPawn=P;}
   if(Time>=NextState){Observe(W,PC,P,Time);NextState=Time+50;Receive(P,Now());}
   Execute(W,PC,P,FMath::Clamp(Dt,0.f,0.05f),Now());return true;
 }

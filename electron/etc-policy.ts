@@ -19,7 +19,8 @@ export class EtcPolicy {
     }
     if(o.phase!=='playing'||o.self.health<=0||o.self.traveling)return wait;
     if(o.self.room!==this.lastRoom){this.lastRoom=o.self.room;this.visits.set(o.self.room,(this.visits.get(o.self.room)??0)+1);}
-    if(o.diagnostics.stuck&&this.active){this.failed.set(this.active,now+5000);this.active='';}
+    if(o.executor?.status==='blocked'&&o.executor.objective){this.failed.set(o.executor.objective,now+5000);if(this.active===o.executor.objective)this.active='';}
+    else if(!o.executor&&o.diagnostics.stuck&&this.active){this.failed.set(this.active,now+5000);this.active='';}
     for(const [id,until] of this.failed)if(until<=now)this.failed.delete(id);
     const visible=o.enemies.length>0, low=o.self.health/o.self.maxHealth<0.4;
     // Survival constraints have priority over cloud advice, loot and target persistence.
@@ -27,6 +28,17 @@ export class EtcPolicy {
     const escape=eligible.filter(a=>a.kind==='portal');
     if(o.self.danger&&escape.length)return this.select(escape.sort((a,b)=>a.distance-b.distance)[0],now);
     if(o.self.healing&&!visible&&!o.self.danger)return wait;
+    // A capable native motor executes a real tactical objective, not a +10 hint.
+    // Only immediate survival/maintenance overrides it; healthy fighters may retreat.
+    if(o.executor?.kind==='shared-bot-v1'&&advice&&!o.self.danger){
+      const tactical=eligible.find(a=>a.id===advice&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
+      const emergency=visible&&low&&eligible.some(a=>a.kind==='cover')
+        ||o.self.magazine===0&&eligible.some(a=>a.kind==='equip'||a.kind==='reload'&&o.self.reserve>0)
+        ||!visible&&low&&eligible.some(a=>a.kind==='heal');
+      const legal=tactical&&(tactical.kind!=='engage'||visible&&o.self.magazine>0&&!o.self.protected)
+        &&(!visible||!['loot','pickup','scan'].includes(tactical.kind));
+      if(legal&&!emergency)return this.select(tactical,now);
+    }
     const score=(a:EtcAction)=>{
       const distance=a.distance/100; // UE centimetres -> metres
       let n=-1000;

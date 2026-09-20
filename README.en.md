@@ -1,5 +1,7 @@
 # Jev-Live · JEV Studio
 
+Autoplay is moving to **Jev tactics + a shared Bot executor**, preserving the player camera and manual takeover, stable path renewal and correlated failure feedback. See the [architecture and tiered acceptance gates](docs/HYBRID_AUTOPLAY.en.md). The executor requires a matching Steam game build; superiority over Pro Bots has not been established.
+
 [简体中文](README.md) · [English](README.en.md)
 
 **Creator: JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj)**

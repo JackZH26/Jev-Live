@@ -1,5 +1,7 @@
 # Jev-Live · JEV Studio
 
+自动玩正在升级为 **Jev 战术决策 + 共用 Bot 执行器**：保留玩家镜头和手动接管，目标续期不重启路径，并反馈受阻原因。见[调整方案与分档对战验收门槛](docs/HYBRID_AUTOPLAY.md)。新执行器需要对应 Steam 游戏构建；尚未证明超过 Pro Bot。
+
 [简体中文](README.md) · [English](README.en.md)
 
 **作者：JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj)**

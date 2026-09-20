@@ -16,9 +16,10 @@ const seconds = Number(arg('--seconds','180'));
 const run = process.argv.includes('--run');
 const launch = process.argv.includes('--launch');
 const tactical = process.argv.includes('--tactical-experiment');
+const hybrid = process.argv.includes('--require-hybrid');
 const delay = ms => new Promise(resolve=>setTimeout(resolve,ms));
 const report = {startedAt:new Date().toISOString(),model:'jev-latest',sdk:'0.6.0',provider:'jev',
-  variant:tactical?'experimental-cloud-tactics-with-context':'existing-advisory-controller',
+  variant:hybrid?'shared-bot-executor-with-jev-tactics':tactical?'experimental-cloud-tactics-with-context':'existing-advisory-controller',
   requestedSeconds:seconds,streamingStarted:false,stage:'preflight',preflight:[],requests:[],samples:[],
   adoption:{adviceAvailable:0,adviceSelected:0,changedFromRules:0,changedAndObserved:0},events:[],hashes:{}};
 let out, game, secret;
@@ -32,6 +33,7 @@ app.disableHardwareAcceleration();
 app.setName('JEV Cloud Acceptance');
 app.whenReady().then(async()=>{
   if(!Number.isInteger(seconds)||seconds<10||seconds>600)throw Error('invalid_duration');
+  if(hybrid&&tactical)throw Error('hybrid_cannot_use_legacy_experimental_override');
   out=path.join(root,'test-results','cloud-jev-'+Date.now());await fs.mkdir(out,{recursive:true});
   console.log(JSON.stringify({output:out}));
   const data=await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JevCloudAcceptance-'));
@@ -49,7 +51,7 @@ app.whenReady().then(async()=>{
       {windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
   }
   if(!secret)throw Error('missing_key');
-  for(const module of ['game','etc-autoplay','etc-policy','etc-bridge']){
+  for(const module of ['game','etc-autoplay','etc-policy','etc-bridge',...(hybrid?['etc-tactics']:[])]){
     report.hashes[module]=createHash('sha256').update(await fs.readFile(path.join(runtime,'electron',module+'.js'))).digest('hex');
   }
   const preflight = new TypeSafeClient({apiKey:secret,baseURL:'https://api.typesafe.ai',defaultModel:'jev-latest',timeout:5000,retry:{maxRetries:0},logLevel:'off'});
@@ -123,13 +125,14 @@ app.whenReady().then(async()=>{
   while(Date.now()<until&&(!game.connected||!game.autoplay.observation))await delay(100);
   if(launch)expectedPid=game.pid;
   if(game.pid!==expectedPid||!game.autoplay.observation)throw Error('game_changed_or_bridge_unavailable');
+  if(hybrid&&game.autoplay.observation.executor?.kind!=='shared-bot-v1')throw Error('steam_build_missing_shared_executor');
   report.buildId=game.selected?.buildId;report.appId=game.selected?.appId;
   if(report.appId!=='5272970')throw Error('wrong_game');
   await game.setMode('auto');report.stage='running';const started=Date.now();
   while(Date.now()-started<seconds*1000){
     await delay(1000);const o=game.autoplay.observation;
     const sample={at:Date.now(),mode:game.gate.mode,nativeMode:o?.mode,phase:o?.phase,foreground:o?.foreground,
-      position:o?.self.position,stuck:o?.diagnostics.stuck,action:o?.diagnostics.lastAction,gameError:game.error,
+      position:o?.self.position,stuck:o?.diagnostics.stuck,action:o?.diagnostics.lastAction,executor:o?.executor,gameError:game.error,
       ...game.autoplay.summary,cloud:{...game.decisionStats}};
     report.samples.push(sample);
     if(report.samples.length%10===0){console.log(JSON.stringify({elapsedSeconds:Math.round((Date.now()-started)/1000),...summary()}));await writeReport();}

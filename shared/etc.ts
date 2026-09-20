@@ -28,6 +28,12 @@ export const etcObservationSchema = z.object({
   result: z.object({placement:z.number().int().min(1),won:z.boolean()}).refine(r=>r.won===(r.placement===1)).nullable(),
   diagnostics:z.object({heldInputs:z.number().int().nonnegative(),shots:z.number().int().nonnegative(),
     stuck:z.boolean(),observationMs:finite.nonnegative(),lastAction:z.string().max(160)}),
+  executor:z.object({
+    kind:z.literal('shared-bot-v1'), objective:z.string().max(160),
+    status:z.enum(['running','succeeded','blocked','paused','released']),
+    reason:z.string().max(80), failures:z.number().int().nonnegative(),
+    pathStatus:z.number().int().min(0).max(3),
+  }).optional(),
 });
 export type EtcObservation = z.infer<typeof etcObservationSchema>;
 export type EtcAction = z.infer<typeof etcActionSchema>;

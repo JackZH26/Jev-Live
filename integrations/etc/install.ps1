@@ -5,7 +5,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $root 'Lyra.uproject'))) { throw 'Se
 $module = Join-Path $root 'Plugins\GameFeatures\EtcCore\Source\EtcCoreRuntime'
 $entry = Join-Path $module 'Private\EtcCoreRuntimeModule.cpp'
 $source = [IO.File]::ReadAllText($entry)
-foreach ($file in @('EtcJevBridge.cpp','EtcJevBridge.h','EtcJevMotor.h','EtcJevMotorTest.cpp')) {
+$patch = Join-Path $PSScriptRoot 'shared-controller.patch'
+# Check the entire shared-code patch before copying any runtime files.
+& git -C $root apply --reverse --check --ignore-space-change $patch 2>$null
+$alreadyApplied = $LASTEXITCODE -eq 0
+if (-not $alreadyApplied) {
+    & git -C $root apply --check --ignore-space-change $patch
+    if ($LASTEXITCODE -ne 0) { throw 'Shared Bot sources changed. Review shared-controller.patch before installing; no files copied.' }
+    & git -C $root apply --ignore-space-change $patch
+    if ($LASTEXITCODE -ne 0) { throw 'Shared Bot patch failed.' }
+}
+foreach ($file in @('EtcJevBridge.cpp','EtcJevBridge.h','EtcJevMotor.h','EtcJevMotorTest.cpp','EtcJevController.h','EtcJevSharedBrain.cpp')) {
     $dest = Join-Path $module ('Private\Development\' + $file)
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $dest -Force
 }

@@ -1,0 +1,437 @@
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
+index 2aa0fcb0..7343c8c4 100644
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
+@@ -9,6 +9,7 @@
+ #include "AbilitySystemGlobals.h"
+ #include "GameFramework/Pawn.h"
+ #include "GameFramework/Controller.h"
++#include "GameFramework/PlayerController.h"
+ 
+ #include UE_INLINE_GENERATED_CPP_BY_NAME(EtcBotAimComponent)
+ 
+@@ -120,7 +121,7 @@ void UEtcBotAimComponent::UpdateAds()
+ 	}
+ 	// AI controllers do not run ALyraPlayerController::PostProcessInput, so
+ 	// injecting a tag without processing it never activates the granted GA.
+-	ASC->ProcessAbilityInput(0.0f, false);
++	if (!Cast<APlayerController>(Controller) || !bWantAds) ASC->ProcessAbilityInput(0.0f, false);
+ 	bool bAbilityActive = false;
+ 	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+ 	{
+@@ -168,15 +169,23 @@ void UEtcBotAimComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		SampleCone();
+ 	}
+ 
+-	const FVector Eye = Pawn->GetPawnViewLocation();
++	FVector Eye = Pawn->GetPawnViewLocation();
++	FRotator CameraRotation = Controller->GetControlRotation();
++	auto* Player = Cast<APlayerController>(Controller);
++	if (Player) Player->GetPlayerViewPoint(Eye, CameraRotation);
+ 	const FVector Point = AimPointAt(Target.Get());
+ 	const FVector ToTarget = (Point - Eye).GetSafeNormal();
+ 	// ConeOffset is an ANGLE around the target direction. The old code stored
+ 	// FRotator(...).Vector(), a world-space unit vector, then added 15% of it to
+ 	// ToTarget. That biased misses toward world +X and did not represent the
+ 	// configured degree cone at all.
+-	const FRotator NewRot = (ToTarget.Rotation() + ConeOffset).GetNormalized();
+-	const FVector Aimed = NewRot.Vector();
++	FRotator NewRot = (ToTarget.Rotation() + ConeOffset).GetNormalized();
++	if (Player)
++	{
++		NewRot = Controller->GetControlRotation() + (NewRot - CameraRotation).GetNormalized();
++		NewRot = FMath::RInterpConstantTo(Controller->GetControlRotation(), NewRot, DeltaTime, 360.0f);
++	}
++	const FVector Aimed = Player ? CameraRotation.Vector() : NewRot.Vector();
+ 	Controller->SetControlRotation(NewRot);
+ 	Pawn->SetActorRotation(FRotator(0.0f, NewRot.Yaw, 0.0f));
+ 
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
+index 4e32a7e8..4484d27d 100644
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
+@@ -5,6 +5,7 @@
+ 
+ #include "AI/EtcBotAimComponent.h"
+ #include "AI/EtcBotController.h"
++#include "Development/EtcJevController.h"
+ #include "AI/EtcBotMobilityRules.h"
+ #include "AI/EtcBotPathfinder.h"
+ #include "AbilitySystem/LyraAbilitySystemComponent.h"
+@@ -192,19 +193,19 @@ void UEtcBotBrainComponent::NotifyEliminated()
+ 	bCoverScouting = false;
+ 	bTrainWindowWaiting = false;
+ 	StuckAccumulator = 0.0f;
+-	if (AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner()))
++	if (AController* Bot = Cast<AController>(GetOwner()))
+ 	{
+-		if (UEtcBotAimComponent* Aim = Bot->GetAim())
++		if (UEtcBotAimComponent* Aim = EtcJevController::Aim(Bot))
+ 		{
+ 			Aim->SetTarget(nullptr);
+ 		}
+-		Bot->StopMovement();
++		EtcJevController::Stop(Bot);
+ 	}
+ }
+ 
+ int32 UEtcBotBrainComponent::CurrentSlot() const
+ {
+-	const AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	const AController* Bot = Cast<AController>(GetOwner());
+ 	const APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	const UEtcMapAssemblySubsystem* Map =
+ 		GetWorld() ? GetWorld()->GetSubsystem<UEtcMapAssemblySubsystem>() : nullptr;
+@@ -224,7 +225,7 @@ void UEtcBotBrainComponent::RefreshLoadout()
+ 	BestWeaponRank = 0;
+ 	MagazineAmmo = 0;
+ 	SpareAmmo = 0;
+-	const AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	const AController* Bot = Cast<AController>(GetOwner());
+ 	if (Bot == nullptr)
+ 	{
+ 		return;
+@@ -436,7 +437,7 @@ AEtcPortalDoor* UEtcBotBrainComponent::DoorToward(int32 FromSlot, int32 NextSlot
+ 
+ bool UEtcBotBrainComponent::PickCoverScoutGoal()
+ {
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	const UEtcMapAssemblySubsystem* Map =
+ 		GetWorld() ? GetWorld()->GetSubsystem<UEtcMapAssemblySubsystem>() : nullptr;
+@@ -548,7 +549,7 @@ void UEtcBotBrainComponent::UpdateCoverScoutLook(float DeltaTime)
+ 	{
+ 		return;
+ 	}
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	if (Pawn == nullptr || MoveGoal.IsNearlyZero()
+ 		|| FVector::DistSquared(Pawn->GetActorLocation(), MoveGoal) > FMath::Square(140.0f))
+@@ -578,6 +579,7 @@ void UEtcBotBrainComponent::UpdateCoverScoutLook(float DeltaTime)
+ 
+ void UEtcBotBrainComponent::Reevaluate()
+ {
++	if (bExternalControl) { ReevaluateExternal(); return; }
+ 	if (bEliminated)
+ 	{
+ 		return;
+@@ -1043,7 +1045,7 @@ void UEtcBotBrainComponent::Reevaluate()
+ 
+ void UEtcBotBrainComponent::ReleaseWeaponInputs()
+ {
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	ULyraAbilitySystemComponent* ASC = EtcBotBrainLocal::GetAbilitySystem(Pawn);
+ 	bool bChanged = false;
+@@ -1065,7 +1067,7 @@ void UEtcBotBrainComponent::ReleaseWeaponInputs()
+ 	Release(EtcBotBrainLocal::FireAutoTag(), bFireAutoHeld);
+ 	Release(EtcBotBrainLocal::ReloadTag(), bReloadHeld);
+ 	Release(FGameplayTag::RequestGameplayTag(FName("InputTag.Ability.Sprint"), false), bHazardSprintPressed);
+-	if (Bot && Bot->GetAim()) Bot->GetAim()->SetTraversalSprint(false);
++	if (Bot && EtcJevController::Aim(Bot)) EtcJevController::Aim(Bot)->SetTraversalSprint(false);
+ 	if (ASC != nullptr && bChanged)
+ 	{
+ 		ASC->ProcessAbilityInput(0.0f, false);
+@@ -1078,18 +1080,18 @@ void UEtcBotBrainComponent::ReleaseWeaponInputs()
+ 
+ void UEtcBotBrainComponent::ReleaseLaserInputs()
+ {
+-    auto* Bot = Cast<AEtcBotController>(GetOwner());
++    auto* Bot = Cast<AController>(GetOwner());
+     auto* C = Bot ? Cast<ACharacter>(Bot->GetPawn()) : nullptr;
+     if (C) { if (bLaserCrouching) C->UnCrouch(); if (bLaserJumpPressed) C->StopJumping(); }
+     if (auto* ASC = EtcBotBrainLocal::GetAbilitySystem(C))
+         if (bGenericTraversalPressed) ASC->AbilityInputTagReleased(EtcBotBrainLocal::JumpTag());
+-    if (Bot && Bot->GetAim()) Bot->GetAim()->SetHazardFacing(false);
++    if (Bot && EtcJevController::Aim(Bot)) EtcJevController::Aim(Bot)->SetHazardFacing(false);
+     bGenericTraversalPressed = false; bLaserCrouching = false; bLaserJumpPressed = false;
+ }
+ 
+ void UEtcBotBrainComponent::ReleaseRotorInputs()
+ {
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	ACharacter* Character = Bot ? Cast<ACharacter>(Bot->GetPawn()) : nullptr;
+ 	if (Character != nullptr)
+ 	{
+@@ -1141,7 +1143,7 @@ void UEtcBotBrainComponent::UpdateWeaponInputs(float DeltaTime, bool bWantsToFir
+ 		}
+ 	}
+ 
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	// Recheck at the actual fire gate, including between perception refreshes.
+ 	bWantsToFire &= UEtcFlashExposureComponent::CanSeeTarget(Pawn, TargetEnemy.Get());
+@@ -1224,7 +1226,7 @@ void UEtcBotBrainComponent::UpdateWeaponInputs(float DeltaTime, bool bWantsToFir
+ 			if ((bPressedShot || (bFireAutoHeld && FireAimSampleRemaining <= 0.0f)))
+ 			{
+ 				FireAimSampleRemaining = 0.18f;
+-				if (UEtcBotAimComponent* Aim = Bot->GetAim())
++				if (UEtcBotAimComponent* Aim = EtcJevController::Aim(Bot))
+ 				{
+ 					Aim->NotifyTriggerPulled();
+ 				}
+@@ -1260,7 +1262,7 @@ void UEtcBotBrainComponent::UpdateWeaponInputs(float DeltaTime, bool bWantsToFir
+ 	{
+ 		Pawn->AddMovementInput(Pawn->GetActorForwardVector().GetSafeNormal2D());
+ 	}
+-	ASC->ProcessAbilityInput(DeltaTime, false);
++	if (!Cast<APlayerController>(Bot)) ASC->ProcessAbilityInput(DeltaTime, false);
+ 	(void)bInputChanged;
+ }
+ 
+@@ -1268,6 +1270,8 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 	FActorComponentTickFunction* ThisTickFunction)
+ {
+ 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
++	if (ExternalLeaseExpired()) { StopExternalControl(TEXT("lease_expired")); return; }
++	if (Cast<APlayerController>(GetOwner()) && !bExternalControl) return;
+ 	if (bEliminated)
+ 	{
+ 		return;
+@@ -1277,7 +1281,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 	if (const UEtcPortalTravelSubsystem* Travel =
+ 			GetWorld() ? GetWorld()->GetSubsystem<UEtcPortalTravelSubsystem>() : nullptr)
+ 	{
+-		const AEtcBotController* BotOwner = Cast<AEtcBotController>(GetOwner());
++		const AController* BotOwner = Cast<AController>(GetOwner());
+ 		if (BotOwner != nullptr && Travel->IsTraveling(BotOwner->GetPawn()))
+ 		{
+ 			return;
+@@ -1297,7 +1301,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		Reevaluate();
+ 	}
+ 
+-	AEtcBotController* Bot = Cast<AEtcBotController>(GetOwner());
++	AController* Bot = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	if (Pawn == nullptr)
+ 	{
+@@ -1310,7 +1314,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		{
+ 			if (Headgear->CanEquip(Pawn))
+ 			{
+-				Bot->StopMovement();
++				EtcJevController::Stop(Bot);
+ 				ReleaseWeaponInputs();
+ 				if (UCharacterMovementComponent* Movement = Cast<ACharacter>(Pawn)
+ 					? Cast<ACharacter>(Pawn)->GetCharacterMovement() : nullptr)
+@@ -1318,6 +1322,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 					Movement->StopMovementImmediately();
+ 				}
+ 				Headgear->TryEquip(Pawn);
++				if (bExternalControl) FinishExternalObjective(TEXT("succeeded"), TEXT("headgear_equipped"));
+ 				return;
+ 			}
+ 		}
+@@ -1341,10 +1346,11 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 			{
+ 				UE_LOG(LogEtcBotBrain, Log, TEXT("%s opened chest %s in slot %d."),
+ 					*GetNameSafe(Bot), *GetNameSafe(Chest), CurrentSlot());
++				if (bExternalControl) FinishExternalObjective(TEXT("succeeded"), TEXT("chest_opened"));
+ 				TargetChest.Reset();
+ 				MoveGoal = FVector::ZeroVector;
+ 				LastIssuedGoal = FVector::ZeroVector;
+-				Bot->StopMovement();
++				EtcJevController::Stop(Bot);
+ 				RecheckAccumulator = 0.25f;
+ 				return;
+ 			}
+@@ -1363,6 +1369,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		{
+ 			if (Door->RequestTravel(Pawn))
+ 			{
++				if (bExternalControl) FinishExternalObjective(TEXT("succeeded"), TEXT("portal_started"));
+ 				const int32 DestinationSlot = Door->LinkedPortal
+ 					? Door->LinkedPortal->OwnerRoomSlot : INDEX_NONE;
+ 				UE_LOG(LogEtcBotBrain, Log, TEXT("%s travel slot %d -> %d"),
+@@ -1375,7 +1382,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 					}
+ 					LastKnownSlot = DestinationSlot;
+ 					++SlotVisitCounts.FindOrAdd(DestinationSlot);
+-					Bot->SetAssignedSlot(DestinationSlot);
++					EtcJevController::AssignedSlot(Bot, DestinationSlot);
+ 				}
+ 				// RequestTravel updates LastKnownSlot immediately, so the normal
+ 				// room-change branch above will not run on the next utility pass.
+@@ -1393,7 +1400,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 				bCoverScouting = false;
+ 				bTrainWindowWaiting = false;
+ 				ReleaseRotorInputs();
+-				Bot->StopMovement();
++				EtcJevController::Stop(Bot);
+ 				RecheckAccumulator = 0.25f;
+ 				return;
+ 			}
+@@ -1550,10 +1557,10 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 	}
+ 	const bool bHazardGoalAdjusted = bChessGoalAdjusted
+ 		|| bRotorGoalAdjusted || bTrainGoalAdjusted || bGenericHazardGoalAdjusted;
+-	if (Bot->GetAim())
++	if (EtcJevController::Aim(Bot))
+ 	{
+-		Bot->GetAim()->SetTraversalSprint(bGenericSprintRequested);
+-		Bot->GetAim()->SetHazardFacing(bGenericDirectMovement);
++		EtcJevController::Aim(Bot)->SetTraversalSprint(bGenericSprintRequested);
++		EtcJevController::Aim(Bot)->SetHazardFacing(bGenericDirectMovement);
+ 	}
+ 	if (bGenericDirectMovement && !NavigationGoal.IsNearlyZero())
+ 	{
+@@ -1566,14 +1573,14 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 	}
+ 	if (bTrainWindowWaiting || bChessWindowWaiting || bGenericHazardWaiting)
+ 	{
+-		Bot->StopMovement();
++		EtcJevController::Stop(Bot);
+ 		LastIssuedGoal = FVector::ZeroVector;
+ 	}
+ 	if (bGenericDirectMovement && !bGenericHazardWaiting)
+ 	{
+ 		// The provider drives input every physics frame. The brain runs at 20Hz;
+ 		// repeatedly stopping it here would cancel the jump's horizontal velocity.
+-		if (Bot->GetMoveStatus() != EPathFollowingStatus::Idle) Bot->StopMovement();
++		if (EtcJevController::Status(Bot) != EPathFollowingStatus::Idle) EtcJevController::Stop(Bot);
+ 		LastIssuedGoal = FVector::ZeroVector;
+ 	}
+ 
+@@ -1593,7 +1600,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		// makes progress.
+ 		const bool bGoalChanged =
+ 			FVector::DistSquared(NavigationGoal, LastIssuedGoal) > FMath::Square(60.0f);
+-		const bool bIdle = Bot->GetMoveStatus() == EPathFollowingStatus::Idle;
++		const bool bIdle = EtcJevController::Status(Bot) == EPathFollowingStatus::Idle;
+ 		if (!bReachedGoal && MoveRetryRemaining <= 0.0f && (bGoalChanged || bIdle))
+ 		{
+ 			FVector PathGoal = NavigationGoal;
+@@ -1608,12 +1615,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 				{
+ 					bProjectedToNavigation = true;
+ 					PathGoal = Projected.Location;
+-					Result = Bot->MoveToLocation(
+-						PathGoal, AcceptanceRadius, /*bStopOnOverlap*/ true,
+-						/*bUsePathfinding*/ true,
+-						/*bProjectDestinationToNavigation*/ false,
+-						/*bCanStrafe*/ true, nullptr,
+-						/*bAllowPartialPaths*/ TargetDoor.IsValid());
++					Result = EtcJevController::Move(Bot, PathGoal, AcceptanceRadius, TargetDoor.IsValid());
+ 				}
+ 			}
+ 			LastIssuedGoal = Result == EPathFollowingRequestResult::Failed
+@@ -1673,6 +1675,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 
+ 				if (ConsecutiveMoveFailures >= FailureLimit)
+ 				{
++					if (bExternalControl) FinishExternalObjective(TEXT("blocked"), TEXT("path_failed"));
+ 					// Evac doors are never blacklisted: collapse routing is more
+ 					// important than loot. A loot actor rejected by a complete path
+ 					// request is excluded immediately so multiple unreachable
+@@ -1694,7 +1697,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 							TargetChest.Reset();
+ 						}
+ 					}
+-					Bot->StopMovement();
++					EtcJevController::Stop(Bot);
+ 					MoveGoal = FVector::ZeroVector;
+ 					LastIssuedGoal = FVector::ZeroVector;
+ 					LastFailedGoal = FVector::ZeroVector;
+@@ -1705,6 +1708,14 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		}
+ 	}
+ 
++	// PlayerController has no AIController path-focus update; keep its camera facing travel.
++	if (bExternalControl && !TargetEnemy.IsValid() && !bGenericDirectMovement
++		&& !Pawn->GetVelocity().IsNearlyZero(10.0f))
++	{
++		const FRotator Facing = FMath::RInterpConstantTo(Bot->GetControlRotation(),
++			Pawn->GetVelocity().GetSafeNormal2D().Rotation(), DeltaTime, 360.0f);
++		Bot->SetControlRotation(Facing);
++	}
+ 	UpdateCoverScoutLook(DeltaTime);
+ 
+ 	// One watchdog covers both classic path stalls and the more subtle
+@@ -1732,6 +1743,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 		StuckAccumulator += DeltaTime;
+ 		if (EtcBotMobilityRules::HasExceededStationaryBudget(StuckAccumulator))
+ 		{
++			if (bExternalControl) FinishExternalObjective(TEXT("blocked"), TEXT("stationary"));
+ 			AActor* ActionTarget = TargetDoor.Get();
+ 			if (ActionTarget == nullptr)
+ 			{
+@@ -1745,7 +1757,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 			UE_LOG(LogEtcBotBrain, Warning,
+ 				TEXT("%s stationary for %.2fs (mode=%s target=%s moveStatus=%d goal=%s); %s."),
+ 				*GetNameSafe(Bot), StuckAccumulator, EtcBot::ModeName(Mode),
+-				*GetNameSafe(ActionTarget), static_cast<int32>(Bot->GetMoveStatus()),
++				*GetNameSafe(ActionTarget), static_cast<int32>(EtcJevController::Status(Bot)),
+ 				*MoveGoal.ToString(), bHadExplicitAction
+ 					? TEXT("diagnosing target route and replanning")
+ 					: TEXT("no action target, switching to cover scout"));
+@@ -1767,7 +1779,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 				}
+ 			}
+ 
+-			Bot->StopMovement();
++			EtcJevController::Stop(Bot);
+ 			MoveGoal = FVector::ZeroVector;
+ 			LastIssuedGoal = FVector::ZeroVector;
+ 			LastFailedGoal = FVector::ZeroVector;
+@@ -1788,7 +1800,7 @@ void UEtcBotBrainComponent::TickComponent(float DeltaTime, ELevelTick TickType,
+ 	if (Mode == EEtcBotMode::Fight && bHasWeapon)
+ 	{
+ 		RefreshLoadout();
+-		if (const UEtcBotAimComponent* Aim = Bot->GetAim())
++		if (const UEtcBotAimComponent* Aim = EtcJevController::Aim(Bot))
+ 		{
+ 			bWantsToFire = Aim->HasAcquired() && Aim->CanPullTrigger();
+ 		}
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
+index 34c1e1af..8cfca137 100644
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
+@@ -21,6 +21,7 @@ class ETCCORERUNTIME_API UEtcBotAimComponent : public UActorComponent
+ 	GENERATED_BODY()
+ 
+ public:
++	int32 GetHeldInputCount() const { return bAdsHeld ? 1 : 0; }
+ 	UEtcBotAimComponent();
+ 
+ 	void SetDifficulty(EEtcBotTier InTier);
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
+index d6c9a5a9..00208866 100644
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
+@@ -31,6 +31,14 @@ public:
+ 	int32 GetMagazineAmmo() const { return MagazineAmmo; }
+ 	int32 GetSpareAmmo() const { return SpareAmmo; }
+ 
++	// Opt-in player execution only. Original Bot strategic policy remains unchanged.
++	bool SetExternalObjective(const FString& Id, const FString& Kind, AActor* Target, const FVector& Goal, double Until);
++	void StopExternalControl(const FString& Reason);
++	const FString& GetExternalObjective() const { return ExternalId; }
++	const FString& GetExternalStatus() const { return ExternalStatus; }
++	const FString& GetExternalReason() const { return ExternalReason; }
++	int32 GetExternalFailures() const { return ExternalFailures; }
++	int32 GetExternalHeldInputs() const;
+ 	void NotifyEliminated();
+ 
+ 	virtual void BeginPlay() override;
+@@ -38,6 +46,15 @@ public:
+ 		FActorComponentTickFunction* ThisTickFunction) override;
+ 
+ private:
++	void ReevaluateExternal();
++	void FinishExternalObjective(const FString& Status, const FString& Reason);
++	bool ExternalLeaseExpired() const;
++	bool bExternalControl = false;
++	double ExternalUntil = 0;
++	FString ExternalId, ExternalKind, ExternalStatus = TEXT("released"), ExternalReason = TEXT("not_started");
++	TWeakObjectPtr<AActor> ExternalTarget;
++	FVector ExternalGoal = FVector::ZeroVector;
++	int32 ExternalFailures = 0;
+ 	void Reevaluate();
+ 	int32 CurrentSlot() const;
+ 	void RefreshLoadout();
