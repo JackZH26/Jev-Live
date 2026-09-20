@@ -4,7 +4,7 @@
 
 **作者：JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj)，欢迎关注交流。**
 
-**需求更新：产品面向 Steam 游戏库。** 用户先从本机 Steam 库添加游戏，再选择直播游戏并通过 Steam 启动；首测 **Enter the Cube Playtest（5272970）**。普通主播不需要开发工程、游戏源码或 Unreal 编辑器。目标是扩展到任意游戏，但可直播与自动操作支持分开标注。第一阶段调整为 Steam 游戏选择、Playtest 自动游玩与 YouTube/Twitch 双路；角色、语音、聊天后续接入。界面首期简中、繁中、日、韩、英五语言，说明文档中英双语；原创软件已确定 MIT。下文完整产品架构包含未来阶段，实际实现和验证以[验收记录](docs/PHASE1_STATUS.md)为准。
+**需求更新：产品面向 Steam 游戏库。** 用户先从本机 Steam 库添加游戏，再选择直播游戏并通过 Steam 启动；首测 **Enter the Cube Playtest（5272970）**。普通主播不需要开发工程、游戏源码或 Unreal 编辑器。目标是扩展到任意游戏，但可直播与自动操作支持分开标注。第一阶段调整为 Steam 游戏选择、Playtest 自动游玩与 YouTube/Twitch/X 推流；角色、语音、聊天后续接入。界面首期简中、繁中、日、韩、英五语言，说明文档中英双语；原创软件已确定 MIT。下文完整产品架构包含未来阶段，实际实现和验证以[验收记录](docs/PHASE1_STATUS.md)为准。
 
 调研日期：2026-09-20。目标首发系统：Windows。首个适配对象：截图中的 Enter the Cube / Enter the Cube Playtest。产品名 JEV Studio 为工作代号，发布前需要检查名称与商标。
 
@@ -12,7 +12,7 @@
 
 可以建设这套软件，但在本次查阅范围内，没有发现一个已验证同时满足“任意 Steam 游戏自主游玩、虚拟角色自然解说、五个平台双向聊天、独立直播布局、24 小时恢复、一键配置”的开源成品。最合适的路线是：以 AIRI 的角色、语音和前端组件为基础，新建直播工作台；结合 JEV 的结构化决策、针对游戏的执行适配包、OBS 的采集与合成、多平台连接器和独立的运行监督程序。
 
-产品提供“自动玩”和“手动玩”两种正式模式。完整版本的虚拟角色、自动解说、自动语音回复、自动文字回复、聊天布局与多平台直播能力完全共用，唯一的功能差别是游戏由 AI 还是用户操作。文字回复仍以各平台已有权限为前提，这个限制对两种模式一致。游戏开发权允许未来增加可选状态接口，但不作为主播使用软件的前提；当前第一阶段优先完成 Steam 游戏选择与游玩、两路直播。
+产品提供“自动玩”和“手动玩”两种正式模式。完整版本的虚拟角色、自动解说、自动语音回复、自动文字回复、聊天布局与多平台直播能力完全共用，唯一的功能差别是游戏由 AI 还是用户操作。文字回复仍以各平台已有权限为前提，这个限制对两种模式一致。游戏开发权允许未来增加可选状态接口，但不作为主播使用软件的前提；当前第一阶段优先完成 Steam 游戏选择与游玩、多平台推流；X 使用官方 Live Studio RTMPS 源，事件和可见性由 X 后台管理，详见 [X 配置](docs/X_SETUP.md)。
 
 用户选择游戏后再选择操作模式。支持自动控制的游戏可任选两种模式；尚未适配自动控制的游戏仍可选择手动玩，使用相同的自动互动系统。游戏解说依据可获取的游戏状态或视觉观察，状态不足时只回应已确认的信息。自动控制适配的缺失不会阻止普通聊天与语音互动。
 
@@ -186,10 +186,10 @@ Steam 游戏 → 只读状态／画面观察 → 游戏事件 ──┐
 | Twitch | 官方登录、推流凭证、直播状态；按需配置频道资料 | 官方 EventSub | 官方 Send Chat Message API | 第一优先；输出画面单独过滤聊天来源 |
 | B站 | 直播间资格与推流凭证另行验证；能拿到 RTMP 不代表拥有全套建播 API | 优先官方直播开放平台，结合应用资格、主播身份码和项目授权实测 | 本次没有确认通用且适用于本产品的官方发送链路 | 首批接入收弹幕与语音回答；文字功能按权限开放 |
 | TikTok | 依账号／地区与 LIVE 权限；只有获得有效外部推流入口时才能直推 | 常用开源库为非官方逆向；可选第三方服务，不能标成官方接口 | 没有核实可对所有普通账号稳定使用的官方聊天发送接口 | 条件支持、实验接入；缺权限时不承诺无人值守 |
-| X | 官方 Producer／Live Studio 提供外部源路径，但账号资格与创建直播另行核验 | 本次未核实适用于普通开发者的通用官方 LIVE chat 接口 | X 帖子回复不等同于直播聊天；不混用 | 优先视频输出，互动保留能力插槽与未验证状态 |
+| X | 官方 Live Studio RTMPS 源已接入并完成真实私密收流；事件在 X 后台创建 | 本次未核实适用于普通开发者的通用官方 LIVE chat 接口 | X 帖子回复不等同于直播聊天；不混用 | 优先视频输出，互动保留能力插槽与未验证状态 |
 | 其他 RTMP 平台 | 用户提供官方有效入口即可评估视频推送 | 需单独连接器 | 需单独连接器 | 可扩展；不能写成“自定义 RTMP = 全功能平台” |
 
-来源：[YouTube LiveChatMessages](https://developers.google.com/youtube/v3/live/docs/liveChatMessages)、[Twitch 收发聊天](https://dev.twitch.tv/docs/chat/send-receive-messages/)、[B站直播开放平台](https://open-live.bilibili.com/)、[TikTok LIVE Studio 权限说明](https://www.tiktok.com/live/studio/help/article/Before-you-go-LIVE/Apply-for-LIVE-access?lang=en)、[TikTok 非官方连接器声明](https://github.com/zerodytrash/TikTok-Live-Connector)、[X Producer](https://help.x.com/en/using-x/how-to-use-live-producer)
+来源：[YouTube LiveChatMessages](https://developers.google.com/youtube/v3/live/docs/liveChatMessages)、[Twitch 收发聊天](https://dev.twitch.tv/docs/chat/send-receive-messages/)、[B站直播开放平台](https://open-live.bilibili.com/)、[TikTok LIVE Studio 权限说明](https://www.tiktok.com/live/studio/help/article/Before-you-go-LIVE/Apply-for-LIVE-access?lang=en)、[TikTok 非官方连接器声明](https://github.com/zerodytrash/TikTok-Live-Connector)、[X Live Studio](https://help.x.com/en/using-x/live-studio)
 
 TikTok 部分帮助页受抓取限制，已检索到官方权限说明，但未进入用户账号实测。B站文档站部分页面依赖登录或前端渲染，不能据此推断所有接口开放。自动化权限与服务政策需要在实际发行和每个平台上线前再次核对，不承诺所有平台都允许无人值守的相同运营方式。
 
@@ -325,7 +325,7 @@ YouTube 超过 12 小时的直播可能无法完整归档；可提供“持续�
 
 第一轮采用云端 LLM／TTS，游戏与 OBS 使用 GPU；先验证两路，再逐步增加到五路。游戏限帧，为合成预留 GPU 时间；监测显存、渲染延迟和编码丢帧，不预先保证某张显卡能在最高游戏画质下满载运行所有配置。若本地 TTS 会造成游戏抖动，移到第二台机器或恢复云端模式。
 
-编码器配置按平台单独选择 H.264／AAC 等已验证组合，分辨率、帧率、码率、关键帧间隔不一刀切。例如 X Producer 官方页目前列出 1080p30 和 720p60 等不同约束，因此不能把五平台统一硬编码为 1080p60。[X 编码规范](https://help.x.com/en/using-x/how-to-use-live-producer)
+编码器配置按平台单独选择 H.264／AAC 等已验证组合，分辨率、帧率、码率、关键帧间隔不一刀切。本版本 X 预设为 1080p30、AAC 128 kbps、三秒关键帧，按实测账号面板配置；新版 Live Studio 帮助也推荐 1080p60，不再沿用旧 Producer 限制。具体按账号面板及最新文档核验。[X 编码规范](https://help.x.com/en/using-x/live-studio)
 
 带宽算例：每路视频 6Mbps，五路为 30Mbps；加音频与协议开销后建议至少约 40–50Mbps 的稳定可用上行，并对目标地区实测。这里是规划算例，不是已测网络能力。6Mbps 每天约 64.8GB，每月 30 天约 1.94TB；五路中继的月出口约 9.72TB，尚未计音频与开销。租中继时带宽流量可能比软件费用更显著。
 
@@ -391,4 +391,4 @@ Social Stream Ninja 和 AI-Vtuber 作为外部兼容方案时保留其许可，�
 
 阶段 0 仍需实际验证：ETC 的 Bridge 接口与可操控范围；Aitum 对多画布及每目标编码控制的覆盖；本机五路不同输出的性能；你的各平台账号权限；B站、TikTok、X 文字发送链路；模型／素材的具体发行许可。以上不影响现在确定产品架构，但会决定首发能力矩阵。
 
-**按更新后的优先级：先完成 Steam 库添加／选择、Playtest 自动游玩与不中断直播的模式切换，以及 YouTube／Twitch 两路；随后接入角色和两种模式共用的自动语音／文字互动，形成两小时闭环，再扩展 B站、24 小时恢复、权限已确认的 TikTok／X 和第二款游戏。每一步都留下可重复的测试与观众侧证据。**
+**按更新后的优先级：先完成 Steam 库添加／选择、Playtest 自动游玩与不中断直播的模式切换，以及 YouTube／Twitch 与 X RTMPS 输出；随后接入角色和两种模式共用的自动语音／文字互动，形成两小时闭环，再扩展 B站、24 小时恢复、权限已确认的 TikTok、X 互动和第二款游戏。每一步都留下可重复的测试与观众侧证据。**

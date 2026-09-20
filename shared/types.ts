@@ -1,4 +1,9 @@
-export type Provider = 'youtube' | 'twitch';
+export const providers = ['youtube','twitch','x'] as const;
+export type Provider = typeof providers[number];
+export type OAuthProvider = Exclude<Provider,'x'>;
+export const providerNames:Record<Provider,string>={youtube:'YouTube',twitch:'Twitch',x:'X'};
+export interface XSourceInput { name:string; server:string; key:string }
+export interface XSourceSummary { configured:boolean; name:string }
 export type PlayMode = 'manual' | 'auto';
 export interface SteamGame {appId:string;name:string;installDirectory:string;buildId:string;branch:string;autoSupport:'experimental'|'unavailable'}
 export interface Settings {
@@ -22,7 +27,7 @@ export interface OutputState {
   frames: number; skipped: number; bytes: number; error?: string;
 }
 export interface Snapshot {
-  settings: Settings; accounts: Record<Provider, Account | null>;
+  settings: Settings; accounts: Record<OAuthProvider, Account | null>; xSource:XSourceSummary;
   outputs: Record<Provider, OutputState>; mode: PlayMode;
   game: GameState | null; gameConnected: boolean; gameError: string; gamePid?:number;
   decision: string; busy: string; lastError: string; hasJevKey: boolean;
@@ -43,9 +48,11 @@ export interface StudioAPI {
   selectPlatforms(platforms: Provider[]): Promise<void>;
   saveJevKey(key: string): Promise<void>;
   importGoogleClient(): Promise<boolean>;
-  connectAccount(provider: Provider): Promise<void>;
-  cancelLogin(provider: Provider): Promise<void>;
-  disconnectAccount(provider: Provider): Promise<void>;
+  connectAccount(provider: OAuthProvider): Promise<void>;
+  cancelLogin(provider: OAuthProvider): Promise<void>;
+  disconnectAccount(provider: OAuthProvider): Promise<void>;
+  saveXSource(source:XSourceInput):Promise<void>;
+  removeXSource():Promise<void>;
   setupOBS(): Promise<void>;
   windows(): Promise<{label:string; value:string}[]>;
   setCapture(window: string): Promise<void>;

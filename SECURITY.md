@@ -4,7 +4,7 @@
 
 Do not post credentials, stream keys, cookies, OAuth JSON exports, diagnostic dumps or account screenshots in issues, PRs or chat.
 
-JEV Studio keeps runtime data outside its source repository, in Electron's per-user `JEV Studio` data directory. On Windows, OAuth access/refresh tokens, imported Google desktop client credentials and JEV API keys are encrypted using Electron `safeStorage` (Windows DPAPI). The renderer receives account display information, never access tokens, refresh tokens or stream keys. There is no plaintext fallback when the system key store is unavailable.
+JEV Studio keeps runtime data outside its source repository, in Electron's per-user `JEV Studio` data directory. On Windows, OAuth access/refresh tokens, imported Google desktop client credentials, JEV API keys and the X source URL/key are encrypted using Electron `safeStorage` (Windows DPAPI). Saved secrets are never returned to the renderer. Manually entered X keys exist briefly in the password input and are cleared on submission; snapshots return only the source label and configured status. There is no plaintext fallback when the system key store is unavailable.
 
 OBS needs its WebSocket password and streaming service settings in its own configuration. OBS does **not** encrypt these files. Managed OBS copies live under the user's application-data directory, never in the repository, and stream keys are cleared after a confirmed stop. Protect the Windows account and do not upload the OBS data directory. Encryption does not protect a compromised Windows session.
 

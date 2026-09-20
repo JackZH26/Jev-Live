@@ -4,6 +4,7 @@ import { Store } from './storage';
 import { Obs } from './obs';
 import { OAuth } from './oauth';
 import { Platforms } from './platforms';
+import { XLive } from './x-live';
 interface Journal { youtubeId?:string; streamId?:string; youtubeUrl?:string; twitchUrl?:string; platforms?:Provider[]; state:string }
 /** Owns only the broadcast resources created by this session, with durable recovery. */
 export class Broadcast {
@@ -22,7 +23,8 @@ export class Broadcast {
       if(!settings.steamAppId||!settings.addedSteamGames.includes(settings.steamAppId))throw new Error(message('error.steamSelection'));
       const accounts=await this.auth.accounts();
       const selected=settings.enabledPlatforms;
-      if(selected.some(p=>!accounts[p]))throw new Error(message('error.accountsFirst'));
+      if(selected.some(p=>p!=='x'&&!accounts[p]))throw new Error(message('error.accountsFirst'));
+      const x=selected.includes('x')?await new XLive(this.store).destination():undefined;
       await this.obs.poll();
       if(!settings.gameWindow)throw new Error(message('error.captureFirst'));
       for(const p of selected) {
@@ -47,10 +49,12 @@ export class Broadcast {
         await this.obs.service('twitch',twitch.server,twitch.key);
         this.state.twitchUrl=twitch.url;await this.save();
       }
+      if(x)await this.obs.service('x',x.server,x.key);
       // Prepare all selected destinations before starting any output.
       for(const p of selected)await this.obs.start(p);
       this.state={...this.state,state:'sending'};await this.save();
       this.log(message('event.sending'));
+      if(x)this.log(message('event.xSending'));
     } catch(e) {
       if(this.state.state==='preparing') {
         const owned=this.outputs();
@@ -72,7 +76,9 @@ export class Broadcast {
       if(results.some(r=>r.status==='rejected')) { this.state.state='recovery';await this.save();throw new Error(message('error.stopUnconfirmed')); }
       if(this.state.youtubeId)await this.platforms.finish(this.state.youtubeId);
       await Promise.allSettled(this.outputs().map(p=>this.obs.clearKey(p)));
+      const usedX=this.outputs().includes('x');
       this.state={state:'idle'};await this.save();this.log(message('event.stopped'));
+      if(usedX)this.log(message('event.xStopped'));
     } catch(e) { this.state.state='recovery';await this.save();throw e; }
     finally {this.locked=false;}
   }

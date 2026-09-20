@@ -4,7 +4,7 @@
 
 请勿在 issue、PR 或聊天中发布凭证、推流密钥、Cookie、OAuth JSON、诊断转储或账号截图。
 
-JEV Studio 将运行数据保存在仓库外的 Electron 用户数据目录 `JEV Studio`。Windows 下，OAuth 访问令牌和刷新令牌、导入的 Google 桌面客户端凭证及 JEV API Key 由 Electron `safeStorage`（Windows DPAPI）加密。渲染页面仅接收账号显示信息，不接收令牌或推流密钥；系统密钥存储不可用时拒绝保存，不降级为明文。
+JEV Studio 将运行数据保存在仓库外的 Electron 用户数据目录 `JEV Studio`。Windows 下，OAuth 访问令牌和刷新令牌、导入的 Google 桌面客户端凭证、JEV API Key 和 X 源地址／密钥由 Electron `safeStorage`（Windows DPAPI）加密。保存的凭证不返回渲染页面；手工填写的 X 密钥短暂存在于密码输入框，提交后清空，状态快照仅返回源名称和是否配置。系统密钥存储不可用时拒绝保存，不降级为明文。
 
 OBS 需要在自己的配置中保存 WebSocket 密码和推流服务设置，这些文件**没有被 OBS 加密**。受管理的 OBS 副本放在用户应用数据目录，确认停流后清除推流密钥。保护 Windows 账号，不能上传 OBS 运行目录。加密无法保护已经被控制的 Windows 登录会话。
 

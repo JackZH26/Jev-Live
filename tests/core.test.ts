@@ -9,6 +9,7 @@ import { ControlGate } from '../electron/game';
 import { Broadcast } from '../electron/broadcast';
 import { Platforms } from '../electron/platforms';
 import { ApiError } from '../electron/http';
+import { XLive } from '../electron/x-live';
 
 const dirs:string[]=[];
 afterEach(async()=>{vi.restoreAllMocks();vi.unstubAllGlobals();for(const d of dirs.splice(0))await rm(d,{recursive:true,force:true});});
@@ -72,7 +73,7 @@ describe('dual-output transaction',()=>{
   async function fixture(){
     const store=await storage();await store.saveSettings({...await store.settings(),gameWindow:'fixture-window',steamAppId:'5272970',addedSteamGames:['5272970']});
     const calls:string[]=[];
-    const obs:any={states:{youtube:{connected:true,ready:true,active:false},twitch:{connected:true,ready:true,active:false}},poll:async()=>{},windows:async()=>[{value:'fixture-window'}],service:async(p:string)=>{calls.push(`service:${p}`);},start:async(p:string)=>{calls.push(`start:${p}`);},stop:vi.fn(async(p:string)=>{calls.push(`stop:${p}`);}),clearKey:async()=>{}};
+    const obs:any={states:{youtube:{connected:true,ready:true,active:false},twitch:{connected:true,ready:true,active:false},x:{connected:true,ready:true,active:false}},poll:async()=>{},windows:async()=>[{value:'fixture-window'}],service:async(p:string)=>{calls.push(`service:${p}`);},start:async(p:string)=>{calls.push(`start:${p}`);},stop:vi.fn(async(p:string)=>{calls.push(`stop:${p}`);}),clearKey:vi.fn(async()=>{})};
     const auth:any={accounts:async()=>({youtube:{},twitch:{}}),validateTwitch:async()=>{}};
     const platforms:any={twitchDestination:async()=>({server:'rtmp://fixture',key:'test',url:'https://www.twitch.tv/fixture'}),createYouTubeBroadcast:async()=>({id:'broadcast'}),createYouTubeStream:async()=>({id:'stream',cdn:{ingestionInfo:{ingestionAddress:'rtmp://fixture',streamName:'test'}}}),bind:async()=>{},finish:vi.fn(async()=>{})};
     return {store,obs,auth,platforms,calls,broadcast:new Broadcast(store,obs,auth,platforms,()=>{})};
@@ -113,6 +114,37 @@ describe('dual-output transaction',()=>{
     const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:[]});
     f.auth.accounts=vi.fn();await expect(f.broadcast.start()).rejects.toThrow('channels.minimum');
     expect(f.auth.accounts).not.toHaveBeenCalled();expect(f.calls).toEqual([]);expect(f.broadcast.state.state).toBe('idle');
+  });
+  it('streams X alone from an encrypted source without OAuth to other platforms',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['x']});
+    await new XLive(f.store).save({name:'Fixture',server:'rtmps://sg.pscp.tv:443/x/',key:'fixture-stream-key'});
+    f.auth.accounts=async()=>({youtube:null,twitch:null});f.auth.validateTwitch=vi.fn();
+    f.platforms.createYouTubeBroadcast=vi.fn();f.platforms.twitchDestination=vi.fn();
+    await f.broadcast.start();expect(f.calls).toEqual(['service:x','start:x']);
+    expect(f.broadcast.state.platforms).toEqual(['x']);expect(f.broadcast.state.state).toBe('sending');
+    await f.broadcast.stop();expect(f.obs.stop).toHaveBeenCalledExactlyOnceWith('x');expect(f.obs.clearKey).toHaveBeenCalledExactlyOnceWith('x');
+    expect(f.platforms.createYouTubeBroadcast).not.toHaveBeenCalled();expect(f.platforms.twitchDestination).not.toHaveBeenCalled();expect(f.auth.validateTwitch).not.toHaveBeenCalled();
+  });
+  it('rejects an unconfigured X source before changing any output',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['x']});
+    await expect(f.broadcast.start()).rejects.toThrow('error.xSourceRequired');expect(f.calls).toEqual([]);
+  });
+  it('rolls back all three selected outputs if the X encoder fails',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube','twitch','x']});
+    await new XLive(f.store).save({name:'Fixture',server:'rtmps://sg.pscp.tv/x',key:'fixture-stream-key'});
+    f.obs.start=async(p:string)=>{f.calls.push(`start:${p}`);if(p==='x')throw new Error('fixture-x-failure');};
+    await expect(f.broadcast.start()).rejects.toThrow('fixture-x-failure');
+    expect(f.calls.slice(0,6)).toEqual(['service:youtube','service:twitch','service:x','start:youtube','start:twitch','start:x']);
+    for(const p of ['youtube','twitch','x']){expect(f.obs.stop).toHaveBeenCalledWith(p);expect(f.obs.clearKey).toHaveBeenCalledWith(p);}
+    expect(f.platforms.finish).toHaveBeenCalledWith('broadcast');expect(f.broadcast.state.state).toBe('idle');
+  });
+  it('recovers an X session even when the current selected platforms change',async()=>{
+    const f=await fixture();await f.store.set('broadcast',{state:'sending',platforms:['x']});
+    await f.broadcast.init();await f.broadcast.stop();expect(f.obs.stop).toHaveBeenCalledExactlyOnceWith('x');
+  });
+  it('does not attach new X output to a legacy two-platform recovery',async()=>{
+    const f=await fixture();await f.store.set('broadcast',{state:'sending'});
+    await f.broadcast.init();await f.broadcast.stop();expect(f.obs.stop).toHaveBeenCalledTimes(2);expect(f.obs.stop).not.toHaveBeenCalledWith('x');
   });
   it('reports YouTube activation rejection without starting either selected output',async()=>{
     const f=await fixture();

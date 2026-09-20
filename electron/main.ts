@@ -10,6 +10,8 @@ import { Game } from './game';
 import { Steam } from './steam';
 import { Platforms } from './platforms';
 import { Broadcast } from './broadcast';
+import { XLive } from './x-live';
+import { providers } from '../shared/types';
 import type { Snapshot } from '../shared/types';
 
 app.setName('JEV Studio');
@@ -17,12 +19,12 @@ app.setName('JEV Studio');
 if(process.env.JEV_TEST_DATA_DIR)app.setPath('userData',process.env.JEV_TEST_DATA_DIR);
 if(!app.requestSingleInstanceLock()) app.quit();
 let window:BrowserWindow, tray:Tray, closing=false, busy='',lastError='';
-let store:Store,auth:OAuth,obs:Obs,game:Game,broadcast:Broadcast;
+let store:Store,auth:OAuth,obs:Obs,game:Game,broadcast:Broadcast,xLive:XLive;
 let currentLocale:Locale='zh-CN';
 const logs:Snapshot['logs']=[];
 const log=(message:string)=>{logs.unshift({at:new Date().toISOString(),message});logs.splice(0,logs.length,...logs.slice(0,100));};
 function updateTray(){if(tray)tray.setContextMenu(Menu.buildFromTemplate([{label:t(currentLocale,'tray.open'),click:()=>window.show()},{label:t(currentLocale,'tray.manual'),click:()=>{void game.setMode('manual');}},{type:'separator'},{label:t(currentLocale,'tray.quit'),click:()=>app.quit()}]));}
-const provider=z.enum(['youtube','twitch']);
+const provider=z.enum(providers),oauthProvider=z.enum(['youtube','twitch']);
 const mode=z.enum(['manual','auto']);
 const dev=process.env.JEV_DEV_URL;
 
@@ -45,6 +47,7 @@ function allowedExternal(raw:string) {
 app.whenReady().then(async()=>{
   const directory=process.env.JEV_TEST_DATA_DIR || app.getPath('userData');
   store=new Store(directory,safeStorage);await store.init();
+  xLive=new XLive(store);
   currentLocale=(await store.settings()).locale;
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
@@ -54,7 +57,7 @@ app.whenReady().then(async()=>{
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
   window.webContents.session.setPermissionCheckHandler(()=>false);
-  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,gameInput:{foreground:game.observation?.foreground??false,heldInputs:game.observation?.heldInputs??0}} satisfies Snapshot));
+  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,gameInput:{foreground:game.observation?.foreground??false,heldInputs:game.observation?.heldInputs??0}} satisfies Snapshot));
   const gameId=z.string().regex(/^\d+$/).max(12);
   const requireGameIdle=()=>{if(broadcast.state.state!=='idle'||game.gate.mode==='auto')throw new Error(message('error.gameSelectionBusy'));};
   handler('scanSteam',()=>steam.scan(),message('steam.scan'));
@@ -90,9 +93,11 @@ app.whenReady().then(async()=>{
     await store.set('google.clientSecret',c.client_secret);await store.set('oauth.youtube',undefined);
     await store.saveSettings({...await store.settings(),googleClientId:c.client_id});return true;
   });
-  handler('connectAccount',async value=>{await auth.login(provider.parse(value));});
-  handler('cancelLogin',async value=>auth.cancel(provider.parse(value)));
-  handler('disconnectAccount',async value=>{if(broadcast.state.state!=='idle')throw new Error(message('error.logoutDuringLive'));await auth.disconnect(provider.parse(value));});
+  handler('connectAccount',async value=>{await auth.login(oauthProvider.parse(value));});
+  handler('cancelLogin',async value=>auth.cancel(oauthProvider.parse(value)));
+  handler('disconnectAccount',async value=>{if(broadcast.state.state!=='idle')throw new Error(message('error.logoutDuringLive'));await auth.disconnect(oauthProvider.parse(value));});
+  handler('saveXSource',async value=>{if(broadcast.state.state!=='idle'||obs.states.x.active)throw new Error(message('error.livePending'));await xLive.save(value);log(message('event.xSaved'));},message('busy.xSource'));
+  handler('removeXSource',async()=>{if(broadcast.state.state!=='idle'||obs.states.x.active)throw new Error(message('error.livePending'));await obs.clearKey('x');await xLive.remove();},message('busy.xSource'));
   handler('setupOBS',()=>obs.setup(),message('busy.obs'));
   handler('windows',()=>obs.windows());handler('setCapture',value=>obs.capture(z.string().min(1).max(1000).parse(value)),message('busy.capture'));
   handler('preview',value=>obs.preview(provider.parse(value)));

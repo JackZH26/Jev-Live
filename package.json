@@ -2,7 +2,7 @@
   "name": "jev-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "Open-source virtual streaming studio for Steam libraries, manual or JEV-assisted gameplay and YouTube/Twitch multistreaming",
+  "description": "Open-source virtual streaming studio for Steam libraries, manual or JEV-assisted gameplay and YouTube/Twitch/X multistreaming",
   "license": "MIT",
   "author": {"name": "JackZH26", "url": "https://x.com/jackzhj"},
   "repository": {"type": "git", "url": "git+https://github.com/JackZH26/Jev-Live.git"},

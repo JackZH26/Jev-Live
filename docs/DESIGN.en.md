@@ -6,7 +6,7 @@
 
 Research date: 2026-09-20. Windows first. JEV Studio is a working product name; check naming and trademarks before release.
 
-**Updated requirement: the product starts from the Steam library.** Add installed games, choose the game to stream and launch it through Steam. The first test target is **Enter the Cube Playtest, AppID 5272970**. Ordinary streamers need no development project, source code or Unreal editor. The ambition is broad game support, with capture/streaming and autonomous-control compatibility shown separately. Phase 1 now prioritizes Steam selection, Playtest automation and YouTube/Twitch outputs; avatars, speech and chat follow. The UI supports Simplified/Traditional Chinese, Japanese, Korean and English; documentation has Chinese/English editions. Original code uses MIT. This document includes future architecture; the [acceptance record](PHASE1_STATUS.en.md) identifies implemented and tested capabilities.
+**Updated requirement: the product starts from the Steam library.** Add installed games, choose the game to stream and launch it through Steam. The first test target is **Enter the Cube Playtest, AppID 5272970**. Ordinary streamers need no development project, source code or Unreal editor. The ambition is broad game support, with capture/streaming and autonomous-control compatibility shown separately. Phase 1 now prioritizes Steam selection, Playtest automation and YouTube/Twitch/X outputs; avatars, speech and chat follow. The UI supports Simplified/Traditional Chinese, Japanese, Korean and English; documentation has Chinese/English editions. Original code uses MIT. This document includes future architecture; the [acceptance record](PHASE1_STATUS.en.md) identifies implemented and tested capabilities.
 
 ## Recommendation and the two-mode contract
 
@@ -137,7 +137,7 @@ Daily controls reduce to host, game, mode, destinations and start. Remember pref
 
 “One click” presumes streaming eligibility, valid authorization and working capture/interaction; autoplay additionally requires a supported adapter. Software cannot remove initial platform activation, CAPTCHAs, review or reauthorization. YouTube notes initial activation can take up to 24 hours. [Encoder streaming](https://support.google.com/youtube/answer/2907883).
 
-Future multi-platform startup may report partial success and offer a saved preference for “any available destination” or “required primary destination.” Disabled platforms must not block authorized ones. Phase 1 deliberately uses a two-destination preparation/rollback transaction; it does not yet implement the future partial-start policy.
+Future multi-platform startup may report partial success and offer a saved preference for “any available destination” or “required primary destination.” Disabled platforms must not block authorized ones. Phase 1 uses a transaction across selected YouTube/Twitch/X outputs; it does not yet implement the future partial-start policy.
 
 For ordinary distribution, maintainers register platform applications and complete applicable review/quotas. Use supported public-client flows; confidential server credentials belong in an optional authorization service, not a desktop installer. Source/self-hosted distributions can provide their own application IDs/services at the cost of one-time setup. A hosted authorization service should also be open-source and replaceable. [Google native OAuth](https://developers.google.com/identity/protocols/oauth2/native-app), [Twitch authorization](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/).
 
@@ -151,10 +151,10 @@ This describes interface feasibility, not verified permissions for a particular 
 | Twitch | Official login, stream credentials and channel metadata | Official EventSub | Official Send Chat Message API | First; isolate its output chat |
 | Bilibili | Verify room eligibility and credentials separately from broadcast APIs | Prefer official Open Live with application/identity-code/project eligibility | No general applicable official send path confirmed in this research | Receive comments and answer by voice first; text conditional |
 | TikTok | Depends on account, region, LIVE and external-ingest access | Common libraries are unofficial reverse engineering; third parties optional | No stable universal official send interface confirmed | Conditional/experimental; no unattended promise without access |
-| X | Producer/Live Studio external sources; eligibility and broadcast creation need verification | No general ordinary-developer LIVE chat API confirmed | Post replies are not LIVE chat | Video first; unverified interaction slot |
+| X | Official Live Studio RTMPS implemented and private ingestion verified; create events on X | No general ordinary-developer LIVE chat API confirmed | Post replies are not LIVE chat | Video first; unverified interaction slot |
 | Other RTMP | Evaluate a valid official ingest supplied by the user | Separate connector needed | Separate connector needed | Custom RTMP does not mean full platform support |
 
-Sources: [YouTube live chat](https://developers.google.com/youtube/v3/live/docs/liveChatMessages), [Twitch chat](https://dev.twitch.tv/docs/chat/send-receive-messages/), [Bilibili Open Live](https://open-live.bilibili.com/), [TikTok LIVE access](https://www.tiktok.com/live/studio/help/article/Before-you-go-LIVE/Apply-for-LIVE-access?lang=en), [unofficial TikTok connector](https://github.com/zerodytrash/TikTok-Live-Connector), [X Producer](https://help.x.com/en/using-x/how-to-use-live-producer).
+Sources: [YouTube live chat](https://developers.google.com/youtube/v3/live/docs/liveChatMessages), [Twitch chat](https://dev.twitch.tv/docs/chat/send-receive-messages/), [Bilibili Open Live](https://open-live.bilibili.com/), [TikTok LIVE access](https://www.tiktok.com/live/studio/help/article/Before-you-go-LIVE/Apply-for-LIVE-access?lang=en), [unofficial TikTok connector](https://github.com/zerodytrash/TikTok-Live-Connector), [X Live Studio](https://help.x.com/en/using-x/live-studio).
 
 Some TikTok help pages restrict retrieval, and some Bilibili documentation requires login/client rendering. This research did not test those user accounts or infer universal API access. Re-check policies and automation permissions before shipping each connector. A voice/subtitle answer is not a successfully sent chat message. If comments cannot be received, video may remain available without invented messages or interactions.
 
@@ -255,7 +255,7 @@ Identify the AI host visibly and expose platform-required disclosure options. Yo
 
 The original read-only hardware inventory found a Core Ultra 7 265K, RTX 5070 Ti with about 16 GB VRAM, and roughly 127 GiB usable RAM (typically marketed as 128 GB). This is a test candidate, not proof of five-output performance. RAM does not remove GPU/encoder limits.
 
-Start with cloud language/voice and local game/OBS GPU work; validate two outputs before five. Limit game frames to reserve composition time, monitor VRAM/render latency/encoder drops, and move local TTS to another machine or cloud if it causes stutter. Choose codec, resolution, rate, bitrate and keyframe intervals per destination; X Producer lists distinct 1080p30/720p60 constraints, so do not hardcode five platforms to 1080p60. [X encoding guidance](https://help.x.com/en/using-x/how-to-use-live-producer).
+Start with cloud language/voice and local game/OBS GPU work; validate two outputs before five. Limit game frames to reserve composition time, monitor VRAM/render latency/encoder drops, and move local TTS to another machine or cloud if it causes stutter. Choose codec, resolution, rate, bitrate and keyframe intervals per destination; the tested X preset uses 1080p30, AAC 128 kbps and three-second keyframes. Current Live Studio help also recommends 1080p60; check account guidance rather than carrying forward old Producer limits. [X encoding guidance](https://help.x.com/en/using-x/live-studio).
 
 Illustrative bandwidth: five 6 Mbps video outputs total 30 Mbps; plan roughly 40–50 Mbps stable usable upstream including audio/overhead and test the target regions. One 6 Mbps output is about 64.8 GB/day or 1.94 TB/30 days; five relay outputs about 9.72 TB/month before overhead. This is planning math, not a measured connection.
 
@@ -281,7 +281,7 @@ Open-source software/protocols do not make JEV, TTS, platforms or model weights 
 
 ## 13. Delivery stages
 
-The original planning estimate assumed 2–3 experienced desktop/media/game developers plus part-time design/testing and optional ETC source access. It excluded platform review, asset production and access approvals, and needs re-estimation after risk validation. The updated first milestone is Steam selection + Playtest autoplay + two official platform connections/outputs.
+The original planning estimate assumed 2–3 experienced desktop/media/game developers plus part-time design/testing and optional ETC source access. It excluded platform review, asset production and access approvals, and needs re-estimation after risk validation. The updated first milestone is Steam selection + Playtest autoplay + YouTube/Twitch OAuth and X Live Studio RTMPS outputs. See [X setup](X_SETUP.en.md) for event and visibility management on X.
 
 | Stage | Original planning range | Deliverables and gate |
 | --- | --- | --- |

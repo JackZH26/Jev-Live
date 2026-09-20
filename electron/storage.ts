@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { providers } from '../shared/types';
 
 export const settingsSchema = z.object({
   locale: z.enum(['zh-CN','zh-TW','ja','ko','en']).default('zh-CN'),
@@ -13,7 +14,7 @@ export const settingsSchema = z.object({
   addedSteamGames:z.array(z.string().regex(/^\d+$/).max(12)).max(200).default([]),
   title: z.string().trim().min(1).max(100).default('Enter the Cube · JEV Studio'),
   youtubePrivacy: z.enum(['private', 'unlisted', 'public']).default('private'),
-  enabledPlatforms:z.array(z.enum(['youtube','twitch'])).max(2).refine(v=>new Set(v).size===v.length).default(['youtube','twitch']),
+  enabledPlatforms:z.array(z.enum(providers)).max(providers.length).refine(v=>new Set(v).size===v.length).default(['youtube','twitch']),
   decisionProvider: z.enum(['rules', 'jev']).default('rules'),
   decisionIntervalMs: z.number().int().min(300).max(5000).default(800),
   autoRestart: z.boolean().default(false), bitrate: z.number().int().min(1500).max(8000).default(6000)

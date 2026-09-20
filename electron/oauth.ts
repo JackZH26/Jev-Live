@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { Store } from './storage';
 import { ApiError, delay, form, jsonRequest } from './http';
-import type { Account, Provider } from '../shared/types';
+import type { Account, OAuthProvider as Provider } from '../shared/types';
 
 const scopes = { youtube: 'https://www.googleapis.com/auth/youtube.force-ssl', twitch: 'channel:read:stream_key channel:manage:broadcast' };
 export interface Credentials { access_token:string; refresh_token:string; expiresAt:number; scope?:string[] | string; clientId:string; account:Account }
