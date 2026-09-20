@@ -4,6 +4,8 @@
 #include "Character/LyraHealthComponent.h"
 #include "Rooms/EtcLootChest.h"
 #include "Rooms/EtcPortalDoor.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "System/EtcSpawnProtectionSubsystem.h"
 
 namespace
@@ -27,6 +29,12 @@ bool UEtcBotBrainComponent::SetExternalObjective(const FString& Id, const FStrin
     if (!Controller || !Controller->GetPawn() || GetWorld()->GetNetMode() != NM_Standalone
         || Until <= JevUtcMs() || Until > JevUtcMs() + 500.0) return false;
     const bool bChanged = !bExternalControl || Id != ExternalId;
+    // Finish a physical jump before replacing its steering. StopExternalControl
+    // still releases immediately for manual takeover, focus loss or expiry.
+    if (bChanged && bExternalControl && ExternalStatus == TEXT("running"))
+        if (const auto* Character = Cast<ACharacter>(Controller->GetPawn());
+            Character && Character->GetCharacterMovement()->IsFalling())
+        { ExternalUntil = Until; return false; }
     bExternalControl = true;
     bEliminated = false;
     ExternalUntil = Until;
@@ -103,7 +111,8 @@ void UEtcBotBrainComponent::ReevaluateExternal()
         { FinishExternalObjective(TEXT("blocked"), TEXT("portal_unavailable")); return; }
         TargetDoor = Door; Mode = EEtcBotMode::Transit;
         MoveGoal = Door->GetActorLocation() + Door->GetActorForwardVector() * 190.0f;
-        MoveGoal.Z = Here.Z;
+        // Door elevation is part of the route (Room011 has four different levels).
+        // Flattening it to the player's height can select the wrong abyss deck.
     }
     else if (ExternalKind == TEXT("loot"))
     {

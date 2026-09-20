@@ -30,6 +30,27 @@ describe('ETC tactical priorities',()=>{
   expect(choose(o,'engage')?.id).toBe('portal');
  });
  it('engages a visible enemy instead of looting',()=>expect(choose(observation())?.kind).toBe('engage'));
+ it('returns fire after damage instead of running across an exposed room for cloud advice',()=>{
+  const p=new EtcPolicy(),o=observation(),now=Date.now();
+  o.executor={kind:'shared-bot-v1',objective:'portal',status:'running',reason:'accepted',failures:0,pathStatus:3};
+  o.actions.find(a=>a.kind==='portal')!.distance=2400;
+  p.choose(o,now,false,true,'portal');o.self.health=88;o.timestamp=now+100;
+  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('engage');
+  o.actions.find(a=>a.kind==='portal')!.distance=300;
+  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('portal');
+ });
+ it('upgrades a starter loadout before an optional strategic relocation but still evacuates danger',()=>{
+  const o=observation({enemies:[]});o.self.weapon='ID_ETC_StarterPistol_C';
+  o.executor={kind:'shared-bot-v1',objective:'wait',status:'running',reason:'accepted',failures:0,pathStatus:0};
+  expect(choose(o,'portal')?.kind).toBe('loot');
+  o.self.danger=true;expect(choose(o,'loot')?.kind).toBe('portal');
+ });
+ it('keeps airborne steering until landing while foreground loss still stops the command',()=>{
+  const p=new EtcPolicy(),o=observation({enemies:[]}),now=Date.now();o.self.grounded=false;
+  o.executor={kind:'shared-bot-v1',objective:'portal',status:'running',reason:'accepted',failures:0,pathStatus:3};
+  expect(p.choose(o,now,false,true,'loot')?.kind).toBe('portal');
+  o.foreground=false;expect(p.choose(o,now,false,true,'loot')?.kind).toBe('wait');
+ });
  it('takes cover at low health before exchanging damage',()=>{
   const o=observation();o.self.health=20;o.actions.push(action('cover'));expect(choose(o,'engage')?.kind).toBe('cover');
  });

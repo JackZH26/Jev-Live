@@ -29,7 +29,7 @@ export const etcObservationSchema = z.object({
   self: z.object({position:vector, health:finite.nonnegative(), maxHealth:finite.positive(),
     magazine:z.number().int().min(-1), reserve:z.number().int().min(-1), weapon:z.string().max(160),
     protected:z.boolean(), traveling:z.boolean(), healing:z.boolean(), room:z.number().int(),roomType:z.number().int().min(1).max(98).optional(),
-    danger:z.boolean(), evacuationSeconds:finite, kills:z.number().int().nonnegative()}),
+    danger:z.boolean(), evacuationSeconds:finite, kills:z.number().int().nonnegative(),grounded:z.boolean().optional()}),
   enemies: z.array(z.object({id:z.string().max(160),position:vector,velocity:vector,distance:finite.nonnegative()})).max(32),
   actions: z.array(etcActionSchema).max(128),
   result: z.object({placement:z.number().int().min(1),won:z.boolean()}).refine(r=>r.won===(r.placement===1)).nullable(),

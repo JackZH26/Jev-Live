@@ -37,7 +37,7 @@ export class EtcMapPlanner {
     if(!o.zone||o.phase!=='playing'||!o.foreground||now-o.timestamp>ETC_MAX_AGE_MS||o.self.traveling)return;
     const action=o.actions.find(a=>a.kind==='inspect_map'&&a.safe);if(!action)return;
     // A visible threat, damage, or the final evacuation seconds preempt the overlay.
-    if(o.enemies.length||now<this.hurtUntil||o.self.healing||o.self.evacuationSeconds>0&&o.self.evacuationSeconds<5)return;
+    if(o.enemies.length||now<this.hurtUntil||o.self.healing||o.self.grounded===false||o.self.evacuationSeconds>0&&o.self.evacuationSeconds<5)return;
     if(o.mapView?.open&&o.executor?.objective==='inspect_map'&&o.executor.status==='running')return action;
     if(this.pending)return action;
     if(now<this.reviewCooldown)return;

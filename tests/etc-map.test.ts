@@ -18,6 +18,11 @@ it('defers map viewing during combat, recent damage and last-second evacuation',
  o.enemies=[];o.self.health=90;o.timestamp+=50;p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
  o.timestamp+=4000;o.self.evacuationSeconds=3;p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
 });
+it('does not stop a jump to open the map and checks it once grounded',()=>{
+ const p=new EtcMapPlanner(),o=state();o.self.grounded=false;p.observe(o,now);
+ expect(p.review(o,now)).toBeUndefined();o.self.grounded=true;
+ expect(p.review(o,now)?.kind).toBe('inspect_map');
+});
 it('prefers a safe multi-hop route and excludes yellow transit rooms that cannot be crossed before refresh',()=>{
  const p=new EtcMapPlanner(),o=snapshot(state());o.zone!.secondsLeft=12;p.observe(o,now);
  expect(p.routes.every(r=>!r.rooms.includes(1))).toBe(true);expect(p.next(o)?.id).toBe('portal_b');

@@ -2,7 +2,27 @@
 
 [简体中文](HYBRID_ACCEPTANCE.md) · [Architecture](HYBRID_AUTOPLAY.en.md)
 
-## Update · 2026-09-21
+## Gameplay knowledge integration · 2026-09-21
+
+Room types 001–028 now have concise knowledge derived from current UE rules, room design/implementation documents and native code. The old Godot GDD path was unavailable; historical design does not override current mechanics. Scoped knowledge, actual M-map inspection and countdown-aware routing are included in the local candidate. See [room knowledge](ROOM_KNOWLEDGE.en.md).
+
+Candidate `20260921-03` completed five consecutive official matches, all with successful input release. All 153 cloud requests carried rules matching the current room's arrival-title type, with zero mismatches. Actual map screenshots cover initial, blocked-route and pre-refresh reviews.
+
+| Receipt suffix | Official place | Shots | Jev requests / admitted |
+|---|---:|---:|---:|
+| 1789924815053 | 15 | 0 | 38 / 37 |
+| 1789924896498 | 19 | 0 | 8 / 7 |
+| 1789924928021 | 8 | 0 | 44 / 41 |
+| 1789925060403 | 17 | 3 | 32 / 28 |
+| 1789925119463 | 13 | 0 | 31 / 30 |
+
+These results validate the context/control pipeline, not combat quality. Evidence exposed excessive relocation, weak equipment, distant retreat without returning fire and falls in rooms 011/027. Follow-up candidate `20260921-04` retains door elevation, defers objective replacement while airborne, separates contingency destinations from immediate actions, prioritizes supplies and responds to visible attacks. Type checks and 170 TypeScript tests passed, alongside Shipping compilation, Cook, Stage and verification of 137 runtime files. Startup focus uses bounded retries; the helper hash is part of streak identity. Official match acceptance is underway; two consecutive firsts remain unproven.
+
+The private console passed renewed HTTPS password access, CSRF, no-cache, mobile-overflow and browser-error checks. The existing private X event is unchanged; game/audio capture follows each new test PID. The remote player audio track measured a peak of 0.087. A standby card prevents a completed match being presented as a current test. These are local pre-release packaged trials, without Steam upload; opponents remain 19 default Regular Bots.
+
+Candidate 04's first match, `1789925760979`, exited room type 011 Hanging Abyss, then recorded pre-refresh snapshot #2 in type 027 Waterpark (62.57 warning seconds remaining) and post-refresh snapshot #3 (collapse stage, 44.52 seconds remaining), both with actual M-map screenshots. Official result: 9th, 73 requests / 71 admitted replies, successful input release; later water traversal still failed. Match `1789925932064` placed 19th with 24 rounds consumed, proving a combat response but not sufficient combat quality. This provides the first real before/after-stage evidence; coverage across additional phases remains outstanding.
+
+## Historical iteration · 2026-09-21
 
 The current local candidate is `20260920-05`. Two consecutive first places remain unachieved. Official receipt `hybrid-smoke-1789920022258` recorded 3rd place, one kill, eight rounds consumed, 283 cloud requests / 251 admitted replies and successful manual release. The next match placed 19th, followed by another 3rd with no kills. All failures and interruptions remain in the record; intervening losses cannot be skipped.
 

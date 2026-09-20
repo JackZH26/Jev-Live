@@ -9,6 +9,7 @@
 #include "Engine/LocalPlayer.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemGlobals.h"
@@ -234,6 +235,7 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   else if(MapOpen){auto M=MakeShared<FJsonObject>();M->SetBoolField(TEXT("open"),true);M->SetNumberField(TEXT("revision"),0);M->SetNumberField(TEXT("observedAt"),0);M->SetNumberField(TEXT("phase"),ZonePhase);M->SetStringField(TEXT("stage"),ZoneStage);M->SetArrayField(TEXT("rooms"),{});M->SetArrayField(TEXT("edges"),{});O->SetObjectField(TEXT("mapView"),M);}
   O->SetNumberField(TEXT("timestamp"),Time);O->SetNumberField(TEXT("frame"),++Frame);O->SetNumberField(TEXT("processId"),FPlatformProcess::GetCurrentProcessId());O->SetStringField(TEXT("phase"),Phase);O->SetStringField(TEXT("mode"),Mode);O->SetNumberField(TEXT("epoch"),Epoch);O->SetNumberField(TEXT("ack"),Ack);O->SetBoolField(TEXT("foreground"),FApp::HasFocus());O->SetStringField(TEXT("map"),W?W->GetMapName():TEXT("none"));
   auto S=MakeShared<FJsonObject>();Vector(S,TEXT("position"),P?P->GetActorLocation():FVector::ZeroVector);S->SetNumberField(TEXT("health"),FMath::Max(0.f,Health));S->SetNumberField(TEXT("maxHealth"),MaxHealth);S->SetNumberField(TEXT("magazine"),L.Magazine);S->SetNumberField(TEXT("reserve"),L.Reserve);S->SetStringField(TEXT("weapon"),L.Weapon);S->SetBoolField(TEXT("protected"),Protected(W,P));S->SetBoolField(TEXT("traveling"),Traveling(W,P));S->SetBoolField(TEXT("healing"),Items&&Items->IsCasting());S->SetNumberField(TEXT("room"),Slot);S->SetBoolField(TEXT("danger"),Danger);S->SetNumberField(TEXT("evacuationSeconds"),Evac);S->SetNumberField(TEXT("kills"),PC?UEtcMatchResultSubsystem::GetEliminationCount(PC->PlayerState):0);O->SetObjectField(TEXT("self"),S);O->SetArrayField(TEXT("enemies"),Enemies);
+  if(const auto* Character=Cast<ACharacter>(P))S->SetBoolField(TEXT("grounded"),Character->GetCharacterMovement()->IsMovingOnGround());
   // This is the current room's normal arrival-title identity. Never disclose
   // archetypes of unvisited slots from the generated map's internal catalog.
   const auto* Entry=PC&&PC->GetLocalPlayer()?PC->GetLocalPlayer()->GetSubsystem<UEtcRoomEntrySubsystem>():nullptr;
@@ -282,7 +284,7 @@ void Execute(UWorld* W,APlayerController* PC,APawn* P,float Dt,double Time){
   if(Active.Kind==TEXT("engage")&&(!EnemyVisible(P,Cast<APawn>(Active.Target.Get()))||Protected(W,P))){Release(TEXT("target_not_visible"));return;}
   auto* Brain=Executor(PC);if(!Brain)return;
   if(Active.Kind==TEXT("inspect_map")){
-    Brain->SetExternalObjective(Active.Id,TEXT("wait"),nullptr,FVector::ZeroVector,Lease);
+    if(!Brain->SetExternalObjective(Active.Id,TEXT("wait"),nullptr,FVector::ZeroVector,Lease))return;
     if(MapFinished)return;
     auto* Hud=PC->GetLocalPlayer()?PC->GetLocalPlayer()->GetSubsystem<UEtcMapHudSubsystem>():nullptr;
     if(!Hud){MapSucceeded=false;MapFinished=true;return;}
@@ -291,7 +293,7 @@ void Execute(UWorld* W,APlayerController* PC,APawn* P,float Dt,double Time){
     return;
   }
   if(auto* Hud=OwnedMap.Get())Hud->HideGlobalMap();OwnedMap.Reset();MapStarted=0;MapFinished=false;
-  Brain->SetExternalObjective(Active.Id,Active.Kind,Active.Target.Get(),Active.Goal,Lease);
+  if(!Brain->SetExternalObjective(Active.Id,Active.Kind,Active.Target.Get(),Active.Goal,Lease))return;
   // Healing and quickbar selection call the same public player actions; the brain owns all movement and weapon inputs.
   if(Active.Kind==TEXT("heal")){if(auto* I=PC->FindComponentByClass<UEtcConsumableComponent>();I&&!I->IsCasting())I->TryUse(static_cast<EEtcConsumableType>(Active.Slot));}
   if(Active.Kind==TEXT("equip")){if(auto* Q=PC->FindComponentByClass<ULyraQuickBarComponent>();Q&&Q->GetActiveSlotIndex()!=Active.Slot)if(auto* F=Q->FindFunction(TEXT("SetActiveSlotIndex"))){struct FArgs{int32 NewIndex;} A{Active.Slot};Q->ProcessEvent(F,&A);}}

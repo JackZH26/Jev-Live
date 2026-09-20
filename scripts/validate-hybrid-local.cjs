@@ -12,6 +12,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  report.candidate=artifact.release;report.requestedSeconds=seconds;report.requestBudget=requestBudget;report.runtimeHashes={};
  for(const name of ['etc-autoplay','etc-policy','etc-tactics','etc-recovery','etc-bridge','etc-map','etc-knowledge'])report.runtimeHashes[name]=createHash('sha256').update(await fs.readFile(path.join(root,'dist-main/electron',name+'.js'))).digest('hex');
  report.harnessHash=createHash('sha256').update(await fs.readFile(__filename)).digest('hex');
+ report.focusHelperHash=createHash('sha256').update(await fs.readFile(path.join(__dirname,'focus-etc-candidate.ps1'))).digest('hex');
  const exe=path.join(release,'content',artifact.config.executable),digest=createHash('sha256').update(await fs.readFile(exe)).digest('hex');
  if(artifact.config.app_id!==5272970||digest!==artifact.files.find(f=>f.path===artifact.config.executable)?.sha256)throw Error('artifact_identity');
  const data=await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JevHybridSmoke-'));app.setPath('userData',data);process.env.JEV_TEST_DATA_DIR=data;
@@ -35,9 +36,9 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  child=spawn(exe,['/EtcCore/Maps/L_ETC_MainMenu','-dx12','-windowed','-ResX=1280','-ResY=720',`-UserDir=${gameData.replaceAll('\\','/')}/`,`-JevBridgeDir=${dir}`],{cwd:path.join(release,'content'),env:{...process.env,SteamAppId:'5272970',SteamGameId:'5272970'},windowsHide:false,stdio:'ignore'});await new Promise((res,rej)=>{child.once('spawn',res);child.once('error',rej)});
  report.pid=child.pid;report.exe=exe;report.sha256=digest;report.bridge=dir;console.log(JSON.stringify({pid:child.pid,out,bridge:dir}));
  await fs.writeFile(path.join(out,'session-info.json'),JSON.stringify({pid:child.pid,bridge:dir,candidate:report.candidate,sha256:digest}));
- const deadline=Date.now()+90000;let o,focused=false;
+ const deadline=Date.now()+90000;let o,focusAt=0,focusAttempts=0;
  while(Date.now()<deadline&&child.exitCode===null){o=await control.observe(child.pid);
-  if(o?.executor&&!focused){focused=true;execFileSync('powershell.exe',['-NoProfile','-File',path.join(__dirname,'focus-etc-candidate.ps1'),'-SmokeProcessId',String(child.pid),'-ExpectedExe',exe],{windowsHide:true,stdio:'ignore'});}
+  if(o?.executor&&!o.foreground&&focusAttempts<3&&Date.now()-focusAt>2500){focusAt=Date.now();focusAttempts++;try{execFileSync('powershell.exe',['-NoProfile','-File',path.join(__dirname,'focus-etc-candidate.ps1'),'-SmokeProcessId',String(child.pid),'-ExpectedExe',exe],{windowsHide:true,stdio:'ignore'});}catch{}}
   if(o?.foreground&&o.executor)break;
   await sleep(100)}
  if(!o?.foreground||!o.executor)throw Error('no_focused_shared_executor');

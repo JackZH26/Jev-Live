@@ -28,6 +28,12 @@ export class EtcPolicy {
     else if(!o.executor&&o.diagnostics.stuck&&this.active){this.failed.set(this.active,now+5000);this.active='';}
     for(const [id,until] of this.failed)if(until<=now)this.failed.delete(id);
     const continuing=o.actions.find(a=>a.id===this.active);
+    // An in-flight jump cannot safely take an unrelated route or map command.
+    // Identity, foreground, death and manual takeover remain outside this hold.
+    if(o.self.grounded===false&&o.executor?.status==='running'){
+      const physical=o.actions.find(a=>a.id===o.executor!.objective&&a.safe);
+      if(physical&&['portal','loot','pickup','scan','cover'].includes(physical.kind))return this.select(physical,now);
+    }
     if(continuing&&['portal','loot','pickup'].includes(continuing.kind)&&o.executor?.objective===this.active&&o.executor.status==='running'){
       if(continuing.distance<this.bestDistance-100){this.bestDistance=continuing.distance;this.progressAt=now;}
       else if(now-this.progressAt>20000){this.failed.set(this.active,now+5000);this.active='';}
@@ -53,6 +59,17 @@ export class EtcPolicy {
         ??eligible.find(a=>a.kind==='scan');
       if(retreat)return this.select(retreat,now);
     }
+    // Return fire while a distant escape would leave us exposed. Cloud may
+    // still select nearby cover/doors, and low health keeps retreat priority.
+    const suggested=eligible.find(a=>a.id===advice);
+    if(visible&&underFire&&!low&&o.self.magazine>0&&!o.self.protected
+      &&!(suggested&&['cover','portal'].includes(suggested.kind)&&suggested.distance<=600)){
+      const fight=eligible.filter(a=>a.kind==='engage').sort((a,b)=>a.distance-b.distance)[0];
+      if(fight)return this.select(fight,now);
+    }
+    const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;
+    const supply=eligible.filter(a=>a.distance<=3000&&(a.kind==='pickup'||a.kind==='loot')).sort((a,b)=>
+      (b.kind==='pickup'?35+(b.rank??0)*4:0)-(a.kind==='pickup'?35+(a.rank??0)*4:0)||a.distance-b.distance)[0];
     // Let a progressing movement finish a short execution window. A new sighting,
     // damage or room danger interrupts immediately; cloud chatter alone does not.
     if(!threatened&&!o.self.danger&&now-this.activeAt<5000&&o.executor?.status==='running'
@@ -65,7 +82,8 @@ export class EtcPolicy {
       const emergency=visible&&low&&eligible.some(a=>a.kind==='cover')
         ||o.self.magazine===0&&eligible.some(a=>a.kind==='equip'||a.kind==='reload'&&o.self.reserve>0)
         ||!threatened&&o.self.health<o.self.maxHealth*.8&&eligible.some(a=>a.kind==='heal')
-        ||!threatened&&eligible.some(a=>a.kind==='equip');
+        ||!threatened&&eligible.some(a=>a.kind==='equip')
+        ||!threatened&&weakLoadout&&supply&&supply.distance<=3000;
       const legal=tactical&&(tactical.kind!=='engage'||visible&&o.self.magazine>0&&!o.self.protected)
         &&(!threatened||!['loot','pickup','scan'].includes(tactical.kind));
       if(legal&&!emergency)return this.select(tactical,now);
@@ -82,9 +100,9 @@ export class EtcPolicy {
         case 'reload': n=o.self.reserve>0?(o.self.magazine===0?130:-60):-1000;break;
         case 'heal': n=!threatened&&o.self.health<o.self.maxHealth*0.8?110:-1000;break;
         case 'equip': n=(o.self.magazine===0?145:!visible?85:25)+(a.rank??0);break;
-        case 'pickup': n=(o.self.magazine<=0&&o.self.reserve<=0?125:55)+(a.rank??0)*4-distance;break;
-        case 'loot': n=(o.self.magazine<=0&&o.self.reserve<=0?100:o.self.reserve>=30&&/AR0|MG0|SR0/.test(o.self.weapon)?10:40)-distance*0.5;break;
-        case 'portal': n=Math.max(5,30-distance*0.1-Math.min(20,6*(this.visits.get(a.destination??-1)??0)))-30*(a.destinationRisk??0)+(planned?.id===a.id?25:0);break;
+        case 'pickup': n=(weakLoadout?125:55)+(a.rank??0)*4-distance;break;
+        case 'loot': n=(weakLoadout?90:o.self.reserve>=30&&/AR0|MG0|SR0/.test(o.self.weapon)?10:40)-distance*0.5;break;
+        case 'portal': n=Math.max(5,30-distance*0.1-Math.min(20,6*(this.visits.get(a.destination??-1)??0)))-30*(a.destinationRisk??0)+(planned?.id===a.id?5:0);break;
       }
       if(o.self.danger&&a.kind!=='portal')n-=200;
       if(visible&&['loot','pickup','portal'].includes(a.kind)&&!o.self.danger)n-=80;
