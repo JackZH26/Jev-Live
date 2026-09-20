@@ -2,6 +2,10 @@
 
 [简体中文](HYBRID_ACCEPTANCE.md) · [Architecture](HYBRID_AUTOPLAY.en.md)
 
+## Steam update accepted · 2026-09-21
+
+`20260921-05` is published as Steam BuildID **25425783** on default and candidate. Actual Steam upgrade, all 137 installed files, lobby, authentication, basic BOT controls and M-map checks passed. See [release acceptance](STEAM_PLAYTEST_20260921.en.md). Earlier local-candidate trials remain below as history; two consecutive first places have not been achieved.
+
 ## Knowledge-based defense and first official victory · 2026-09-21
 
 The first six-match batch for this strategy placed 14th, 18th, 1st, 14th, 19th and 6th in order, all with official results and confirmed release. Final streak: zero; longest: one. Follow-up knowledge version `etc-20260921-03` adds countdown-budgeted nearby supplies and immediately cancels an old optional portal objective when defense becomes eligible. All 177 tests and type checks passed. This later strategy needs separate live results and cannot inherit the earlier win.
