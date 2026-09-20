@@ -40,6 +40,7 @@ export interface StudioAPI {
   removeSteamGame(appId:string):Promise<void>;
   snapshot(): Promise<Snapshot>;
   saveSettings(settings: Settings): Promise<void>;
+  selectPlatforms(platforms: Provider[]): Promise<void>;
   saveJevKey(key: string): Promise<void>;
   importGoogleClient(): Promise<boolean>;
   connectAccount(provider: Provider): Promise<void>;

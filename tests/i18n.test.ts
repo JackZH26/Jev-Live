@@ -34,7 +34,7 @@ describe('five-language contract',()=>{
     expect(settingsSchema.safeParse({locale:'de'}).success).toBe(false);
     expect(normalizeLocale('de')).toBe('zh-CN');
     expect(settingsSchema.parse({}).enabledPlatforms).toEqual(['youtube','twitch']);
-    expect(settingsSchema.safeParse({enabledPlatforms:[]}).success).toBe(false);
+    expect(settingsSchema.parse({enabledPlatforms:[]}).enabledPlatforms).toEqual([]);
     expect(settingsSchema.safeParse({enabledPlatforms:['youtube','youtube']}).success).toBe(false);
   });
 });

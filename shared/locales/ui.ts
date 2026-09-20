@@ -78,6 +78,7 @@ export const ui = [
  ["live.notReady","完成所选平台的账号、OBS 和游戏窗口设置后即可开播","完成所選平台的帳號、OBS 與遊戲視窗設定後即可開播","選択したサービスのアカウント・OBS・ゲームウィンドウを設定してください","선택한 플랫폼의 계정, OBS, 게임 창 설정을 완료하세요","Connect selected accounts, prepare OBS and select a game window"],
  ["live.disclosure","开播将向所选平台发送当前游戏画面和声音","開播會向所選平台傳送目前遊戲畫面與聲音","開始すると現在のゲーム映像と音声が選択したサービスに送信されます","시작하면 현재 게임 화면과 소리가 선택한 플랫폼으로 전송됩니다","Starting sends current game video and audio to the selected platforms"],
  ['live.view','查看 {provider} 直播 ↗','查看 {provider} 直播 ↗','{provider} 配信を確認 ↗','{provider} 방송 보기 ↗','View {provider} stream ↗'],
+ ['live.youtubeStudio','打开 YouTube Studio ↗','開啟 YouTube Studio ↗','YouTube Studio を開く ↗','YouTube Studio 열기 ↗','Open YouTube Studio ↗'],
  ['activity.title','运行记录','執行記錄','実行ログ','실행 기록','Activity'],
  ['activity.note','仅显示本机事件，不包含密钥','僅顯示本機事件，不含金鑰','ローカルイベントのみ・秘密情報を含みません','로컬 이벤트만 표시 · 키 제외','Local events only · No secrets'],
  ['app.scope','第一阶段：游戏控制与双路推流。虚拟头像、自动解说和评论回复尚未启用；两种游戏模式共用后续互动模块。','第一階段：遊戲控制與雙路推流。虛擬角色、自動解說及留言回覆尚未啟用；兩種模式共用後續互動模組。','フェーズ 1：ゲーム操作と同時配信。アバター・自動実況・コメント返信は未実装で、今後は両プレイモードで共通利用します。','1단계: 게임 제어와 동시 송출. 아바타, 자동 해설, 댓글 답변은 아직 제공되지 않으며 향후 두 모드에서 공통으로 사용합니다.','Phase 1: gameplay and dual streaming. Avatars, automatic commentary and chat replies are not enabled yet; both play modes will share them.'],

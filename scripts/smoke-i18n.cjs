@@ -16,10 +16,12 @@ const assert=require('node:assert/strict');
   await page.locator('.platform-toggle input').nth(1).uncheck();
   for(let n=0;n<50;n++){if((await page.evaluate(()=>window.studio.snapshot())).settings.enabledPlatforms.length===1)break;await page.waitForTimeout(50);}
   assert.deepEqual((await page.evaluate(()=>window.studio.snapshot())).settings.enabledPlatforms,['youtube']);
-  await page.locator('.platform-toggle input').first().click();
-  await page.waitForSelector('[role=alert]');
-  assert(await page.locator('.platform-toggle input').first().isChecked());
-  await page.locator('[role=alert] button').click();
+  await page.locator('.platform-toggle input').first().uncheck();
+  for(let n=0;n<50;n++){if(!(await page.evaluate(()=>window.studio.snapshot())).settings.enabledPlatforms.length)break;await page.waitForTimeout(50);}
+  assert.deepEqual((await page.evaluate(()=>window.studio.snapshot())).settings.enabledPlatforms,[]);
+  assert(await page.locator('.live-card .primary-button').isDisabled());
+  await page.locator('.platform-toggle input').first().check();
+  for(let n=0;n<50;n++){if((await page.evaluate(()=>window.studio.snapshot())).settings.enabledPlatforms.length===1)break;await page.waitForTimeout(50);}
   await fs.mkdir(path.join(root,'test-results'),{recursive:true});
   const headings={'zh-CN':'让游戏，持续发生。','zh-TW':'讓遊戲，持續發生。',ja:'ゲームの続きを、配信しよう。',ko:'게임의 다음 순간을, 함께.',en:'Keep the game going.'};
   for(const locale of ['zh-CN','zh-TW','ja','ko','en']){

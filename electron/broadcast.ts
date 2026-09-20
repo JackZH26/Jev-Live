@@ -18,6 +18,7 @@ export class Broadcast {
     this.locked=true;
     try {
       const settings=await this.store.settings();
+      if(!settings.enabledPlatforms.length)throw new Error(message('channels.minimum'));
       if(!settings.steamAppId||!settings.addedSteamGames.includes(settings.steamAppId))throw new Error(message('error.steamSelection'));
       const accounts=await this.auth.accounts();
       const selected=settings.enabledPlatforms;

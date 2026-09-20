@@ -7,6 +7,8 @@ import { Store } from '../electron/storage';
 import { OAuth, createPKCE, equalState, googleCode, officialAuthUrl } from '../electron/oauth';
 import { ControlGate } from '../electron/game';
 import { Broadcast } from '../electron/broadcast';
+import { Platforms } from '../electron/platforms';
+import { ApiError } from '../electron/http';
 
 const dirs:string[]=[];
 afterEach(async()=>{vi.restoreAllMocks();vi.unstubAllGlobals();for(const d of dirs.splice(0))await rm(d,{recursive:true,force:true});});
@@ -107,6 +109,21 @@ describe('dual-output transaction',()=>{
     await f.broadcast.start();expect(f.calls).toEqual(['service:twitch','start:twitch']);await f.broadcast.stop();
     expect(f.platforms.createYouTubeBroadcast).not.toHaveBeenCalled();expect(f.platforms.finish).not.toHaveBeenCalled();expect(f.obs.stop).toHaveBeenCalledWith('twitch');
   });
+  it('requires a platform before contacting services or changing outputs',async()=>{
+    const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:[]});
+    f.auth.accounts=vi.fn();await expect(f.broadcast.start()).rejects.toThrow('channels.minimum');
+    expect(f.auth.accounts).not.toHaveBeenCalled();expect(f.calls).toEqual([]);expect(f.broadcast.state.state).toBe('idle');
+  });
+  it('reports YouTube activation rejection without starting either selected output',async()=>{
+    const f=await fixture();
+    const platforms=new Platforms({credentials:async()=>({access_token:'fixture'})} as any);
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{errors:[{reason:'livePermissionBlocked'}]}}),{status:403})));
+    f.platforms.createYouTubeBroadcast=platforms.createYouTubeBroadcast.bind(platforms);
+    f.platforms.twitchDestination=vi.fn();
+    await expect(f.broadcast.start()).rejects.toThrow('error.youtubeLiveUnavailable');
+    expect(f.calls.some(c=>c.startsWith('start:'))).toBe(false);expect(f.platforms.twitchDestination).not.toHaveBeenCalled();
+    expect(f.broadcast.state.state).toBe('idle');expect((await f.store.settings()).enabledPlatforms).toEqual(['youtube','twitch']);
+  });
   it('recovers the original selected outputs even if settings change after a crash',async()=>{
     const f=await fixture();await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube']});await f.broadcast.start();
     await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['twitch']});
@@ -117,5 +134,21 @@ describe('dual-output transaction',()=>{
     const f=await fixture();await f.broadcast.stop();expect(f.obs.stop).not.toHaveBeenCalled();
     await f.store.saveSettings({...await f.store.settings(),enabledPlatforms:['youtube']});f.obs.start=async()=>{throw new Error('startup-failed');};
     await expect(f.broadcast.start()).rejects.toThrow('startup-failed');expect(f.obs.stop).toHaveBeenCalledTimes(1);expect(f.obs.stop).toHaveBeenCalledWith('youtube');
+  });
+});
+
+describe('platform error guidance',()=>{
+  it.each(['livePermissionBlocked','liveStreamingNotEnabled'])('explains YouTube %s without exposing the provider body',async code=>{
+    const p=new Platforms({credentials:async()=>({access_token:'fixture'})} as any);
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{message:'private provider content',errors:[{reason:code}]}}),{status:403})));
+    const error=await p.createYouTubeBroadcast('Fixture','private').catch(e=>e);
+    expect(error.message).toContain('error.youtubeLiveUnavailable');expect(error.message).toContain(code);expect(error.message).not.toContain('private provider content');
+  });
+  it('does not mislabel unrelated permission errors as YouTube activation',async()=>{
+    const p=new Platforms({credentials:async()=>({access_token:'fixture'})} as any);
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:{errors:[{reason:'forbidden'}]}}),{status:403})));
+    await expect(p.createYouTubeBroadcast('Fixture','private')).rejects.toBeInstanceOf(ApiError);
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error:'livePermissionBlocked'}),{status:403})));
+    await expect(p.twitch('streams')).rejects.toBeInstanceOf(ApiError);
   });
 });

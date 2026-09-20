@@ -17,6 +17,7 @@ export class Obs {
   constructor(private store:Store,private log:(message:string)=>void) {}
   async setup() {
     const settings=await this.store.settings();
+    if(!settings.enabledPlatforms.length)throw new Error(message('channels.minimum'));
     const source=resolve(settings.obsDirectory);
     await access(join(source,'bin','64bit','obs64.exe'));
     for(const provider of settings.enabledPlatforms) {
@@ -92,6 +93,7 @@ export class Obs {
   async windows() {
     const settings=await this.store.settings();
     const provider=settings.enabledPlatforms.find(p=>this.states[p].connected)??settings.enabledPlatforms[0];
+    if(!provider)throw new Error(message('channels.minimum'));
     const result=await this.client(provider).call('GetInputPropertiesListPropertyItems',{inputName:'ETC Game',propertyName:'window'});
     return result.propertyItems.filter(i=>i.itemEnabled).map(i=>({label:String(i.itemName),value:String(i.itemValue)}));
   }

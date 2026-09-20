@@ -1,12 +1,18 @@
 import { message } from '../shared/i18n';
 import { OAuth } from './oauth';
-import { jsonRequest } from './http';
+import { ApiError, jsonRequest } from './http';
 
 export class Platforms {
   constructor(private auth:OAuth) {}
   async youtube(path:string,method='GET',body?:unknown) {
     const c=await this.auth.credentials('youtube');
-    return jsonRequest(`https://www.googleapis.com/youtube/v3/${path}`,{method,headers:{Authorization:`Bearer ${c.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    try {
+      return await jsonRequest(`https://www.googleapis.com/youtube/v3/${path}`,{method,headers:{Authorization:`Bearer ${c.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+    } catch(e) {
+      if(e instanceof ApiError && e.status===403 && ['livePermissionBlocked','liveStreamingNotEnabled'].includes(e.code))
+        throw new Error(message('error.youtubeLiveUnavailable',{code:e.code}));
+      throw e;
+    }
   }
   async twitch(path:string,method='GET',body?:unknown) {
     const c=await this.auth.credentials('twitch');

@@ -14,6 +14,8 @@
 
 YouTube 单路测试：工作台只勾选 YouTube，保持“私密”，准备所选 OBS 并选择 Steam 游戏窗口。无需先绑定 Twitch。首次开通频道直播时，以 Studio 的等待倒计时为准；OAuth 绑定成功也不能跳过频道激活等待。确认平台接收画面和声音后结束测试。
 
+如果开播后立即返回待机，并显示 `livePermissionBlocked` 或 `liveStreamingNotEnabled`，请使用错误提示中的 YouTube Studio 入口查看开通倒计时或频道限制。所选平台的准备必须全部成功后才开始推流，因此 YouTube 被拒绝时不会自动改为 Twitch 开播。可在开播前取消勾选 YouTube，单独选择 Twitch；Twitch 为公开直播。平台勾选与游戏的自动／手动模式独立，可再次点击取消，也可全部取消；至少选择一个平台才能开播。直播进行中暂时锁定选择，结束后恢复。新增输出后需重新应用游戏采集窗口。
+
 实现采用 Authorization Code + PKCE S256、随机 state、每次新建 `127.0.0.1` 随机端口回调；scope 为 `youtube.force-ssl`，使用离线授权续期。Google 桌面客户端 secret 并非能在客户端分发中保密的服务端密钥，但本软件仍将导入凭证加密保存。
 
 频道需开通直播。Testing 状态、未验证应用及刷新令牌期限受 Google 当前规则影响；正式分发需按控制台要求完成品牌、隐私政策与验证，不能用测试账号结果承诺生产可用性。

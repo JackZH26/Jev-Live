@@ -18,6 +18,8 @@ The channel needs streaming access. Testing status, unverified applications and 
 
 For a YouTube-only test, select only YouTube in the studio, keep visibility Private, prepare the selected OBS output and apply the Steam game window. No Twitch account is needed. On a channel's first activation, follow the wait countdown in YouTube Studio; successful OAuth binding does not bypass activation. End the test after verifying received video and audio.
 
+If starting immediately returns to idle with `livePermissionBlocked` or `liveStreamingNotEnabled`, use the error's YouTube Studio link to check the activation countdown or channel restrictions. All selected destinations must be prepared before streaming begins, so a YouTube rejection does not automatically start Twitch alone. Before starting, you can deselect YouTube and select only Twitch; Twitch broadcasts are public. Platform checkboxes work independently of manual/automatic gameplay and can be unchecked again, including clearing all selections. Starting requires at least one selected platform. Selection stays locked during a broadcast and unlocks when it ends. Apply game capture again after adding an output.
+
 ## Twitch
 
 Before registering an application, Twitch requires the developer account to have a verified email and two-factor authentication enabled. The account owner completes sign-in, CAPTCHAs and two-factor verification on the official website. See [Twitch application registration requirements](https://dev.twitch.tv/docs/authentication/register-app/).

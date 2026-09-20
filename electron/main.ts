@@ -67,12 +67,18 @@ app.whenReady().then(async()=>{
     if(broadcast.state.state!=='idle' || game.gate.mode==='auto')throw new Error(message('error.settingsDuringRun'));
     if(next.googleClientId!==old.googleClientId) {await store.set('oauth.youtube',undefined);await store.set('google.clientSecret',undefined);}
     if(next.twitchClientId!==old.twitchClientId)await store.set('oauth.twitch',undefined);
-    // Selection is changed only by the validated Steam library handlers.
-    // Newly enabled outputs must capture the selected window before broadcasting.
-    const addedOutput=next.enabledPlatforms.some(p=>!old.enabledPlatforms.includes(p));
-    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,gameWindow:addedOutput?'':old.gameWindow});
+    // Dedicated selectors own game/output selection, including when settings were opened earlier.
+    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,enabledPlatforms:old.enabledPlatforms,gameWindow:old.gameWindow});
     currentLocale=next.locale;updateTray();
   });
+  handler('selectPlatforms',async value=>{
+    if(broadcast.state.state!=='idle')throw new Error(message('error.livePending'));
+    const selected=settingsSchema.shape.enabledPlatforms.parse(value),old=await store.settings();
+    const addedOutput=selected.some(p=>!old.enabledPlatforms.includes(p));
+    // Platform selection is independent of manual/automatic game control.
+    // Require capture application when adding an output that may have an older scene.
+    await store.saveSettings({...old,enabledPlatforms:selected,gameWindow:addedOutput?'':old.gameWindow});
+  },message('busy.platforms'));
   handler('setLocale',async value=>{const locale=z.enum(locales).parse(value);await store.saveSettings({...await store.settings(),locale});currentLocale=locale;updateTray();});
   handler('saveJevKey',async value=>{const key=z.string().trim().min(8).max(4096).parse(value);await store.set('jev.key',key);log(message('event.keySaved'));});
   handler('importGoogleClient',async()=>{
