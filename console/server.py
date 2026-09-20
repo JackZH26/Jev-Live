@@ -145,7 +145,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {'ok': True}, cookie=cookie)
         # Publisher sends an explicit public telemetry projection, never raw bridge
         # commands/session credentials. Enforce the top-level contract again here.
-        allowed = {'updatedAt', 'candidate', 'phase', 'game', 'self', 'executor', 'actions', 'enemies', 'cloud', 'timeline', 'route', 'metrics', 'streak', 'frame', 'trial', 'result'}
+        allowed = {'updatedAt', 'candidate', 'phase', 'game', 'self', 'executor', 'actions', 'enemies', 'cloud', 'timeline', 'route', 'metrics', 'streak', 'frame', 'trial', 'result', 'zone', 'mapView', 'navigation', 'knowledge'}
         def safe_fields(value):
             if isinstance(value, dict):
                 return all(not re.search(r'token|password|secret|session|authorization|cookie|bridge|path|processId', key, re.I) and safe_fields(item) for key, item in value.items() if key != 'pathStatus')

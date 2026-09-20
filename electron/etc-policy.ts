@@ -14,7 +14,7 @@ export class EtcPolicy {
   private progressAt=0;
   private bestDistance=Infinity;
   reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;}
-  choose(o:EtcObservation, now:number, autoRestart:boolean, played:boolean, advice?:string):EtcAction|undefined {
+  choose(o:EtcObservation, now:number, autoRestart:boolean, played:boolean, advice?:string, planned?:EtcAction):EtcAction|undefined {
     if(o.matchId!==this.match){this.reset();this.match=o.matchId;}
     const wait = o.actions.find(a=>a.kind==='wait');
     if(now-o.timestamp>ETC_MAX_AGE_MS||o.timestamp>now+50||!o.foreground)return wait;
@@ -40,10 +40,10 @@ export class EtcPolicy {
     if(visible)this.seenAt=now;
     const underFire=now-this.hurtAt<5000, threatened=visible||underFire||now-this.seenAt<2000;
     // Survival constraints have priority over cloud advice, loot and target persistence.
-    const eligible=o.actions.filter(a=>a.kind!=='new_match'&&!this.failed.has(a.id)&&a.safe);
+    const eligible=o.actions.filter(a=>!['new_match','inspect_map'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe);
     const escape=eligible.filter(a=>a.kind==='portal');
     const escapeOrder=(a:EtcAction,b:EtcAction)=>(a.destinationRisk??0)-(b.destinationRisk??0)||a.distance-b.distance;
-    if(o.self.danger&&escape.length)return this.select(escape.sort(escapeOrder)[0],now);
+    if(o.self.danger&&escape.length)return this.select(planned&&escape.includes(planned)?planned:escape.sort(escapeOrder)[0],now);
     if(o.self.healing&&!threatened&&!o.self.danger)return wait;
     // Moving uses the normal game's cast interruption. Do not restart a heal
     // each time incoming damage cancels it, or stand still awaiting cloud advice.
@@ -84,7 +84,7 @@ export class EtcPolicy {
         case 'equip': n=(o.self.magazine===0?145:!visible?85:25)+(a.rank??0);break;
         case 'pickup': n=(o.self.magazine<=0&&o.self.reserve<=0?125:55)+(a.rank??0)*4-distance;break;
         case 'loot': n=(o.self.magazine<=0&&o.self.reserve<=0?100:o.self.reserve>=30&&/AR0|MG0|SR0/.test(o.self.weapon)?10:40)-distance*0.5;break;
-        case 'portal': n=Math.max(5,30-distance*0.1-Math.min(20,6*(this.visits.get(a.destination??-1)??0)))-30*(a.destinationRisk??0);break;
+        case 'portal': n=Math.max(5,30-distance*0.1-Math.min(20,6*(this.visits.get(a.destination??-1)??0)))-30*(a.destinationRisk??0)+(planned?.id===a.id?25:0);break;
       }
       if(o.self.danger&&a.kind!=='portal')n-=200;
       if(visible&&['loot','pickup','portal'].includes(a.kind)&&!o.self.danger)n-=80;

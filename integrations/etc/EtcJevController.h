@@ -66,7 +66,9 @@ inline FVector NextPathCorner(AController* Controller, const FVector& Goal)
     const FVector Start=Controller->GetNavAgentLocation();
     const auto* Data=Nav?Nav->GetNavDataForProps(Controller->GetNavAgentPropertiesRef(),Start):nullptr;
     if(!Data)return Goal;
-    FPathFindingQuery Query(Controller,*Data,Start,Goal);Query.SetAllowPartialPaths(false);
+    FNavLocation Projected;
+    if(!Nav->ProjectPointToNavigation(Goal,Projected,FVector(500,500,700),Data))return Goal;
+    FPathFindingQuery Query(Controller,*Data,Start,Projected.Location);Query.SetAllowPartialPaths(false);
     const auto Result=Nav->FindPathSync(Query);
     if(Result.IsSuccessful()&&Result.Path.IsValid()&&Result.Path->GetPathPoints().Num()>1)
         CachedCorner=Result.Path->GetPathPoints()[1].Location;

@@ -28,7 +28,7 @@ describe('hybrid tactical contract',()=>{
     if(reason==='match')current.matchId='next';
     if(reason==='session')current.session='next';
     if(reason==='room')current.self.room=2;
-    if(reason==='age')now+=1501;
+    if(reason==='age'){now+=2201;current.timestamp=now;}
     if(reason==='foreground')current.foreground=false;
     if(reason==='phase')current.phase='dead';
     if(reason==='removed')current.actions=current.actions.filter(a=>a.id!=='portal');

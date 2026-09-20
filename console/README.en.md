@@ -29,4 +29,8 @@ The ingestion token is separate from the viewing password. `telemetry.cjs` uploa
 
 ## Verification
 
+The map card shows actual M-map snapshots, phase countdowns and planned routes. Map display numbers are not archetype IDs; planned lines disappear if the snapshot or phase differs. See [gameplay knowledge](../docs/ROOM_KNOWLEDGE.en.md) for sources and timing limits.
+
+`--bind-x-preview` manages a live standby card: completed tests, lost focus or stale observations hide gameplay, preventing OBS from reacquiring an old window. A verified fresh test restores gameplay and rebuilds game audio capture. The card comes from `standby.html`; the private URL and permissions remain intact.
+
 `python -m unittest discover -s console -p test_server.py` covers access protection, origin checks, cookies, tampering, throttling and credential rejection. `npm test -- tests/console-telemetry.test.ts` covers telemetry redaction. Deployment acceptance also requires real HTTPS login, anonymous data 401, mobile layout, all five languages and actual gameplay images. This preview is not evidence of 24-hour stability or autoplay victories.

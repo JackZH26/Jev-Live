@@ -51,7 +51,7 @@ export class EtcTactics {
     this.lastRequest=now;this.requestedSignature=signature;return true;
   }
   accept(id:string,source:EtcObservation,current:EtcObservation|null,epoch:number,now:number){
-    if(!current||epoch!==this.epoch||source.epoch!==epoch||current.epoch!==epoch||source.session!==this.session||source.matchId!==this.match||current.session!==source.session||current.matchId!==source.matchId||current.self.room!==source.self.room||current.phase!=='playing'||current.mode!=='auto'||!current.foreground||now-source.timestamp>1500||now-current.timestamp>250||current.timestamp>now+50)return false;
+    if(!current||epoch!==this.epoch||source.epoch!==epoch||current.epoch!==epoch||source.session!==this.session||source.matchId!==this.match||current.session!==source.session||current.matchId!==source.matchId||current.self.room!==source.self.room||current.phase!=='playing'||current.mode!=='auto'||!current.foreground||now-source.timestamp>2200||now-current.timestamp>250||current.timestamp>now+50||source.zone?.phase!==current.zone?.phase||source.zone?.stage!==current.zone?.stage)return false;
     if(!this.options(source).some(a=>a.id===id)||!this.options(current).some(a=>a.id===id))return false;
     const e=current.executor;
     if(e?.objective===id&&['succeeded','blocked','released'].includes(e.status))return false;

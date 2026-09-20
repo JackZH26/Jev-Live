@@ -50,7 +50,10 @@ bool UEtcBotBrainComponent::SetExternalObjective(const FString& Id, const FStrin
 
 void UEtcBotBrainComponent::StopExternalControl(const FString& Reason)
 {
-    if (!bExternalControl) return;
+    // Portal travel can release inputs before a frame hitch expires the lease.
+    // Preserve the newest authoritative stop reason even after input cleanup;
+    // otherwise the client cannot distinguish expiry from a manual takeover.
+    if (!bExternalControl) { ExternalStatus = TEXT("released"); ExternalReason = Reason; return; }
     NotifyEliminated(); // Normal Bot cleanup releases fire, ADS, reload, traversal and movement.
     bExternalControl = false; ExternalUntil = 0;
     ExternalStatus = TEXT("released"); ExternalReason = Reason;

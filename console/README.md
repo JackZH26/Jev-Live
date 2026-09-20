@@ -29,4 +29,8 @@
 
 ## 检查
 
+实际 M 地图快照、阶段倒计时和规划路线会显示在独立地图卡片中；显示号来自地图，不能当作房间类型。规划线在快照或阶段不匹配时隐藏。规则来源与估时边界见[玩法知识](../docs/ROOM_KNOWLEDGE.md)。
+
+`--bind-x-preview` 同时管理实时待机卡：测试结束、失焦或观测过期时隐藏游戏源，避免 OBS 重用旧窗口后播出上一局。新测试就绪后恢复画面并重建游戏音频采集。卡片来自 `standby.html`，不会修改直播地址或私密权限。
+
 `python -m unittest discover -s console -p test_server.py` 检查访问保护、同源校验、Cookie、篡改、限流和上传凭据拒绝；`npm test -- tests/console-telemetry.test.ts` 检查遥测脱敏。部署验收还需真实 HTTPS 登录、未登录接口 401、手机布局、五种语言和真实游戏画面。预览不是 24 小时稳定性或自动游玩夺冠证明。

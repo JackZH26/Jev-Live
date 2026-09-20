@@ -53,6 +53,10 @@ Earlier setup failures involving foreground acquisition, loading-phase reauthori
 
 ## Remaining gates
 
+2026-09-21 gameplay-context iteration: curated bilingual rules for the current 001–028 catalog, with a local source audit. Jev only knows the current and previously visited archetypes. Added actual M-map snapshots, countdown reviews, connected-room plans and private console visualization; see [gameplay knowledge](ROOM_KNOWLEDGE.en.md). All 166 TypeScript tests and four console security tests passed.
+
+Candidate `20260921-02`, trial `hybrid-smoke-1789923875621`, actually opened M (three samples confirmed visibility), obtained a 42-room snapshot and traversed Gallery and Big TV. Fourteen cloud calls included corresponding room rules; twelve tactical replies were accepted, with recent successful responses around 397–512 ms. A portal hitch exposed an old travel-release reason masking subsequent lease expiry, so acceptance conservatively stopped. There was no official result and no win credit. Native repeated-release feedback has been corrected for the next candidate. The 250 ms input lease and manual takeover boundary are unchanged.
+
 The user's current milestone is two consecutive official first-place results on the same local candidate. It remains unmet; iteration continues against that criterion.
 
 In diagnostic run `hybrid-smoke-1789916337173`, all 53 successful cloud replies chose scanning and the three-minute run timed out. Added scouting progress, room duration, recent damage and a twelve-second unproductive-scan limit. Run `hybrid-smoke-1789916611837` crossed a room before stalling; its screenshot and source inspection identified Room027 direct movement excluding PlayerController. That trial also remained incomplete.
