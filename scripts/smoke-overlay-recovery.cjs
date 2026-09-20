@@ -13,6 +13,7 @@ if(process.versions.electron){
  await fixture();await page.goto(url);await until(s=>s.audioEnded===1);let s=await stats();assert.equal(s.audioStarted,1);assert.equal(s.audioErrors,1);assert.equal(s.recovered,1);assert.equal(s.stateErrors,0);
  stateFailures=1;await until(s=>s.stateErrors===1);s=await stats();assert.equal(s.audioErrors,1);assert.equal(s.lastError.kind,'state');
  await page.reload();await page.waitForTimeout(1200);assert.equal((await stats()).audioStarted,1,'Reload replayed an already started utterance');
- await fixture();await until(s=>s.audioEnded===2);s=await stats();assert.equal(s.audioStarted,2);assert.equal(s.expired,0);assert.deepEqual(errors,[]);console.log(JSON.stringify({audioRetry:true,stateErrorsSeparated:true,reloadDeduplicated:true,nextUtterancePlayed:true,health:s}));
+ await app.evaluate(()=>{globalThis.overlayTest.host.gameConnected=()=>false;});await page.waitForSelector('.game-waiting');await app.evaluate(()=>{globalThis.overlayTest.host.gameConnected=()=>true;});await page.waitForSelector('.game-waiting',{state:'detached'});
+ await fixture();await until(s=>s.audioEnded===2);s=await stats();assert.equal(s.audioStarted,2);assert.equal(s.expired,0);assert.deepEqual(errors,[]);console.log(JSON.stringify({gameDisconnectSlate:true,gameReconnectClearedSlate:true,audioRetry:true,stateErrorsSeparated:true,reloadDeduplicated:true,nextUtterancePlayed:true,health:s}));
  }finally{await app.evaluate(async({app})=>{globalThis.overlayTest?.server.close();app.exit(0);}).catch(()=>{});await app.close().catch(()=>{});}})().catch(e=>{console.error(e.stack);process.exitCode=1;});}
 

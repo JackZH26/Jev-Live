@@ -61,7 +61,7 @@ app.whenReady().then(async()=>{
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
   broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log,p=>obs.overlay(p,overlay.url(p),hosting.config.layouts[p]));await game.init();await broadcast.init();
-  hosting=new Hosting(store,auth,()=>JSON.stringify({game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,3000)??'':''}),()=>broadcast.state.youtubeId);
+  hosting=new Hosting(store,auth,()=>JSON.stringify({game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,3000)??'':''}),()=>broadcast.state.youtubeId,()=>game.connected);
   await hosting.init();overlay=new OverlayServer(hosting,join(__dirname,'../../dist'));await overlay.start();
   const applyLayouts=async()=>{for(const p of (await store.settings()).enabledPlatforms)if(obs.states[p].ready)await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);};
   window=new BrowserWindow({width:1480,height:960,minWidth:1080,minHeight:720,backgroundColor:'#f2f3f8',title:'JEV Studio',autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});

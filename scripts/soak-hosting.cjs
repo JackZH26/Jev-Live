@@ -28,6 +28,7 @@ try{
   await fs.writeFile(path.join(out,'latest.json'),JSON.stringify(sample,null,2));
   if(Object.values(sample.outputs).some(s=>!s.active||s.reconnecting))throw new Error('Output stopped or reconnecting');
   if(sample.game.mode!=='manual')throw new Error('Soak changed gameplay mode');
+  if(!sample.game.connected)throw new Error('Steam game observation disconnected; outgoing frames alone do not certify game capture');
   if(Date.now()-lastCapture>60*60*1000){lastCapture=Date.now();for(const p of ['youtube','twitch','x']){const image=await app.evaluate(async(_,p)=>globalThis.hostSoak.obs.preview(p),p);await fs.writeFile(path.join(out,`${p}-${Math.floor((Date.now()-started)/1000)}.jpg`),Buffer.from(image.split(',')[1],'base64'));}}
   await fs.writeFile(path.join(out,'progress.json'),JSON.stringify({requestedSeconds:seconds,elapsedSeconds:(Date.now()-started)/1000,completed:false,sampleCount,samples},null,2));
   console.log(JSON.stringify({elapsedSec:Math.round((Date.now()-started)/1000),generated:sample.host.stats.generated,failures:sample.host.stats.failures,audio:Object.fromEntries(Object.entries(sample.host.overlay).map(([p,v])=>[p,v.audioStarted])),gpu:sample.gpu}));await pause(Math.min(30000,seconds*1000-(Date.now()-started)));
