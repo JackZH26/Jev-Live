@@ -20,6 +20,8 @@ YouTube 单路测试：工作台只勾选 YouTube，保持“私密”，准备�
 
 ## Twitch
 
+注册应用前，Twitch 要求开发者账号完成邮箱验证并启用两步验证；登录、验证码和两步验证在官方页面由账号本人完成。见 [Twitch 应用注册要求](https://dev.twitch.tv/docs/authentication/register-app/)。
+
 1. 在 [Twitch 开发者控制台](https://dev.twitch.tv/console/apps) 注册 **Public** 类型应用。
 2. 把 Client ID 填入软件，不需要 Client Secret。
 3. 点击官方登录，软件打开 Twitch 返回的激活链接（通常已包含验证码）。用户在官方网页授权，软件自动完成连接。
@@ -27,6 +29,8 @@ YouTube 单路测试：工作台只勾选 YouTube，保持“私密”，准备�
 申请 `channel:read:stream_key` 和 `channel:manage:broadcast`。本阶段未申请尚未实现的聊天权限。刷新操作串行并立即保存旋转后的 refresh token；启动时及每 55 分钟验证授权。
 
 如控制台要求 Redirect URI，可登记 `http://localhost`；本软件的 **Device Code Flow 不使用重定向回调**。不要改为 Confidential 后继续使用本配置。
+
+应用类别可选择 Broadcaster Suite，名称需唯一。绑定成功后先检查频道名称和推流权限；绑定账号不会自动开始直播。Twitch 输出是否参与下次开播由工作台的平台勾选项决定。
 
 ## 普通主播的最终分发
 

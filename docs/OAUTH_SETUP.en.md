@@ -20,6 +20,8 @@ For a YouTube-only test, select only YouTube in the studio, keep visibility Priv
 
 ## Twitch
 
+Before registering an application, Twitch requires the developer account to have a verified email and two-factor authentication enabled. The account owner completes sign-in, CAPTCHAs and two-factor verification on the official website. See [Twitch application registration requirements](https://dev.twitch.tv/docs/authentication/register-app/).
+
 1. Register a **Public** application in the [Twitch developer console](https://dev.twitch.tv/console/apps).
 2. Enter its Client ID; no Client Secret is required.
 3. Click official sign-in. The app opens the activation URL returned by Twitch, normally with the verification code included. Authorize on the official website; connection completes automatically.
@@ -27,6 +29,8 @@ For a YouTube-only test, select only YouTube in the studio, keep visibility Priv
 Requested scopes are `channel:read:stream_key` and `channel:manage:broadcast`. Chat permissions are not requested before chat is implemented. Refreshes are serialized and rotated refresh tokens are saved immediately. Authorization is validated at startup and every 55 minutes.
 
 If the console requires a Redirect URI, register `http://localhost`. This app's **Device Code Flow does not use a redirect callback**. Do not switch the application to Confidential while retaining these settings.
+
+Broadcaster Suite is an appropriate application category; the application name must be unique. After binding, verify the channel name and streaming permissions. Connecting an account does not start a broadcast. The studio's platform checkboxes determine whether Twitch participates in the next broadcast.
 
 ## Distribution to ordinary streamers
 
