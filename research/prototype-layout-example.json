@@ -1,0 +1,343 @@
+{
+  "schemaVersion": 1,
+  "conceptOnly": true,
+  "units": "percent",
+  "layouts": {
+    "overview": {
+      "avatar": {
+        "x": 3,
+        "y": 52,
+        "w": 24,
+        "h": 47,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 8,
+        "w": 23,
+        "h": 26,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 37,
+        "w": 23,
+        "h": 26,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 66,
+        "w": 23,
+        "h": 26,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 49,
+        "y": 35,
+        "w": 23,
+        "h": 26,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 49,
+        "y": 64,
+        "w": 23,
+        "h": 26,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    },
+    "youtube": {
+      "avatar": {
+        "x": 3,
+        "y": 52,
+        "w": 24,
+        "h": 47,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    },
+    "twitch": {
+      "avatar": {
+        "x": 6.346080305927343,
+        "y": 48.60080730826429,
+        "w": 30,
+        "h": 47,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    },
+    "bilibili": {
+      "avatar": {
+        "x": 3,
+        "y": 52,
+        "w": 24,
+        "h": 47,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    },
+    "tiktok": {
+      "avatar": {
+        "x": 3,
+        "y": 56,
+        "w": 43,
+        "h": 41,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 48,
+        "y": 53,
+        "w": 49,
+        "h": 37,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    },
+    "x": {
+      "avatar": {
+        "x": 3,
+        "y": 52,
+        "w": 24,
+        "h": 47,
+        "opacity": 100,
+        "visible": true,
+        "locked": false
+      },
+      "youtube": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "twitch": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "bilibili": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "tiktok": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      },
+      "x": {
+        "x": 75,
+        "y": 20,
+        "w": 23,
+        "h": 58,
+        "opacity": 96,
+        "visible": true,
+        "locked": false
+      }
+    }
+  }
+}

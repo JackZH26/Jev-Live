@@ -1,0 +1,103 @@
+{
+  "checked_at": "2026-09-20",
+  "method": "GitHub API via Cindy GitHub; pushed_at is repository activity, not a stability claim",
+  "repos": [
+    {
+      "name": "moeru-ai/airi",
+      "url": "https://github.com/moeru-ai/airi",
+      "license_api": "MIT",
+      "pushed_at": "2026-09-20T01:32:23Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "Open-LLM-VTuber/Open-LLM-VTuber",
+      "url": "https://github.com/Open-LLM-VTuber/Open-LLM-VTuber",
+      "license_api": "NOASSERTION",
+      "license_note": "LICENSE text is MIT with separately licensed Live2D sample assets",
+      "pushed_at": "2026-05-15T07:18:04Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "Ikaros-521/AI-Vtuber",
+      "url": "https://github.com/Ikaros-521/AI-Vtuber",
+      "license_api": "GPL-3.0",
+      "pushed_at": "2025-07-29T10:04:17Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "steveseguin/social_stream",
+      "url": "https://github.com/steveseguin/social_stream",
+      "license_api": "GPL-3.0",
+      "pushed_at": "2026-09-18T00:53:23Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "sorayuki/obs-multi-rtmp",
+      "url": "https://github.com/sorayuki/obs-multi-rtmp",
+      "license_api": "GPL-2.0",
+      "pushed_at": "2026-08-01T00:36:38Z",
+      "archived": false,
+      "default_branch": "master"
+    },
+    {
+      "name": "bluenviron/mediamtx",
+      "url": "https://github.com/bluenviron/mediamtx",
+      "license_api": "MIT",
+      "pushed_at": "2026-09-19T14:46:07Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "Aitum/obs-vertical-canvas",
+      "url": "https://github.com/Aitum/obs-vertical-canvas",
+      "license_api": "GPL-2.0",
+      "pushed_at": "2026-08-24T10:16:52Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "Aitum/obs-aitum-multistream",
+      "url": "https://github.com/Aitum/obs-aitum-multistream",
+      "license_api": "GPL-2.0",
+      "pushed_at": "2026-05-19T11:01:20Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "jkudish/jev-browser",
+      "url": "https://github.com/jkudish/jev-browser",
+      "license_api": "MIT",
+      "pushed_at": "2026-09-19T08:20:40Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "xfgryujk/blivechat",
+      "url": "https://github.com/xfgryujk/blivechat",
+      "license_api": "MIT",
+      "pushed_at": "2026-08-19T17:30:55Z",
+      "archived": false,
+      "default_branch": "dev"
+    },
+    {
+      "name": "BAAI-Agents/Cradle",
+      "url": "https://github.com/BAAI-Agents/Cradle",
+      "license_api": "MIT",
+      "pushed_at": "2024-11-07T04:58:20Z",
+      "archived": false,
+      "default_branch": "main"
+    },
+    {
+      "name": "MineDojo/Voyager",
+      "url": "https://github.com/MineDojo/Voyager",
+      "license_api": "MIT",
+      "pushed_at": "2024-04-03T18:51:36Z",
+      "archived": false,
+      "default_branch": "main"
+    }
+  ]
+}
