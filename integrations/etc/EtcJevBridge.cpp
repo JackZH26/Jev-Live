@@ -247,6 +247,12 @@ bool Tick(float Dt){
   Execute(W,PC,P,FMath::Clamp(Dt,0.f,0.05f),Now());return true;
 }
 }
+bool HasControlLease(const APawn* Pawn){
+  const double Time=Now();const auto* Brain=SharedBrain.Get();
+  return Pawn&&OwnedPawn.Get()==Pawn&&Pawn->GetNetMode()==NM_Standalone&&FApp::HasFocus()
+    &&Mode==TEXT("auto")&&Time<=Lease&&Time<=SessionUntil&&Brain
+    &&Brain->IsComponentTickEnabled()&&Brain->GetExternalStatus()==TEXT("running");
+}
 void Install(){
   if(IsRunningCommandlet()||IsRunningDedicatedServer()||Handle.IsValid())return;
 #if WITH_EDITOR

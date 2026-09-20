@@ -4,12 +4,21 @@
 #include "AIController.h"
 #include "AI/EtcBotController.h"
 #include "AI/EtcBotAimComponent.h"
+#include "Development/EtcJevBridge.h"
 #include "GameFramework/PlayerController.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavigationSystem.h"
 
 namespace EtcJevController
 {
+// Room providers can keep a direct-drive route between Brain ticks. It must not
+// exclude an automatic player, or continue driving one after manual takeover.
+inline bool MayDrivePawn(const APawn* Pawn)
+{
+    if (!Pawn) return false;
+    if (!Pawn->IsPlayerControlled()) return true;
+    return EtcJevBridge::HasControlLease(Pawn);
+}
 inline UEtcBotAimComponent* Aim(const AController* Controller)
 {
     return Controller ? Controller->FindComponentByClass<UEtcBotAimComponent>() : nullptr;

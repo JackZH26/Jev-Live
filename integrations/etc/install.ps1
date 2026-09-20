@@ -5,13 +5,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $root 'Lyra.uproject'))) { throw 'Se
 $module = Join-Path $root 'Plugins\GameFeatures\EtcCore\Source\EtcCoreRuntime'
 $entry = Join-Path $module 'Private\EtcCoreRuntimeModule.cpp'
 $source = [IO.File]::ReadAllText($entry)
-$patch = Join-Path $PSScriptRoot 'shared-controller.patch'
-# Check the entire shared-code patch before copying any runtime files.
-& git -C $root apply --reverse --check --ignore-space-change $patch 2>$null
-$alreadyApplied = $LASTEXITCODE -eq 0
-if (-not $alreadyApplied) {
+# Check all independent patches before changing source or copying runtime files.
+$pending = @()
+foreach ($name in @('shared-controller.patch','room-control.patch')) {
+    $patch = Join-Path $PSScriptRoot $name
+    & git -C $root apply --reverse --check --ignore-space-change $patch 2>$null
+    if ($LASTEXITCODE -eq 0) { continue }
     & git -C $root apply --check --ignore-space-change $patch
-    if ($LASTEXITCODE -ne 0) { throw 'Shared Bot sources changed. Review shared-controller.patch before installing; no files copied.' }
+    if ($LASTEXITCODE -ne 0) { throw "ETC sources changed. Review $name before installing; no files copied." }
+    $pending += $patch
+}
+foreach ($patch in $pending) {
     & git -C $root apply --ignore-space-change $patch
     if ($LASTEXITCODE -ne 0) { throw 'Shared Bot patch failed.' }
 }

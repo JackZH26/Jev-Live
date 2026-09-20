@@ -1,0 +1,64 @@
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom027Waterpark.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom027Waterpark.cpp
+@@ -1,3 +1,4 @@
++#include "Development/EtcJevController.h"
+ #include "Rooms/EtcRoom027Waterpark.h"
+ #include "Character/LyraHealthComponent.h"
+ #include "Components/AudioComponent.h"
+@@ -292,7 +293,7 @@
+         const FVector Foot=C->GetActorLocation()-FVector(0,0,C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+         if(GetActorTransform().InverseTransformPosition(Foot).Z<=-121&&!Drowned.Contains(C))
+         {Drowned.Add(C);PendingRecovery.Add(C,Recovery(Foot));MulticastSplash(FVector(Foot.X,Foot.Y,GetActorLocation().Z-120),FMath::Clamp(float(-C->GetVelocity().Z/650),1.f,1.65f));++WaterDeaths;H->DamageSelfDestruct(true);}
+-        if(!C->IsPlayerControlled())
++        if(EtcJevController::MayDrivePawn(C))
+         {
+             if(auto* Route=BotRoutes.Find(C);Route&&Route->Direct&&Route->Path.IsValidIndex(Route->Step)&&!Route->Waiting)
+             {FVector Move=NodePoint(Route->Path[Route->Step])-C->GetActorLocation();Move.Z=0;if(Move.SizeSquared()>625)C->AddMovementInput(Move.GetSafeNormal());}
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom010FerryHazard.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom010FerryHazard.cpp
+@@ -1,3 +1,4 @@
++#include "Development/EtcJevController.h"
+ #include "Rooms/EtcRoom010FerryHazard.h"
+ #include "Components/BoxComponent.h"
+ #include "Components/CapsuleComponent.h"
+@@ -239,7 +240,7 @@
+     if(GetNetMode()!=NM_Client)for(auto& Entry:BotTrips)
+     {
+         ACharacter* C=Entry.Key.Get();const auto& Trip=Entry.Value;
+-        if(C&&Trip.DriveUntil>T&&Contains(C->GetActorLocation()))
++        if(EtcJevController::MayDrivePawn(C)&&Trip.DriveUntil>T&&Contains(C->GetActorLocation()))
+         {
+             const FVector Delta=GetActorTransform().TransformPosition(Trip.DriveTarget)-C->GetActorLocation();
+             if(Delta.SizeSquared2D()>FMath::Square(30.f))C->AddMovementInput(Delta.GetSafeNormal2D(),1.f);
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
+@@ -1,3 +1,4 @@
++#include "Development/EtcJevController.h"
+ #include "Rooms/EtcRoom011Abyss.h"
+ 
+ #include "Components/BoxComponent.h"
+@@ -398,7 +399,7 @@
+     if(HasAuthority())for(auto& Item:Trips)
+     {
+         ACharacter* C=Item.Key.Get();auto& Trip=Item.Value;
+-        if(!C||Trip.DriveUntil<T||!ContainsPoint(C->GetActorLocation()))continue;
++        if(!EtcJevController::MayDrivePawn(C)||Trip.DriveUntil<T||!ContainsPoint(C->GetActorLocation()))continue;
+         const FVector Target=GetActorTransform().TransformPosition(Trip.DriveTarget);
+         const FVector Dir=(Target-C->GetActorLocation()).GetSafeNormal2D();
+         if(Trip.bFaceTarget&&!Dir.IsNearlyZero())
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom024LaserHazard.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom024LaserHazard.cpp
+@@ -1,3 +1,4 @@
++#include "Development/EtcJevController.h"
+ #include "Rooms/EtcRoom024LaserHazard.h"
+ #include "AbilitySystem/Attributes/LyraCombatSet.h"
+ #include "AbilitySystem/LyraAbilitySystemComponent.h"
+@@ -230,7 +231,7 @@
+         for(const auto& Pair:BotStates)if(Pair.Key.IsValid()&&Pair.Value.DirectUntil>=Now)
+         {
+             auto* C=const_cast<ACharacter*>(Pair.Key.Get());FVector D=Pair.Value.DirectGoal-C->GetActorLocation();D.Z=0;
+-            C->AddMovementInput(D.GetSafeNormal());
++            if(EtcJevController::MayDrivePawn(C))C->AddMovementInput(D.GetSafeNormal());
+         }
+     }
+     if(GetNetMode()!=NM_DedicatedServer)Visuals(Now);

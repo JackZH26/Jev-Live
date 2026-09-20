@@ -64,6 +64,39 @@ describe('hybrid tactical contract',()=>{
     expect(t.advice(o,at)).toBeUndefined();expect(t.context().recent).toEqual([]);
     expect(t.accept('portal',o,o,1,at)).toBe(false);
   });
+  it('expires unproductive scouting without stopping the movement heartbeat',()=>{
+    const t=new EtcTactics(),o=state();o.enemies=[];o.actions=o.actions.filter(a=>a.kind!=='engage');
+    o.executor={...o.executor!,objective:'scan'};t.observe(o,1,at);expect(t.accept('scan',o,o,1,at)).toBe(true);
+    for(let i=1;i<=48;i++){o.timestamp=at+i*250;o.frame++;o.self.position[0]+=25;t.observe(o,1,o.timestamp);}
+    expect(t.context().progress.unproductiveScoutSeconds).toBe(12);
+    expect(t.context().progress.sampledRoomDistanceM).toBe(12);
+    expect(t.options(o).map(a=>a.id)).toContain('portal');
+    expect(t.options(o).map(a=>a.id)).not.toContain('scan');
+    expect(t.accept('scan',o,o,1,o.timestamp)).toBe(false);
+    expect(new EtcPolicy().choose(o,o.timestamp,false,true,t.advice(o,o.timestamp))?.id).toBe('portal');
+    o.actions.find(a=>a.id==='portal')!.safe=false;
+    expect(t.options(o).map(a=>a.id)).toContain('scan'); // Never remove the only useful fallback.
+  });
+  it('new supplies and a new room renew reconnaissance, repeated sightings do not',()=>{
+    const t=new EtcTactics(),o=state();o.enemies=[];o.actions=o.actions.filter(a=>a.kind!=='engage');
+    o.executor={...o.executor!,objective:'scan'};t.observe(o,1,at);
+    for(let i=1;i<=48;i++){o.timestamp=at+i*250;t.observe(o,1,o.timestamp);}
+    o.actions.push({id:'chest',kind:'loot',distance:500,safe:true});t.observe(o,1,o.timestamp+50);
+    expect(t.context().progress.unproductiveScoutSeconds).toBe(0);
+    t.observe(o,1,o.timestamp+100);expect(t.context().progress.unproductiveScoutSeconds).toBe(.05);
+    o.self.room=2;t.observe(o,1,o.timestamp+150);
+    expect(t.context().progress.unproductiveScoutSeconds).toBe(0);
+    expect(t.context().progress.sampledRoomDistanceM).toBe(0);
+  });
+  it('own health loss triggers a bounded tactical refresh without inventing an attacker',()=>{
+    const t=new EtcTactics(),o=state();t.observe(o,1,at);t.shouldRequest(o,at,2500);t.accept('portal',o,o,1,at);
+    o.timestamp=at+900;o.self.health=90;t.observe(o,1,o.timestamp);
+    expect(t.shouldRequest(o,o.timestamp,2500)).toBe(true);
+    expect(t.context().progress.damageSecondsAgo).toBe(0);
+    o.timestamp+=50;o.self.health=80;t.observe(o,1,o.timestamp);
+    expect(t.shouldRequest(o,o.timestamp,2500)).toBe(false);
+    t.reset();expect(t.context().progress.damageSecondsAgo).toBeNull();
+  });
 });
 
 describe('hybrid survival arbitration',()=>{

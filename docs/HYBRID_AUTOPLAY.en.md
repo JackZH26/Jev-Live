@@ -28,6 +28,8 @@ Keep the existing Bot strategy entry point. Add an external-objective entry poin
 * Priority: manual takeover/focus/lease > engine hazard response > immediate survival > Jev objective > ordinary local strategy.
 * Completion, blockage, room, enemy and danger changes trigger reconsideration. Failed objectives enter a short cooldown. The executor continues its valid task while awaiting the cloud.
 * Scanning reuses Bot cover scouting and short exploration instead of indefinite stationary camera rotation.
+* Tactical context includes room/objective duration, sampled movement and recent own-health loss. After 12 seconds of scouting without a new discovery, scan is withheld while a safe exit/supply target exists. New visible enemies/supplies or a room change renew reconnaissance.
+* Room providers that drive movement every frame also check the control lease. Waterpark, ferry, abyss and laser movement must support an automatic PlayerController and stop after manual takeover.
 
 ## Fairness and scope
 
@@ -48,6 +50,7 @@ This native integration initially supports ETC offline Steam Playtest. Other Ste
 | Gate | Required evidence |
 | --- | --- |
 | Protocol | Stale epoch/match/frame rejection, stable lease renewal, correlated feedback, cloud fallback, takeover and input release |
+| Current local milestone | Two consecutive official first-place results on the same candidate and strategy version. Keep every trial; losses, interruptions, timeouts or version changes reset the streak. Normal nineteen-Bot offline matches currently default to Regular; this does not establish Pro superiority |
 | Motor | At least 40 routes including rooms 005/031, door approaches, chests and ledges; no unexplained stationary period over three seconds without recovery feedback |
 | Match loop | At least 20 complete matches including entry, equipment, combat, travel, results and restart; interruptions are recorded separately |
 | Bot tiers | Equal seed/equipment/public-information conditions against Easy through Pro; start with 100 trials and extend to 400 as needed; 95% win-rate lower confidence bound must exceed 50% against Pro |

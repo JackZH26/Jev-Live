@@ -132,7 +132,10 @@ export class Game {
     this.autoplay.transitionUntil=0;
     await this.autoplay.change('auto',this.gate.change('auto'));
    }else if(o.mode==='manual'&&o.epoch===this.gate.epoch){
-    await this.setMode('manual');this.error=message('etc.lost');return;
+    const recovery=this.autoplay.recovery.poll(o,this.gate.epoch,now);
+    if(recovery==='wait')return;
+    if(recovery==='resume')await this.autoplay.resumeControl(this.gate.change('auto'));
+    else {await this.setMode('manual');this.error=message('etc.lost');return;}
    }
    if(this.gate.mode!=='auto')return;
    await this.autoplay.tick(settings,this.gate.epoch);

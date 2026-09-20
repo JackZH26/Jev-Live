@@ -10,7 +10,7 @@ These were pre-release checks of packaged candidate `20260920-02`, **not accepta
 
 ## Engineering checks
 
-* Studio type checks passed; full suite 127/127, including 56 autoplay/tactical checks.
+* Studio type checks passed; latest full suite 145/145, including tactical-progress and bounded lease-recovery regressions.
 * Studio frontend and main-process builds passed.
 * ETC Shipping, accompanying native modules and frozen-snapshot Shipping compiled.
 * ETC release tooling and backend checks: 100/100 passed.
@@ -40,6 +40,12 @@ Path length sums planar distances between adjacent samples in the same room, exc
 Earlier setup failures involving foreground acquisition, loading-phase reauthorization in the test harness and an already-exited candidate process were recorded separately and excluded from these two valid matches. Lease and foreground protections were not relaxed.
 
 ## Remaining gates
+
+The user's current milestone is two consecutive official first-place results on the same local candidate. It remains unmet; iteration continues against that criterion.
+
+In diagnostic run `hybrid-smoke-1789916337173`, all 53 successful cloud replies chose scanning and the three-minute run timed out. Added scouting progress, room duration, recent damage and a twelve-second unproductive-scan limit. Run `hybrid-smoke-1789916611837` crossed a room before stalling; its screenshot and source inspection identified Room027 direct movement excluding PlayerController. That trial also remained incomplete.
+
+Candidate `20260920-03` fixes this integration and gates room 010/011/024/027 per-frame movement on the player's control lease. Shipping, Cook, Stage and 137-file verification passed. Longer trials exposed lease interruptions; bounded recovery now requires the same identity/match, foreground and fresh observations. Interruptions remain recorded as non-wins. The background editor used about 78% of GPU; minimizing its windows reduced this to about 4.5% while preserving its process and development state. Full matches must establish the resulting improvement.
 
 1. Install the new build from Steam, launch from its library and validate cloud Jev.
 2. Obtain valid native automation results; complete 40 navigation routes and 20 full matches.
