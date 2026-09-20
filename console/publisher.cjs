@@ -10,7 +10,12 @@ app.whenReady().then(async()=>{
   await connectObs();if(!(await obs.call('GetStreamStatus')).outputActive)return;
   const {propertyItems}=await obs.call('GetInputPropertiesListPropertyItems',{inputName:'ETC Game',propertyName:'window'});
   const target=propertyItems.find(x=>x.itemEnabled&&x.itemValue==='JEV Hybrid Acceptance:UnrealWindow:LyraGame-Win64-Shipping.exe');if(!target)return;
-  for(const inputName of ['ETC Game','ETC Audio'])await obs.call('SetInputSettings',{inputName,inputSettings:{window:target.itemValue,priority:0},overlay:true});
+  await obs.call('SetInputSettings',{inputName:'ETC Game',inputSettings:{window:target.itemValue,priority:0},overlay:true});
+  // WASAPI can keep the previous process capture alive when its HWND is reused.
+  // A distinct empty target invalidates that session before binding the new PID.
+  await obs.call('SetInputSettings',{inputName:'ETC Audio',inputSettings:{window:''},overlay:true});
+  await sleep(1000);
+  await obs.call('SetInputSettings',{inputName:'ETC Audio',inputSettings:{window:target.itemValue,priority:0},overlay:true});
   boundPid=meta.pid;frame=undefined;frameAt=Date.now();console.log('Private X preview rebound to the current acceptance game.');
  }
  async function image(){if(Date.now()-frameAt<5000)return frame;frameAt=Date.now();try{
