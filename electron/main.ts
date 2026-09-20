@@ -13,6 +13,9 @@ import { Broadcast } from './broadcast';
 import { XLive } from './x-live';
 import { Hosting } from './hosting';
 import { OverlayServer } from './overlay-server';
+import {streamChecks,type ReadinessReport} from '../shared/readiness';
+import {neuralHealth} from './neural-speech';
+import {access} from 'node:fs/promises';
 import { providers } from '../shared/types';
 import type { Snapshot } from '../shared/types';
 
@@ -54,7 +57,7 @@ app.whenReady().then(async()=>{
   currentLocale=(await store.settings()).locale;
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
-  broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log);await game.init();await broadcast.init();
+  broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log,p=>obs.overlay(p,overlay.url(p),hosting.config.layouts[p]));await game.init();await broadcast.init();
   hosting=new Hosting(store,auth,()=>JSON.stringify({game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,3000)??'':''}),()=>broadcast.state.youtubeId);
   await hosting.init();overlay=new OverlayServer(hosting,join(__dirname,'../../dist'));await overlay.start();
   const applyLayouts=async()=>{for(const p of (await store.settings()).enabledPlatforms)if(obs.states[p].ready)await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);};
@@ -63,7 +66,7 @@ app.whenReady().then(async()=>{
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
   window.webContents.session.setPermissionCheckHandler(()=>false);
-  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
+  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,recovery:broadcast.recovery.status,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
   const gameId=z.string().regex(/^\d+$/).max(12);
   const requireGameIdle=()=>{if(broadcast.state.state!=='idle'||game.gate.mode==='auto')throw new Error(message('error.gameSelectionBusy'));};
   handler('scanSteam',()=>steam.scan(),message('steam.scan'));
@@ -107,6 +110,17 @@ app.whenReady().then(async()=>{
   handler('setupOBS',async()=>{await obs.setup();await applyLayouts();},message('busy.obs'));
   handler('windows',()=>obs.windows());handler('setCapture',async value=>{await obs.capture(z.string().min(1).max(1000).parse(value));await applyLayouts();},message('busy.capture'));
   handler('hostSnapshot',async()=>({...await hosting.snapshot(),assetUrl:overlay.assetURL()}));
+  handler('preflight',async()=>{
+    await obs.poll();const settings=await store.settings(),accounts=await auth.accounts();
+    const checks=streamChecks({settings,accounts,xSource:await xLive.summary(),outputs:obs.states,selectedGame:game.selected,gameConnected:game.connected} as Snapshot);
+    const installed=await access(join(settings.obsDirectory,'bin/64bit/obs64.exe')).then(()=>true,()=>false);
+    checks.unshift({id:'obs-install',key:'setup.obsInstall',ready:installed,required:!settings.enabledPlatforms.every(p=>obs.states[p].ready),action:'obs'});
+    let model=false;try{const url=hosting.config.apiBase.replace(/\/$/,'')+(hosting.config.modelProvider==='ollama'?'/api/tags':'/models');const r=await fetch(url,{signal:AbortSignal.timeout(2500),redirect:'error'});if(r.ok){const data=await r.json() as any;model=hosting.config.modelProvider==='ollama'?data.models?.some((m:any)=>m.name===hosting.config.model):data.data?.some((m:any)=>m.id===hosting.config.model);}}catch{}
+    const speech=!hosting.config.speech||(hosting.config.speechProvider==='qwen'?await neuralHealth():hosting.voices.some(v=>hosting.config.voice?v.name===hosting.config.voice:v.language.split('-')[0]===hosting.config.language.split('-')[0]));
+    checks.push({id:'model',key:'setup.model',ready:!!model,required:false,action:'host'},{id:'voice',key:'setup.voice',ready:speech,required:false,action:'host'});
+    if(hosting.config.chatPlatforms.includes('twitch')){let granted=false;try{const c=await auth.credentials('twitch'),scopes=typeof c.scope==='string'?c.scope.split(' '):c.scope??[];granted=['user:read:chat','user:write:chat'].every(scope=>scopes.includes(scope));}catch{}checks.push({id:'chat-twitch',key:'setup.chat',provider:'twitch',ready:granted,required:false,action:'host'});}
+    return {at:Date.now(),checks,canStream:checks.filter(c=>c.required).every(c=>c.ready),canHost:checks.filter(c=>['model','voice','chat-twitch'].includes(c.id)).every(c=>c.ready)} satisfies ReadinessReport;
+  });
   handler('saveHostConfig',async value=>{await hosting.save(value);await applyLayouts();});
   handler('saveHostLayouts',async value=>{await hosting.saveLayouts(value);await applyLayouts();});
   handler('saveHostKey',value=>hosting.key(value));
@@ -128,7 +142,7 @@ app.whenReady().then(async()=>{
   tray.on('double-click',()=>window.show());
   window.on('close',event=>{if(!closing){event.preventDefault();window.hide();}});
   globalShortcut.register('CommandOrControl+Alt+M',()=>{void game.setMode('manual');window.show();});
-  setInterval(()=>{void obs.poll();},2000).unref();
+  setInterval(()=>{void obs.poll().then(()=>broadcast.monitor());},2000).unref();
   setInterval(()=>{void auth.validateTwitch().catch(()=>log(message('event.twitchCheck')));},55*60*1000).unref();
   void auth.validateTwitch().catch(()=>log(message('event.twitchStartup')));
   log(message('event.started'));

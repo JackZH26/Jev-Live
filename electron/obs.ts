@@ -20,12 +20,13 @@ export class Obs {
   private processes:Partial<Record<Provider,ReturnType<typeof spawn>>>={};
   private polling=false;
   constructor(private store:Store,private log:(message:string)=>void) {}
-  async setup() {
+  async setup(only?:Provider[],signal?:AbortSignal) {
     const settings=await this.store.settings();
     if(!settings.enabledPlatforms.length)throw new Error(message('channels.minimum'));
     const source=resolve(settings.obsDirectory);
     await access(join(source,'bin','64bit','obs64.exe'));
-    for(const provider of settings.enabledPlatforms) {
+    for(const provider of settings.enabledPlatforms.filter(p=>!only||only.includes(p))) {
+      signal?.throwIfAborted();
       if(this.states[provider].connected && this.states[provider].ready) continue;
       if(this.states[provider].connected) await this.clients[provider]?.disconnect();
       const root=join(this.store.directory,'obs',provider);
@@ -66,7 +67,7 @@ export class Obs {
         let launchError=false;this.processes[provider]!.on('error',()=>{launchError=true;});
         let connected=false;
         for(let n=0;n<30;n++) {
-          if(launchError) break;await delay(1000);
+          if(launchError) break;await delay(1000,signal);
           try { await client.connect(`ws://127.0.0.1:${port}`,password);connected=true;break; } catch {}
         }
         if(!connected) throw new Error(message('error.obsConnect',{provider,port}));
@@ -75,7 +76,7 @@ export class Obs {
       // OBS WebSocket accepts connections before frontend FINISHED_LOADING.
       let stream:Awaited<ReturnType<typeof client.call<'GetStreamStatus'>>>|undefined;
       for(let attempt=0;attempt<40;attempt++) {
-        try { stream=await client.call('GetStreamStatus');break; } catch {await delay(500);}
+        try { signal?.throwIfAborted();stream=await client.call('GetStreamStatus');break; } catch {await delay(500,signal);}
       }
       if(!stream) {this.states[provider].connected=false;throw new Error(message('error.obsInitializing',{provider}));}
       this.states[provider].active=stream.outputActive;
@@ -142,7 +143,7 @@ export class Obs {
     if(!/^rtmps?:\/\//.test(server)) throw new Error(message('error.destination'));
     await this.client(provider).call('SetStreamServiceSettings',{streamServiceType:'rtmp_custom',streamServiceSettings:{server,key,use_auth:false}});
   }
-  async start(provider:Provider) { const c=this.client(provider);await c.call('StartStream');for(let i=0;i<60;i++){const s=await c.call('GetStreamStatus');if(s.outputActive&&!s.outputReconnecting){this.states[provider].active=true;return;}await delay(500);}throw new Error(message('error.obsStart',{provider:providerNames[provider]})); }
+  async start(provider:Provider,signal?:AbortSignal) { signal?.throwIfAborted();const c=this.client(provider);await c.call('StartStream');for(let i=0;i<60;i++){signal?.throwIfAborted();const s=await c.call('GetStreamStatus');if(s.outputActive&&!s.outputReconnecting){this.states[provider].active=true;return;}await delay(500,signal);}throw new Error(message('error.obsStart',{provider:providerNames[provider]})); }
   async stop(provider:Provider) {
     const c=this.client(provider); const s=await c.call('GetStreamStatus');
     if(s.outputActive) await c.call('StopStream');

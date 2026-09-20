@@ -1,0 +1,8 @@
+import {describe,it,expect,vi} from 'vitest';import {OutputRecovery} from '../electron/output-recovery';import type {OutputState} from '../shared/types';
+const good=():OutputState=>({connected:true,ready:true,active:true,reconnecting:false,frames:1,skipped:0,bytes:1});
+const outputs=()=>({youtube:good(),twitch:{...good(),active:false},x:good()});
+describe('owned output recovery',()=>{
+ it('repairs only an owned failed output after the grace period',async()=>{const repair=vi.fn().mockResolvedValue(undefined),r=new OutputRecovery(repair),s=outputs();r.start(['twitch','x']);r.tick(s,0);await r.settled();r.tick(s,10001);await r.settled();expect(repair).toHaveBeenCalledTimes(1);expect(repair.mock.calls[0][0]).toBe('twitch');expect(r.status.x?.state).toBe('healthy');});
+ it('aborts an in-flight repair before stop completes and never restarts after stop',async()=>{let aborted=false;const repair=vi.fn((_,signal:AbortSignal)=>new Promise<void>(resolve=>signal.addEventListener('abort',()=>{aborted=true;resolve();}))),r=new OutputRecovery(repair),s=outputs();r.start(['twitch']);r.tick(s,0);await r.settled();r.tick(s,10001);await r.stop();expect(aborted).toBe(true);r.tick(s,100000);await r.settled();expect(repair).toHaveBeenCalledOnce();});
+ it('defers to native network reconnect and bounds persistent failures',async()=>{const repair=vi.fn().mockRejectedValue(new Error('offline')),r=new OutputRecovery(repair),s=outputs();r.start(['twitch']);s.twitch.reconnecting=true;r.tick(s,0);await r.settled();expect(repair).not.toHaveBeenCalled();s.twitch.reconnecting=false;for(let i=1;i<=9;i++){r.tick(s,i*70000);await r.settled();}expect(repair).toHaveBeenCalledTimes(5);expect(r.status.twitch?.state).toBe('failed');});
+});

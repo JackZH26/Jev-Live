@@ -93,8 +93,11 @@ export class OAuth {
           try {
             tokens=await jsonRequest('https://id.twitch.tv/oauth2/token',{...form({client_id:clientId,scopes:scopes.twitch,device_code:device.device_code,grant_type:'urn:ietf:params:oauth:grant-type:device_code'}),signal}); break;
           } catch(error) {
+            signal.throwIfAborted();
             if(error instanceof ApiError && ['authorization_pending','authorization pending'].includes(error.code)) continue;
             if(error instanceof ApiError && error.code==='slow_down') { interval+=5000; continue; }
+            // A transient poll timeout must not discard a device authorization still awaiting consent.
+            if(error instanceof TypeError||error instanceof Error&&error.name==='TimeoutError'||error instanceof ApiError&&error.status>=500){interval=Math.min(30000,interval+5000);continue;}
             throw error;
           }
         }

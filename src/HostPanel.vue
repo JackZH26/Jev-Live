@@ -12,6 +12,7 @@ const languages=[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja','日本
 const layers:Layer[]=['game','avatar','chat','captions'];
 const layout=computed(()=>config.value!.layouts[provider.value]);
 const rectangle=computed(()=>layout.value[selected.value]);
+const blockedText=computed({get:()=>config.value?.blockedWords.join('\n')??'',set:value=>{if(config.value)config.value.blockedWords=value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean).slice(0,50);}});
 const style=(r:LayerRect)=>({left:r.x/19.2+'%',top:r.y/10.8+'%',width:r.width/19.2+'%',height:r.height/10.8+'%',opacity:r.visible?1:.24});
 let timer:ReturnType<typeof setInterval>,polling=false,previewAt=0,audio:HTMLAudioElement|undefined;
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value));
@@ -51,6 +52,7 @@ onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmount
     <div class="inline-buttons"><button @click="config.avatar.kind='builtin'">{{t('host.builtin')}}</button><button @click="run(importAvatar)">{{t('host.import')}}</button></div><p class="hint">{{t('host.assetHint')}}</p>
     <label>{{t('host.persona')}}<textarea v-model="config.persona" maxlength="3000" rows="3"></textarea></label>
     <div class="form-row"><label>{{t('host.language')}}<select v-model="config.language"><option v-for="l in languages" :key="l[0]" :value="l[0]">{{l[1]}}</option></select></label><label>{{t('host.voice')}}<select v-model="config.voice"><option value="">{{t('host.autoVoice')}}</option><option v-for="v in s.voices" :key="v.name" :value="v.name">{{v.name}} · {{v.language}}</option></select></label></div>
+    <div class="form-row"><label>{{t('host.speechProvider')}}<select v-model="config.speechProvider"><option value="system">{{t('host.systemVoice')}}</option><option value="qwen">Qwen3-TTS · {{t('host.localModel')}}</option></select></label><label v-if="config.speechProvider==='qwen'">{{t('host.voice')}}<select v-model="config.neuralVoice"><option value="">{{t('host.autoVoice')}}</option><option v-for="v in ['aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']" :key="v" :value="v">{{v}}</option></select></label></div>
     <label class="check"><input type="checkbox" v-model="config.speech">{{t('host.speech')}}</label><button :disabled="!config.speech" @click="run(voice)">{{t('host.testVoice')}}</button>
    </fieldset></section>
    <section class="card host-settings"><h2>{{t('host.localModel')}}</h2><fieldset :disabled="s.running||pending">
@@ -62,12 +64,15 @@ onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmount
    <section class="card host-settings"><h2>{{t('host.controls')}}</h2><p class="hint">{{t('host.manualHint')}}</p><fieldset :disabled="s.running||pending">
     <div class="inline-buttons"><label v-for="p in ['youtube','twitch'] as const" :key="p" class="check"><input type="checkbox" v-model="config.chatPlatforms" :value="p">{{providerNames[p]}}</label></div>
     <label class="check"><input type="checkbox" v-model="config.commentary">{{t('host.commentary')}}</label><label class="check"><input type="checkbox" v-model="config.textReplies">{{t('host.textReplies')}}</label>
+    <label>{{t('host.pace')}}<select v-model="config.pace"><option v-for="v in ['calm','balanced','lively'] as const" :value="v" :key="v">{{t(('host.'+v) as MessageKey)}}</option></select></label>
+    <label>{{t('host.blockedWords')}}<textarea v-model="blockedText" rows="2" maxlength="2549"></textarea></label><p class="hint">{{t('host.blockedHint')}}</p>
     <div class="form-row"><label>{{t('host.interval')}}<input type="number" v-model.number="config.intervalSec" min="15" max="300"></label><label>{{t('host.limit')}}<input type="number" v-model.number="config.maxPerHour" min="1" max="240"></label></div>
     <button class="primary-button" @click="run(save)">{{t('host.saveSettings')}}</button>
    </fieldset><button v-if="s.running" class="stop-button" :disabled="pending&&!s.warming" @click="s.warming?api.stopHost():run(()=>api.stopHost())">{{t('host.stop')}}</button><button v-else class="primary-button" :disabled="pending" @click="run(async()=>{await save();await api.startHost();})">{{t('host.start')}}</button></section>
    <section class="card host-settings health"><h2>{{t('host.activity')}}</h2><p class="host-status"><i class="dot" :class="{on:s.running}"></i>{{t(s.warming?'host.warming':s.running?'host.running':'host.off')}}</p><div class="host-counters"><div><b>{{s.stats.generated}}</b>{{t('host.generated')}}</div><div><b>{{s.stats.replies}}</b>{{t('host.replies')}}</div><div><b>{{s.stats.failures}}</b>{{t('host.errors')}}</div></div>
     <div v-for="p in ['youtube','twitch'] as const" :key="p" class="chat-health"><b>{{providerNames[p]}}</b><span>{{t(('host.'+(s.chat[p].state==='reauthorize'?'off':s.chat[p].state)) as MessageKey)}}</span><button v-if="p==='twitch'&&s.chat[p].state==='reauthorize'&&!auth" @click="api.connectAccount('twitch').catch(e=>notice=String(e))">{{t('host.reauthorize')}}</button><p v-if="s.chat[p].error">{{t(s.chat[p].error as MessageKey)}}</p></div>
     <p v-if="auth" class="hint">{{tr(auth)}}<button @click="api.cancelLogin('twitch')">{{t('account.cancel')}}</button></p>
+    <p class="hint" v-if="s.timing">{{t('host.timing')}} {{(s.timing.modelMs/1000).toFixed(1)}} / {{(s.timing.speechMs/1000).toFixed(1)}} / {{(s.timing.responseP95Ms/1000).toFixed(1)}} s</p>
     <div class="host-transcript" aria-live="polite">{{s.utterance?.text}}</div>
    </section>
   </div>

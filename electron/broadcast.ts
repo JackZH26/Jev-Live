@@ -5,11 +5,21 @@ import { Obs } from './obs';
 import { OAuth } from './oauth';
 import { Platforms } from './platforms';
 import { XLive } from './x-live';
+import {OutputRecovery} from './output-recovery';
 interface Journal { youtubeId?:string; streamId?:string; youtubeUrl?:string; twitchUrl?:string; platforms?:Provider[]; state:string }
 /** Owns only the broadcast resources created by this session, with durable recovery. */
 export class Broadcast {
   state:Journal={state:'idle'};private locked=false;
-  constructor(private store:Store,private obs:Obs,private auth:OAuth,private platforms:Platforms,private log:(message:string)=>void) {}
+  private destinations:Partial<Record<Provider,{server:string;key:string}>>={};
+  readonly recovery:OutputRecovery;
+  constructor(private store:Store,private obs:Obs,private auth:OAuth,private platforms:Platforms,private log:(message:string)=>void,private restored:(p:Provider)=>Promise<void>=async()=>{}) {this.recovery=new OutputRecovery(async(p,signal)=>{
+    if(this.state.state!=='sending')throw new Error('inactive');
+    if(p==='youtube'&&this.state.youtubeId){const data=await this.platforms.youtube('liveBroadcasts?part=status&id='+encodeURIComponent(this.state.youtubeId),'GET',undefined,signal);if(!['live','testing','ready','created'].includes(data.items?.[0]?.status?.lifeCycleStatus))throw new Error('ended');}
+    const destination=this.destinations[p];if(!destination)throw new Error('missing');
+    await this.obs.setup([p],signal);signal.throwIfAborted();await this.restored(p);signal.throwIfAborted();
+    if(!this.obs.states[p].active){await this.obs.service(p,destination.server,destination.key);signal.throwIfAborted();await this.obs.start(p,signal);}
+  });}
+  monitor(){if(this.state.state==='sending'&&!this.locked)this.recovery.tick(this.obs.states);}
   async init() { const journal=await this.store.get<Journal>('broadcast');if(journal && journal.state!=='idle') { this.state={...journal,state:'recovery'};this.log(message('event.recovery')); } }
   private async save() { await this.store.set('broadcast',this.state); }
   // Old journals predate platform selection and always owned both outputs.
@@ -43,19 +53,23 @@ export class Broadcast {
         const ingest=stream.cdn?.ingestionInfo;
         if(!ingest?.streamName || !ingest.ingestionAddress)throw new Error(message('error.youtubeDestination'));
         await this.obs.service('youtube',ingest.rtmpsIngestionAddress||ingest.ingestionAddress,ingest.streamName);
+        this.destinations.youtube={server:ingest.rtmpsIngestionAddress||ingest.ingestionAddress,key:ingest.streamName};
       }
       if(selected.includes('twitch')) {
         const twitch=await this.platforms.twitchDestination(settings.title);
         await this.obs.service('twitch',twitch.server,twitch.key);
+        this.destinations.twitch={server:twitch.server,key:twitch.key};
         this.state.twitchUrl=twitch.url;await this.save();
       }
-      if(x)await this.obs.service('x',x.server,x.key);
+      if(x){await this.obs.service('x',x.server,x.key);this.destinations.x={server:x.server,key:x.key};}
       // Prepare all selected destinations before starting any output.
       for(const p of selected)await this.obs.start(p);
       this.state={...this.state,state:'sending'};await this.save();
+      this.recovery.start(selected);
       this.log(message('event.sending'));
       if(x)this.log(message('event.xSending'));
     } catch(e) {
+      this.destinations={};await this.recovery.stop();
       if(this.state.state==='preparing') {
         const owned=this.outputs();
         const results=await Promise.allSettled(owned.map(p=>this.obs.stop(p)));
@@ -71,6 +85,7 @@ export class Broadcast {
   async stop() {
     if(this.locked)throw new Error(message('error.liveBusy'));if(this.state.state==='idle')return;this.locked=true;
     try {
+      await this.recovery.stop();
       this.state.state='stopping';await this.save();
       const results=await Promise.allSettled(this.outputs().map(p=>this.obs.stop(p)));
       if(results.some(r=>r.status==='rejected')) { this.state.state='recovery';await this.save();throw new Error(message('error.stopUnconfirmed')); }
@@ -78,6 +93,7 @@ export class Broadcast {
       await Promise.allSettled(this.outputs().map(p=>this.obs.clearKey(p)));
       const usedX=this.outputs().includes('x');
       this.state={state:'idle'};await this.save();this.log(message('event.stopped'));
+      this.destinations={};
       if(usedX)this.log(message('event.xStopped'));
     } catch(e) { this.state.state='recovery';await this.save();throw e; }
     finally {this.locked=false;}

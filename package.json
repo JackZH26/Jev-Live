@@ -1,6 +1,6 @@
 {
   "name": "jev-studio",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Open-source Steam streaming studio with local AI hosting, editable avatars and YouTube/Twitch/X OBS outputs",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "test": "vitest run",
     "start": "electron .",
     "build:native": "node scripts/build-native.mjs",
-    "pack": "npm run build && npm run build:native && electron-builder --win dir"
+    "pack": "npm run build && npm run build:native && electron-builder --win dir",
+    "installer": "npm run build && npm run build:native && electron-builder --win nsis"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",
@@ -94,6 +95,14 @@
     "win": {
       "target": "dir",
       "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": false,
+      "artifactName": "JEV-Studio-${version}-Setup.${ext}"
     }
   }
 }

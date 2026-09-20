@@ -10,13 +10,18 @@ import soundfile as sf
 from qwen_tts import Qwen3TTSModel
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--device',choices=['cpu','cuda:0'],default='cpu');p.add_argument('--port',type=int,default=11435);args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--device',choices=['cpu','cuda:0'],default='cpu');p.add_argument('--port',type=int,default=11435);p.add_argument('--gpu-budget-mib',type=int,default=3072);args=p.parse_args()
     torch.set_num_threads(8)
+    if args.device.startswith('cuda'):
+        if not 1024<=args.gpu_budget_mib<=8192:raise ValueError('Invalid GPU budget')
+        torch.cuda.set_per_process_memory_fraction(min(.8,args.gpu_budget_mib*1048576/torch.cuda.get_device_properties(0).total_memory),0)
     model=Qwen3TTSModel.from_pretrained(str(Path(args.model).resolve()),device_map=args.device,dtype=torch.float32 if args.device=='cpu' else torch.bfloat16,attn_implementation='sdpa')
     speakers=model.get_supported_speakers();lock=threading.Lock()
     languages={'zh-CN':'Chinese','zh-TW':'Chinese','ja':'Japanese','ko':'Korean','en':'English'}
     defaults={'zh-CN':'uncle_fu','zh-TW':'uncle_fu','ja':'ono_anna','ko':'sohee','en':'ryan'}
     class Handler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup();self.connection.settimeout(10)
         def log_message(self,*_): pass
         def send(self,code,body,kind='application/json',headers=None):
             self.send_response(code);self.send_header('Content-Type',kind);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(body)))
@@ -43,7 +48,8 @@ def main():
             try:
                 start=time.monotonic()
                 with torch.inference_mode():
-                    wavs,rate=model.generate_custom_voice(text=text,language=languages[language],speaker=speaker,non_streaming_mode=True,max_new_tokens=500,do_sample=False)
+                    wavs,rate=model.generate_custom_voice(text=text,language=languages[language],speaker=speaker,non_streaming_mode=True,max_new_tokens=350,max_time=25,do_sample=False)
+                if time.monotonic()-start>=25:raise TimeoutError('synthesis_deadline')
                 output=io.BytesIO();sf.write(output,wavs[0],rate,format='WAV',subtype='PCM_16');audio=output.getvalue()
                 self.send(200,audio,'audio/wav',{'X-Synthesis-Ms':round((time.monotonic()-start)*1000),'X-Audio-Ms':round(len(wavs[0])/rate*1000)})
             except Exception:

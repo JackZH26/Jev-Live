@@ -2,7 +2,7 @@
 
 [简体中文](RELIABILITY.md) · [English](RELIABILITY.en.md)
 
-Scope: acceptance, natural hosting, local speech, recovery, simple configuration and avatar/layout improvements. New platforms and autoplay are excluded from this iteration.
+Scope: remaining-work items 1–6: reliability, platform integration, full-show acceptance, natural hosting and speech, recovery, setup and distribution. Advanced avatar/layout work and new platforms (7–8) are deferred. Autoplay remains owned by the other session.
 
 ## Fixed and verified
 

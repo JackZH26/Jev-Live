@@ -11,6 +11,9 @@ export const hostConfigSchema=z.object({
  avatar:z.object({kind:z.enum(['builtin','image','vrm']).default('builtin'),asset:z.string().regex(/^$|^[a-f0-9]{32}\.(png|webp|jpg|vrm)$/).default(''),name:z.string().trim().min(1).max(40).default('JEV'),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#9b8cff')}).default(()=>({kind:'builtin' as const,asset:'',name:'JEV',color:'#9b8cff'})),
  persona:z.string().max(3000).default('A friendly, curious gaming companion. Keep reactions concise, varied and grounded in visible game information. Be honest when uncertain.'),
  language:z.enum(['zh-CN','zh-TW','ja','ko','en']).default('zh-CN'),voice:z.string().max(200).default(''),
+ speechProvider:z.enum(['system','qwen']).default('system'),neuralVoice:z.enum(['','aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']).default(''),
+ pace:z.enum(['calm','balanced','lively']).default('balanced'),
+ blockedWords:z.array(z.string().trim().min(1).max(50)).max(50).default([]),
  speech:z.boolean().default(true),textReplies:z.boolean().default(false),commentary:z.boolean().default(true),
  intervalSec:z.number().int().min(15).max(300).default(40),replyCooldownSec:z.number().int().min(5).max(120).default(12),maxPerHour:z.number().int().min(1).max(240).default(90),
  modelProvider:z.enum(['ollama','compatible']).default('ollama'),compute:z.enum(['auto','cpu']).default('cpu'),
@@ -24,7 +27,7 @@ export const overlayEvents=['started','ended','stateError','audioError','recover
 export type OverlayEvent=typeof overlayEvents[number];
 export interface OverlayHealth{lastSeen:number;audioStarted:number;audioEnded:number;audioErrors:number;stateErrors:number;recovered:number;expired:number;interrupted:number;lastError?:{kind:'state'|'audio';code:string;at:number}}
 export const blankOverlay=():OverlayHealth=>({lastSeen:0,audioStarted:0,audioEnded:0,audioErrors:0,stateErrors:0,recovered:0,expired:0,interrupted:0});
-export interface HostSnapshot{config:HostConfig;assetUrl?:string;running:boolean;warming:boolean;hasKey:boolean;utterance:Utterance|null;messages:ChatMessage[];chat:Record<OAuthProvider,ChatStatus>;error:string;voices:{name:string;language:string}[];stats:{startedAt:number;generated:number;spoken:number;replies:number;failures:number};overlay:Record<Provider,OverlayHealth>}
+export interface HostSnapshot{config:HostConfig;assetUrl?:string;running:boolean;warming:boolean;hasKey:boolean;utterance:Utterance|null;messages:ChatMessage[];chat:Record<OAuthProvider,ChatStatus>;error:string;voices:{name:string;language:string}[];stats:{startedAt:number;generated:number;spoken:number;replies:number;failures:number};overlay:Record<Provider,OverlayHealth>;timing:{modelMs:number;speechMs:number;responseP95Ms:number}}
 export interface OverlayState{layout:Layout;avatar:HostConfig['avatar'];messages:ChatMessage[];utterance:Utterance|null;provider:Provider;language:HostConfig['language']}
 export interface HostingAPI{hostSnapshot():Promise<HostSnapshot>;saveHostConfig(config:HostConfig):Promise<void>;saveHostLayouts(layouts:HostConfig['layouts']):Promise<void>;saveHostKey(key:string):Promise<void>;importAvatar():Promise<boolean>;startHost():Promise<void>;stopHost():Promise<void>;testHostVoice():Promise<string>;applyHostLayout():Promise<void>;gamePreview(provider:Provider):Promise<string>}
 export const clampRect=(r:LayerRect):LayerRect=>{const width=Math.min(1920,Math.max(40,Math.round(r.width))),height=Math.min(1080,Math.max(40,Math.round(r.height)));return {...r,width,height,x:Math.max(0,Math.min(1920-width,Math.round(r.x))),y:Math.max(0,Math.min(1080-height,Math.round(r.y)))};};

@@ -38,8 +38,10 @@ export interface Snapshot {
   gameInput:{foreground:boolean;heldInputs:number};
   auth: Partial<Record<Provider, string>>; logs: {at:string; message:string}[];
   broadcast: { youtubeUrl?: string; twitchUrl?: string; state: string };
+  recovery?:Partial<Record<Provider,{state:'healthy'|'waiting'|'recovering'|'failed';attempts:number;nextAt:number}>>;
 }
 export interface StudioAPI extends HostingAPI {
+  preflight():Promise<import('./readiness').ReadinessReport>;
   setLocale(locale: import('./i18n').Locale): Promise<void>;
   scanSteam():Promise<SteamGame[]>;
   addSteamGame(appId:string):Promise<void>;

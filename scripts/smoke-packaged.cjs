@@ -3,7 +3,7 @@ const path=require('node:path'),fs=require('node:fs/promises'),assert=require('n
 (async()=>{
  const root=path.resolve(__dirname,'..'),data=await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JEV Studio PackageTest-'));
  const env={...process.env,JEV_TEST_DATA_DIR:data};delete env.ELECTRON_RUN_AS_NODE;delete env.JEV_DEV_URL;
- const app=await electron.launch({executablePath:path.join(root,'release','win-unpacked','JEV Studio.exe'),args:[],env,timeout:60000});
+ const app=await electron.launch({executablePath:process.env.JEV_PACKAGE_EXE||path.join(root,'release','win-unpacked','JEV Studio.exe'),args:[],env,timeout:60000});
  try{
   const page=await app.firstWindow();await page.waitForSelector('.studio-grid');
   const poll=async condition=>{const end=Date.now()+20000;do{const snapshot=await page.evaluate(()=>window.studio.snapshot());if(condition(snapshot))return snapshot;await new Promise(r=>setTimeout(r,200));}while(Date.now()<end);throw new Error('Packaged Steam state did not become ready');};

@@ -7,7 +7,7 @@
 
 An open-source virtual streaming studio for your **Steam library**: add installed games, select one to stream, launch through Steam, choose manual or automatic play, and connect YouTube / Twitch through official OAuth or X through an official Live Studio source for OBS multistreaming. The first test game is **Enter the Cube Playtest (Steam AppID 5272970)**, using its Steam installation. Built with Electron, Vue and TypeScript for Windows.
 
-**Status: 0.1.0 developer preview.** The current focus is **ETC-specific autoplay**: a native game API, local real-time tactics and optional JEV advice, independent of streaming. The interface is implemented but must ship in a compatible game build before Steam match acceptance. General-purpose autoplay is deferred; esports-level skill, guaranteed wins and 24-hour acceptance are not claimed. Other games retain manual play and streaming.
+**Status: 0.1.2 developer preview.** This iteration improves automatic hosting, output recovery and setup checks, with private X review and Windows installer builds. Neural speech, actual platform chat and endurance still need acceptance; see the [iteration record](docs/ITERATION_012.en.md). ETC-specific autoplay remains a separate effort requiring a compatible game build. Esports-level skill, guaranteed wins and 24-hour acceptance are not claimed. Other games retain manual play and streaming.
 
 ## Current features
 

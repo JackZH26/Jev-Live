@@ -4,10 +4,10 @@ from pathlib import Path
 os.environ['HF_HUB_DISABLE_TELEMETRY']='1'
 os.environ['HF_HUB_DISABLE_IMPLICIT_TOKEN']='1'
 from huggingface_hub import HfApi, snapshot_download
-p=argparse.ArgumentParser();p.add_argument('--directory',required=True);args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--directory',required=True);p.add_argument('--revision',default='85e237c12c027371202489a0ec509ded67b5e4b5');args=p.parse_args()
 root=Path(args.directory).resolve();root.mkdir(parents=True,exist_ok=True)
 model='Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice'
-revision=HfApi(token=False).model_info(model).sha
+revision=HfApi(token=False).model_info(model,revision=args.revision).sha
 snapshot_download(model,revision=revision,local_dir=root,token=False,max_workers=3,allow_patterns=['*.json','*.txt','*.safetensors','speech_tokenizer/*'])
 (root/'jev-model-receipt.json').write_text(json.dumps({'model':model,'revision':revision},indent=2),encoding='utf-8')
 print(json.dumps({'downloaded':True,'model':model,'revision':revision}))

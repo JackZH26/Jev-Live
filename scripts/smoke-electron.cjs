@@ -3,7 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 (async()=>{
   const root=path.resolve(__dirname,'..');
-  const env={...process.env,JEV_TEST_DATA_DIR:path.join(process.env.LOCALAPPDATA,'JEV Studio DevTest')};
+  const env={...process.env,JEV_TEST_DATA_DIR:await fs.mkdtemp(path.join(process.env.LOCALAPPDATA,'JEV Studio DevTest-'))};
   delete env.ELECTRON_RUN_AS_NODE;delete env.JEV_DEV_URL;
   const app=await electron.launch({args:[root],env,timeout:60000});
   const page=await app.firstWindow();
@@ -15,7 +15,7 @@ const fs = require('node:fs/promises');
     if(await page.evaluate(()=>typeof window.require!=='undefined'))throw new Error('Renderer exposes Node');
     await fs.mkdir(path.join(root,'test-results'),{recursive:true});
     await page.screenshot({path:path.join(root,'test-results','desktop.png'),fullPage:true});
-    await page.locator('.nav-item').nth(2).click();
+    await page.locator('.nav-item').last().click();
     await page.waitForSelector('.settings-grid');
     await page.screenshot({path:path.join(root,'test-results','settings.png'),fullPage:true});
     if(process.argv.includes('--obs')) {
