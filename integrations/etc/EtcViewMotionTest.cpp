@@ -12,6 +12,9 @@ bool FEtcViewMotionTest::RunTest(const FString& Parameters)
         }
         TestTrue(TEXT("converges at all tested render rates"),std::abs(160-Angle)<.1);
         const double Before=Angle;Angle=Axis.Step(Angle,-160,1.0);TestTrue(TEXT("hitch does not snap"),std::abs(EtcViewMotion::Wrap(Angle-Before))<=8.501);
+        Axis.Reset();Angle=0;
+        for(int I=0;I<int(Hz*4);++I)Angle=Axis.Step(Angle,12.0*(I+1)/Hz,1./Hz,240,1150,12);
+        TestTrue(TEXT("visible motion compensation fits the existing fire gate"),std::abs(48-Angle)<.45);
     }
     EtcViewMotion::Axis Wrap;double Angle=179;for(int I=0;I<180;++I)Angle=Wrap.Step(Angle,-179,1./60);
     TestTrue(TEXT("crosses wrap by shortest arc"),std::abs(EtcViewMotion::Wrap(Angle+179))<.01);

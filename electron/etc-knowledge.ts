@@ -1,6 +1,6 @@
 import type {EtcAction,EtcObservation} from '../shared/etc';
 
-export const KNOWLEDGE_VERSION='etc-20260921-04';
+export const KNOWLEDGE_VERSION='etc-20260921-05';
 export interface RoomKnowledge {id:number;name:string;zh:string;crossingSeconds:number;rules:string[];rulesZh:string[];source:string}
 const room=(id:number,name:string,zh:string,crossingSeconds:number,source:string,rules:string[],rulesZh:string[]):RoomKnowledge=>({id,name,zh,crossingSeconds,source,rules,rulesZh});
 /** Authored mechanics, not live world state. Crossing times are conservative policy estimates, not promises. */
@@ -56,6 +56,8 @@ export function canResupplyBeforeEvacuation(o:EtcObservation,a:EtcAction){
 }
 export const MATCH_RULES=[
  'Win by being the last survivor. Official placement is authoritative; no hidden enemies, future collapse order or random schedules are available.',
+ 'Once loaded and healthy, finish short bursts on visible opponents; avoid repeatedly changing targets or shelter before useful fire. After reaching cover, briefly counterattack if a target remains visible. Low health and collapse override aggression.',
+ 'Weapon rarity is not tactical suitability: use loaded automatics against nearby moving targets, a sniper at longer sightlines, and avoid point-blank rockets. The shared player motor chooses from owned weapons and uses the equipped weapon for stand-off distance.',
  'Map display numbers, instance slots and room archetype IDs are different. Learn an archetype only from the current room arrival title; never infer it from the map number.',
  'Read the real M map before and after safe-zone changes. Yellow means upcoming damage; active danger requires immediate escape. Plan connected safe destinations and allow for hazard waits.',
  'The fixed starter pistol cannot be dropped or replaced. Main weapons occupy slots 2 and 3; improve the loadout through visible reachable supplies.',

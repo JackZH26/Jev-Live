@@ -47,6 +47,28 @@ it('rejects cloud advice to abandon a loaded favorable fight for distant cover',
  o.actions.push({id:'fight',kind:'engage',safe:true,distance:1400},{id:'far',kind:'cover',safe:true,distance:4500});
  expect(new EtcPolicy().choose(o,time,false,true,'far')?.id).toBe('fight');
 });
+it('returns fire after cover despite another hit, while low health and danger interrupt the burst',()=>{
+ const p=new EtcPolicy(),o=state();o.enemies=[{id:'enemy',distance:1400,position:[1400,0,90],velocity:[0,0,0]}];
+ o.actions.push({id:'fight',kind:'engage',safe:true,distance:1400},{id:'a',kind:'cover',safe:true,distance:500},{id:'b',kind:'cover',safe:true,distance:700});
+ p.choose(o,time,false,true,'fight');o.self.health=88;o.timestamp+=50;expect(p.choose(o,o.timestamp,false,true)?.id).toBe('a');
+ o.executor={...o.executor!,objective:'a',status:'succeeded',reason:'cover_reached'};o.actions.find(a=>a.id==='a')!.distance=40;o.timestamp+=900;
+ expect(p.choose(o,o.timestamp,false,true,'b')?.id).toBe('fight');
+ o.executor={...o.executor!,objective:'fight',status:'running',reason:'accepted'};o.timestamp+=200;o.self.health=76;
+ expect(p.choose(o,o.timestamp,false,true,'b')?.id).toBe('fight');
+ o.timestamp+=50;o.self.health=20;expect(p.choose(o,o.timestamp,false,true,'fight')?.id).toBe('b');
+ o.self.danger=true;expect(p.choose(o,o.timestamp,false,true,'fight')?.kind).toBe('portal');
+});
+it('bounds an exposed shelter approach and retains a burst target across small distance changes',()=>{
+ const p=new EtcPolicy(),o=state();o.enemies=[{id:'enemy',distance:1400,position:[1400,0,90],velocity:[0,0,0]}];
+ o.actions.push({id:'fight',kind:'engage',safe:true,distance:1400},{id:'a',kind:'cover',safe:true,distance:1200});
+ p.choose(o,time,false,true,'fight');o.timestamp+=50;o.self.health=88;expect(p.choose(o,o.timestamp,false,true)?.id).toBe('a');
+ o.executor={...o.executor!,objective:'a',status:'running'};o.timestamp+=3100;o.self.health=65;
+ expect(p.choose(o,o.timestamp,false,true,'a')?.id).toBe('fight');
+ o.executor={...o.executor!,objective:'fight',status:'running'};o.timestamp+=200;
+ o.actions.push({id:'other',kind:'engage',safe:true,distance:1300});
+ expect(p.choose(o,o.timestamp,false,true,'other')?.id).toBe('fight');
+ o.actions=o.actions.filter(a=>a.id!=='fight');expect(p.choose(o,o.timestamp,false,true,'other')?.id).toBe('other');
+});
 it('does not heal or top up immediately after taking damage even if the attacker leaves the camera',()=>{
  const p=new EtcPolicy(),o=state();p.choose(o,time,false,true);o.self.health=90;o.self.magazine=4;o.timestamp+=50;
  expect(['heal','reload']).not.toContain(p.choose(o,o.timestamp,false,true)?.kind);

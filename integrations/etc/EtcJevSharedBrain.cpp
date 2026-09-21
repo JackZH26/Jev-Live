@@ -1,6 +1,7 @@
 // External objectives reuse the normal Bot Brain execution tick, never its world strategy.
 #include "AI/EtcBotBrainComponent.h"
 #include "Development/EtcJevController.h"
+#include "Development/EtcJevBridge.h"
 #include "Character/LyraHealthComponent.h"
 #include "Rooms/EtcLootChest.h"
 #include "Rooms/EtcPortalDoor.h"
@@ -139,18 +140,19 @@ void UEtcBotBrainComponent::ReevaluateExternal()
     {
         auto* Enemy = Cast<APawn>(ExternalTarget.Get());
         const auto* Protection = GetWorld()->GetSubsystem<UEtcSpawnProtectionSubsystem>();
-        if (!Enemy || (Protection && (Protection->IsProtected(Pawn) || Protection->IsProtected(Enemy))))
+        if (!EtcJevBridge::IsEnemyVisible(Pawn,Enemy) || (Protection && (Protection->IsProtected(Pawn) || Protection->IsProtected(Enemy))))
         { FinishExternalObjective(TEXT("blocked"), TEXT("target_unavailable")); return; }
         TargetEnemy = Enemy; Mode = EEtcBotMode::Fight;
         FVector Away = (Here - Enemy->GetActorLocation()).GetSafeNormal2D();
         if (Away.IsNearlyZero()) Away = -Pawn->GetActorForwardVector().GetSafeNormal2D();
         // Fire from the reached position whenever the visible target is already
         // in effective range. Do not abandon nearby cover to hug every enemy.
-        const float Range=BestWeaponRank>=5?4500.f:BestWeaponRank>=3?2600.f:1200.f;
+        const float Range=ActiveWeaponRange;
         MoveGoal = FVector::Dist2D(Here,Enemy->GetActorLocation())<=Range && !bOutOfAmmo
             ? FVector::ZeroVector : Enemy->GetActorLocation()+Away*Range*.8f;
         if(MoveGoal.IsNearlyZero())EtcJevController::Stop(Controller);
-        if (FVector::Dist(Here, Enemy->GetActorLocation()) < 200.0f) MoveGoal = Here + Away * 400.0f;
+        if (FVector::Dist(Here, Enemy->GetActorLocation()) < FMath::Max(200.f,ActiveWeaponMinimumRange))
+            MoveGoal = Here + Away * FMath::Max(400.f,ActiveWeaponMinimumRange);
     }
     else if (ExternalKind == TEXT("cover"))
     {

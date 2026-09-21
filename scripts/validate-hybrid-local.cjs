@@ -48,7 +48,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
   const readAt=Date.now();o=await control.observe(child.pid,true);
   report.polls.push({at:readAt,readMs:Date.now()-readAt,ageMs:o?Date.now()-o.timestamp:null,frame:o?.frame,mode:o?.mode,reason:o?.executor?.reason});if(report.polls.length>200)report.polls.shift();
   if(o){
-   if(!o.foreground){report.stopReason='focus_lost';break;}
+   if(!o.foreground){report.stopReason='focus_lost';report.focusLoss={at:Date.now(),phase:o.phase,mode:o.mode,frame:o.frame,observationAgeMs:Date.now()-o.timestamp,executor:o.executor};break;}
    if(control.transitionUntil>0){if(o.phase!=='playing'&&!o.roomPick){await sleep(40);continue;}if(o.phase==='playing'||o.mode==='manual')await control.resumeControl(++epoch);if(o.phase==='playing')control.transitionUntil=0;}
    if(o.mode==='manual'&&o.epoch===epoch){const recovery=control.recovery.poll(o,epoch,Date.now());if(recovery==='wait'){await sleep(40);continue;}if(recovery!=='resume'){report.stopReason='native_stop';report.events.push({at:Date.now(),native:o.executor,recovery,phase:o.phase,foreground:o.foreground,ageMs:Date.now()-o.timestamp,held:o.diagnostics.heldInputs,recoveryState:{...control.recovery}});break;}report.events.push({at:Date.now(),native:o.executor,recovery});await control.resumeControl(++epoch);}
    await control.tick(settings,epoch);lastFresh=Date.now();
@@ -64,5 +64,6 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  if(report.stopReason!=='official_result')process.exitCode=2;
 }).catch(e=>{report.error=/^[a-z_]+$/.test(e.message)?e.message:'test_failed';process.exitCode=1}).finally(async()=>{
  if(control){const requestedAt=Date.now();await control.change('manual',999).catch(()=>{});const {verifyManualRelease}=require('./verify-manual-release.cjs');report.releaseCheck=await verifyManualRelease({observe:pid=>control.observe(pid),pid:child?.pid,epoch:999,requestedAt});report.manualRelease=report.releaseCheck.confirmed;await control.close(1000).catch(()=>{});}
+ if(report.focusLoss&&child?.pid){try{report.focusLoss.os=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-File',path.join(__dirname,'inspect-candidate-focus.ps1'),'-CandidateProcessId',String(child.pid)],{windowsHide:true,encoding:'utf8',timeout:5000,stdio:['ignore','pipe','ignore']}));}catch{report.focusLoss.os={error:'unavailable'};}}
  secret=undefined;report.finishedAt=new Date().toISOString();if(out)await fs.writeFile(path.join(out,'receipt.json'),JSON.stringify(report,null,2));if(child?.exitCode===null)child.kill();console.log(JSON.stringify({out,summary:report.summary,cloudStats:report.cloudStats,stopReason:report.stopReason,error:report.error,manualRelease:report.manualRelease}));app.exit(process.exitCode??0);
 });

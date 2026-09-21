@@ -133,7 +133,7 @@ FString WeaponName(UObject* Item){
   const auto* P=Item?CastField<FObjectPropertyBase>(FindFProperty<FProperty>(Item->GetClass(),TEXT("ItemDef"))):nullptr;
   return P?GetNameSafe(P->GetObjectPropertyValue_InContainer(Item)):TEXT("");
 }
-int32 Rank(const FString& S){return S.Contains(TEXT("SR01"))?5:S.Contains(TEXT("LMG"))||S.Contains(TEXT("MG01"))||S.Contains(TEXT("GL01"))?4:S.Contains(TEXT("AR0"))?3:S.Contains(TEXT("SMG01"))||S.Contains(TEXT("SG02"))||S.Contains(TEXT("Revolver"))?2:1;}
+int32 Rank(const FString& S){return S.Contains(TEXT("SR01"))?5:S.Contains(TEXT("SMG"))||S.Contains(TEXT("SG02"))||S.Contains(TEXT("Revolver"))?2:S.Contains(TEXT("LMG"))||S.Contains(TEXT("MG01"))||S.Contains(TEXT("GL01"))?4:S.Contains(TEXT("AR0"))?3:1;}
 struct FLoadout{int32 Magazine=-1,Reserve=-1,Capacity=-1,Slot=-1;FString Weapon;};
 FLoadout Loadout(APlayerController* PC){
   FLoadout L;auto* Q=PC?PC->FindComponentByClass<ULyraQuickBarComponent>():nullptr;if(!Q)return L;
@@ -360,6 +360,7 @@ bool Tick(float Dt){
   Execute(W,PC,P,FMath::Clamp(Dt,0.f,0.05f),Now());return true;
 }
 }
+bool IsEnemyVisible(const APawn* Pawn,const APawn* Enemy){return Pawn&&Enemy&&EnemyVisible(const_cast<APawn*>(Pawn),const_cast<APawn*>(Enemy));}
 bool HasControlLease(const APawn* Pawn){
   const double Time=Now();const auto* Brain=SharedBrain.Get();
   return Pawn&&OwnedPawn.Get()==Pawn&&Pawn->GetNetMode()==NM_Standalone&&FApp::HasFocus()

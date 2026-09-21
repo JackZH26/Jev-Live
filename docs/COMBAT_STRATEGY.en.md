@@ -30,6 +30,12 @@ Capability availability and observed execution are separate checks. A match with
 
 ## Camera
 
+September 21 follow-up: engagement distance now follows the equipped weapon. The player motor prefers loaded automatics nearby, considers a sniper at longer sightlines, and suppresses point-blank rockets. Switching releases the previous weapon's ADS ability before normal reacquisition. SMG classification precedes the overlapping `MG01` substring; ordinary opponent BOT difficulty remains unchanged.
+
+Reaching shelter grants a healthy, loaded fighter a 1.6-second counterattack window, including after another minor hit. An exposed shelter approach lasting more than three seconds is reconsidered. Low health, empty ammunition, lost visibility and room danger override the burst. Brief target persistence prevents small distance changes from continually resetting aim.
+
+Camera tracking uses angular velocity estimated from consecutive visible bearings. Target changes, lost visibility, hitches and manual release clear the estimate. In an isolated 12-degree/s moving-target test, steady error at 30/60/120 Hz falls from approximately 2.75–2.90 degrees to 0.25/0.15/0.10 degrees while preserving speed and acceleration bounds. This is an algorithm result, not a measured improvement in match accuracy or win rate.
+
 Previously, travel facing, 90-degree scouting, periodic full-circle awareness and aiming could each write the view. A single player-view controller now arbitrates traversal, combat, observation and travel targets in that order. Ordinary enemy BOT aim tuning stays unchanged.
 
 A damped controller preserves angular velocity across target changes, limits speed and acceleration, and uses the shortest arc across ±180 degrees. Horizontal limits are 150 degrees/s normally and 240 degrees/s for combat/traversal; pitch is 110 degrees/s. Hitches advance at most 50 ms. Brief, spaced observation targets replace scheduled full-circle spins. Manual release clears momentum.

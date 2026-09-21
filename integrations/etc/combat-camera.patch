@@ -9,43 +9,59 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
  
  #include "AI/EtcBotDifficultySettings.h"
  #include "AbilitySystem/LyraAbilitySystemComponent.h"
-@@ -26,6 +27,27 @@
+@@ -26,6 +27,28 @@
  	Difficulty = InTier;
  }
  
-+void UEtcBotAimComponent::RequestPlayerLook(const FRotator& Rotation,int32 Priority,float HoldSeconds)
++void UEtcBotAimComponent::RequestPlayerLook(const FRotator& Rotation,int32 Priority,float HoldSeconds,const FRotator& AngularVelocity)
 +{
 +    if(!Cast<APlayerController>(GetOwner())||!GetWorld()||Rotation.ContainsNaN())return;
 +    const double Now=GetWorld()->GetTimeSeconds();
 +    if(Now<LookUntil&&Priority<LookPriority)return;
 +    LookGoal=Rotation.GetNormalized();LookGoal.Pitch=FMath::Clamp(LookGoal.Pitch,-70.0,70.0);
 +    LookPriority=Priority;LookUntil=Now+FMath::Clamp(HoldSeconds,0.05f,1.0f);
++    LookVelocity=AngularVelocity.ContainsNaN()?FRotator::ZeroRotator:AngularVelocity;
 +}
-+void UEtcBotAimComponent::ResetPlayerLook(){LookUntil=0;LookPriority=0;ViewYaw.Reset();ViewPitch.Reset();}
++void UEtcBotAimComponent::ResetPlayerLook(){LookUntil=0;LookPriority=0;ViewYaw.Reset();ViewPitch.Reset();LookVelocity=FRotator::ZeroRotator;bHasVisibleBearing=false;VisibleAngularVelocity=FRotator::ZeroRotator;}
 +float UEtcBotAimComponent::GetPlayerViewSpeed() const{return float(FMath::Sqrt(ViewYaw.Velocity*ViewYaw.Velocity+ViewPitch.Velocity*ViewPitch.Velocity));}
 +void UEtcBotAimComponent::UpdatePlayerLook(float DeltaTime)
 +{
 +    auto* PC=Cast<APlayerController>(GetOwner());if(!PC)return;
 +    if(!EtcJevBridge::HasControlLease(PC->GetPawn())){ResetPlayerLook();return;}
-+    if(GetWorld()->GetTimeSeconds()>LookUntil){LookPriority=0;LookGoal=PC->GetControlRotation();}
++    if(GetWorld()->GetTimeSeconds()>LookUntil){LookPriority=0;LookGoal=PC->GetControlRotation();LookVelocity=FRotator::ZeroRotator;}
 +    const FRotator Current=PC->GetControlRotation();
 +    const double Speed=LookPriority>=60?240:150, Acceleration=LookPriority>=60?1150:650;
-+    const FRotator Next(ViewPitch.Step(Current.Pitch,LookGoal.Pitch,DeltaTime,110,500),ViewYaw.Step(Current.Yaw,LookGoal.Yaw,DeltaTime,Speed,Acceleration),0);
++    const FRotator Next(ViewPitch.Step(Current.Pitch,LookGoal.Pitch,DeltaTime,110,500,LookVelocity.Pitch),ViewYaw.Step(Current.Yaw,LookGoal.Yaw,DeltaTime,Speed,Acceleration,LookVelocity.Yaw),0);
 +    PC->SetControlRotation(Next);
 +}
 +
  void UEtcBotAimComponent::SetTarget(AActor* NewTarget, bool bUrgent)
  {
  	if (Target.Get() == NewTarget)
-@@ -149,6 +171,7 @@
+@@ -38,6 +61,7 @@
+ 		return;
+ 	}
+ 	Target = NewTarget;
++	bHasVisibleBearing=false;VisibleAngularVelocity=FRotator::ZeroRotator;
+ 	bAcquired = false;
+ 	bInsideFireGate = false;
+ 	bUrgentAppliedForTarget = false;
+@@ -145,10 +169,13 @@
+ 
+ 	AController* Controller = Cast<AController>(GetOwner());
+ 	APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+-	if (bHazardFacing || Pawn == nullptr || !Target.IsValid() || !UEtcFlashExposureComponent::CanSeeTarget(Pawn, Target.Get()))
++	if (bHazardFacing || Pawn == nullptr || !Target.IsValid() || !UEtcFlashExposureComponent::CanSeeTarget(Pawn, Target.Get())
++		|| (Cast<APlayerController>(Controller)&&!EtcJevBridge::IsEnemyVisible(Pawn,Cast<APawn>(Target.Get()))))
  	{
  		bInsideFireGate = false;
++		bHasVisibleBearing=false;VisibleAngularVelocity=FRotator::ZeroRotator;LookVelocity=FRotator::ZeroRotator;
  		UpdateAds();
 +		UpdatePlayerLook(DeltaTime);
  		return;
  	}
  
-@@ -157,6 +180,7 @@
+@@ -157,6 +184,7 @@
  		ReactionRemaining -= DeltaTime;
  		if (ReactionRemaining > 0.0f)
  		{
@@ -53,12 +69,22 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
  			return;
  		}
  		bAcquired = true;
-@@ -183,11 +207,11 @@
+@@ -183,11 +211,21 @@
  	if (Player)
  	{
  		NewRot = Controller->GetControlRotation() + (NewRot - CameraRotation).GetNormalized();
 -		NewRot = FMath::RInterpConstantTo(Controller->GetControlRotation(), NewRot, DeltaTime, 360.0f);
-+		RequestPlayerLook(NewRot,60);
++		// Derive motion from consecutive visible bearings, excluding randomized
++		// aim error. No actor velocity/hidden location extrapolation is consumed.
++		const FRotator Bearing=(Controller->GetControlRotation()+(ToTarget.Rotation()-CameraRotation).GetNormalized()).GetNormalized();
++		if(bHasVisibleBearing&&DeltaTime>0.001f&&DeltaTime<=0.05f){
++			const FRotator Delta=(Bearing-PreviousVisibleBearing).GetNormalized();
++			const double Blend=1.0-FMath::Exp(-DeltaTime/0.06);
++			VisibleAngularVelocity.Yaw=FMath::Lerp(VisibleAngularVelocity.Yaw,FMath::Clamp(Delta.Yaw/DeltaTime,-160.0,160.0),Blend);
++			VisibleAngularVelocity.Pitch=FMath::Lerp(VisibleAngularVelocity.Pitch,FMath::Clamp(Delta.Pitch/DeltaTime,-90.0,90.0),Blend);
++		}else VisibleAngularVelocity=FRotator::ZeroRotator;
++		PreviousVisibleBearing=Bearing;bHasVisibleBearing=true;
++		RequestPlayerLook(NewRot,60,0.12f,VisibleAngularVelocity);
  	}
  	const FVector Aimed = Player ? CameraRotation.Vector() : NewRot.Vector();
 -	Controller->SetControlRotation(NewRot);
@@ -71,7 +97,93 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
 diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
-@@ -570,8 +570,8 @@
+@@ -4,6 +4,8 @@
+ #include "Weapons/EtcFlashExposureComponent.h"
+ 
+ #include "AI/EtcBotAimComponent.h"
++#include "AI/EtcCombatLoadout.h"
++#include "Development/EtcJevBridge.h"
+ #include "AI/EtcBotController.h"
+ #include "Development/EtcJevController.h"
+ #include "AI/EtcBotMobilityRules.h"
+@@ -225,6 +227,8 @@
+ 	BestWeaponRank = 0;
+ 	MagazineAmmo = 0;
+ 	SpareAmmo = 0;
++	ActiveWeaponRange = 1100.f;
++	ActiveWeaponMinimumRange = 0.f;
+ 	const AController* Bot = Cast<AController>(GetOwner());
+ 	if (Bot == nullptr)
+ 	{
+@@ -249,6 +253,12 @@
+ 	int32 BestUsableRank = INDEX_NONE;
+ 	int32 BestUsableMagazine = 0;
+ 	int32 BestUsableSpare = 0;
++	float BestUtility = -10001.f;
++	float BestRange = 1100.f, BestMinimumRange = 0.f;
++	const APawn* Pawn = Bot->GetPawn();
++	const APawn* VisibleTarget = ExternalKind == TEXT("engage") ? Cast<APawn>(ExternalTarget.Get()) : nullptr;
++	const float VisibleDistance = bExternalControl && EtcJevBridge::IsEnemyVisible(Pawn, VisibleTarget)
++		? FVector::Dist(Pawn->GetActorLocation(), VisibleTarget->GetActorLocation()) : -1.f;
+ 	for (int32 i = 0; i < Slots.Num(); ++i)
+ 	{
+ 		UObject* Item = Slots[i];
+@@ -262,38 +272,51 @@
+ 				Item, EtcBotBrainLocal::MagazineAmmoTag());
+ 			const int32 Spare = EtcBotBrainLocal::GetStatTagStackCount(
+ 				Item, EtcBotBrainLocal::SpareAmmoTag());
++			const FString WeaponName=GetNameSafe(EtcBotBrainLocal::GetItemDefinition(Item));
++			const auto Profile=EtcCombatLoadout::Classify(std::wstring_view(*WeaponName,WeaponName.Len()));
++			const float Utility=EtcCombatLoadout::Utility(Profile,Mag,Spare,VisibleDistance,i==ActiveSlot);
+ 			if (i == ActiveSlot)
+ 			{
+ 				ActiveRank = Rank;
+ 				MagazineAmmo = Mag;
+ 				SpareAmmo = Spare;
++				ActiveWeaponRange = EtcCombatLoadout::HoldRange(Profile);
++				ActiveWeaponMinimumRange = EtcCombatLoadout::MinimumFireRange(Profile);
+ 			}
+ 			// Keep the current gun on a tie, but upgrade immediately when a
+ 			// stronger usable weapon is already carried. Previously a bot
+ 			// stayed on its first pistol until it was completely dry.
+ 			if ((Mag > 0 || Spare > 0)
+-				&& (Rank > BestUsableRank
+-					|| (Rank == BestUsableRank && i == ActiveSlot)))
++				&& (bExternalControl ? Utility > BestUtility : (Rank > BestUsableRank
++					|| (Rank == BestUsableRank && i == ActiveSlot))))
+ 			{
+ 				BestUsableSlot = i;
+ 				BestUsableRank = Rank;
+ 				BestUsableMagazine = Mag;
+ 				BestUsableSpare = Spare;
++				BestUtility = Utility;
++				BestRange = EtcCombatLoadout::HoldRange(Profile);
++				BestMinimumRange = EtcCombatLoadout::MinimumFireRange(Profile);
+ 			}
+ 		}
+ 	}
+ 	bHasWeapon = WeaponCount > 0;
+ 	const bool bActiveUsable = MagazineAmmo > 0 || SpareAmmo > 0;
+ 	if (bHasWeapon && BestUsableSlot != INDEX_NONE && BestUsableSlot != ActiveSlot
+-		&& (ActiveSlot == INDEX_NONE || !bActiveUsable || BestUsableRank > ActiveRank))
++		&& (bExternalControl || ActiveSlot == INDEX_NONE || !bActiveUsable || BestUsableRank > ActiveRank))
+ 	{
+ 		// AbilityInputTagPressed stores the specs granted by the current
+ 		// equipment. Clear held tags before changing slots so the newly
+ 		// granted Fire/FireAuto spec receives a fresh press next tick.
+ 		ReleaseWeaponInputs();
++		// Equipment owns its ADS/scope ability. Release the old grant before
++		// switching, then reacquire normally at the end of ReevaluateExternal.
++		if(bExternalControl)if(auto* Aim=EtcJevController::Aim(Cast<AController>(GetOwner())))Aim->SetTarget(nullptr);
+ 		EtcBotBrainLocal::SetActiveSlot(QuickBar, BestUsableSlot);
+ 		MagazineAmmo = BestUsableMagazine;
+ 		SpareAmmo = BestUsableSpare;
++		ActiveWeaponRange = BestRange;
++		ActiveWeaponMinimumRange = BestMinimumRange;
+ 	}
+ 	bNeedsReload = bHasWeapon && MagazineAmmo <= 0 && SpareAmmo > 0;
+ 	bOutOfAmmo = bHasWeapon && BestUsableSlot == INDEX_NONE;
+@@ -570,8 +593,8 @@
  	const float LookYaw = BaseYaw
  		+ static_cast<float>((ScoutLookDirectionIndex++ % 4) * 90);
  	const FRotator LookRotation(0.0f, LookYaw, 0.0f);
@@ -82,7 +194,16 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
  	ScoutLookRemaining = FMath::FRandRange(
  		EtcBotMobilityRules::ScoutLookStepMinSeconds,
  		EtcBotMobilityRules::ScoutLookStepMaxSeconds);
-@@ -1568,7 +1568,9 @@
+@@ -1147,6 +1170,8 @@
+ 	APawn* Pawn = Bot ? Bot->GetPawn() : nullptr;
+ 	// Recheck at the actual fire gate, including between perception refreshes.
+ 	bWantsToFire &= UEtcFlashExposureComponent::CanSeeTarget(Pawn, TargetEnemy.Get());
++	if(bExternalControl)bWantsToFire &= EtcJevBridge::IsEnemyVisible(Pawn,Cast<APawn>(TargetEnemy.Get()))
++		&& TargetEnemy.IsValid() && FVector::Dist(Pawn->GetActorLocation(),TargetEnemy->GetActorLocation())>=ActiveWeaponMinimumRange;
+ 	ULyraAbilitySystemComponent* ASC = EtcBotBrainLocal::GetAbilitySystem(Pawn);
+ 	if (ASC == nullptr)
+ 	{
+@@ -1568,7 +1593,9 @@
  		if (!Direction.IsNearlyZero())
  		{
  			const FRotator Facing = FMath::RInterpTo(Pawn->GetActorRotation(), Direction.Rotation(), DeltaTime, 12.f);
@@ -93,7 +214,7 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
  		}
  	}
  	if (bTrainWindowWaiting || bChessWindowWaiting || bGenericHazardWaiting)
-@@ -1712,9 +1714,7 @@
+@@ -1712,9 +1739,7 @@
  	if (bExternalControl && !TargetEnemy.IsValid() && !bGenericDirectMovement
  		&& !Pawn->GetVelocity().IsNearlyZero(10.0f))
  	{
@@ -104,7 +225,7 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBo
  	}
  	UpdateCoverScoutLook(DeltaTime);
  
-@@ -1797,6 +1797,16 @@
+@@ -1797,6 +1822,16 @@
  	}
  
  	if (bExternalControl && !bGenericDirectMovement) EtcJevBridge::UpdateAwarenessLook(Pawn, DeltaTime);
@@ -165,20 +286,24 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBot
  
  	void SetTarget(AActor* NewTarget, bool bUrgent = false);
 +	/** Player-only view arbitration: travel=10, observation=20, combat=60, traversal=100. */
-+	void RequestPlayerLook(const FRotator& Rotation, int32 Priority, float HoldSeconds=0.12f);
++	void RequestPlayerLook(const FRotator& Rotation, int32 Priority, float HoldSeconds=0.12f, const FRotator& AngularVelocity=FRotator::ZeroRotator);
 +	void ResetPlayerLook();
 +	float GetPlayerViewSpeed() const;
 +	int32 GetPlayerViewPriority() const { return LookPriority; }
  	/** Shelter runs use normal sprint speed; aiming resumes after reaching cover. */
  	void SetTraversalSprint(bool bValue) { bTraversalSprint = bValue; UpdateAds(); }
  	/** A ledge transfer owns facing until the normal navigation path resumes. */
-@@ -49,6 +55,11 @@
+@@ -49,6 +55,15 @@
  private:
  	void SampleCone();
  	void UpdateAds();
 +	void UpdatePlayerLook(float DeltaTime);
 +	EtcViewMotion::Axis ViewYaw, ViewPitch;
 +	FRotator LookGoal=FRotator::ZeroRotator;
++	FRotator LookVelocity=FRotator::ZeroRotator;
++	FRotator PreviousVisibleBearing=FRotator::ZeroRotator;
++	FRotator VisibleAngularVelocity=FRotator::ZeroRotator;
++	bool bHasVisibleBearing=false;
 +	double LookUntil=0;
 +	int32 LookPriority=0;
  	FVector AimPointAt(const AActor* Actor) const;
@@ -195,6 +320,15 @@ diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBot
  	double ExternalUntil = 0;
  	FString ExternalId, ExternalKind, ExternalStatus = TEXT("released"), ExternalReason = TEXT("not_started");
  	TWeakObjectPtr<AActor> ExternalTarget;
+@@ -81,6 +82,8 @@
+ 	int32 WeaponCount = 0;
+ 	int32 WeaponSlotCapacity = 3;
+ 	int32 BestWeaponRank = 0;
++	float ActiveWeaponRange = 1100.f;
++	float ActiveWeaponMinimumRange = 0.f;
+ 	int32 MagazineAmmo = 0;
+ 	int32 SpareAmmo = 0;
+ 	bool bOutOfAmmo = false;
 diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h

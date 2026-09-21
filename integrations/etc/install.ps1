@@ -58,6 +58,7 @@ foreach ($file in @('EtcJevBridge.cpp','EtcJevBridge.h','EtcJevMotor.h','EtcJevM
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $dest -Force
 }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'EtcViewMotion.h') -Destination (Join-Path $module 'Public\AI\EtcViewMotion.h') -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'EtcCombatLoadout.h') -Destination (Join-Path $module 'Public\AI\EtcCombatLoadout.h') -Force
 New-Item -ItemType Directory -Path (Join-Path $module 'Private\Tests') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'EtcViewMotionTest.cpp') -Destination (Join-Path $module 'Private\Tests\EtcViewMotionTest.cpp') -Force
 if (-not $source.Contains('#include "Development/EtcJevBridge.h"')) {
