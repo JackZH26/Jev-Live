@@ -64,7 +64,7 @@ TWeakObjectPtr<APawn> OwnedPawn;
 TWeakObjectPtr<UWorld> ObservedWorld;
 bool SawLiving=false;
 float ObservedHealth=-1, SearchYaw=0;
-double SearchUntil=0,NextAwareness=0;
+double SearchUntil=0,NextAwareness=0,LastDamageAt=0;
 TWeakObjectPtr<UEtcMapHudSubsystem> OwnedMap;
 TSharedPtr<FJsonObject> MapSnapshot;
 double MapStarted=0,MapVisibleSince=0;
@@ -166,8 +166,8 @@ void Observe(UWorld* W,APlayerController* PC,APawn* P,double Time){
   auto* Map=W?W->GetSubsystem<UEtcMapAssemblySubsystem>():nullptr;
   auto* Rooms=W?W->GetSubsystem<UEtcRoomStateSubsystem>():nullptr;
   const int32 Slot=Map&&P?Map->GetRoomSlotAtLocation(P->GetActorLocation()):-1;
-  if(Slot!=LastRoom){Release(TEXT("room_changed"));LastRoom=Slot;RememberedThreats.Reset();ObservedHealth=-1;SearchUntil=0;NextAwareness=Time+1500;}
-  if(Health>0&&ObservedHealth>=0&&Health<ObservedHealth-.5f&&Time>SearchUntil){SearchUntil=Time+1200;SearchYaw=(PC?PC->GetControlRotation().Yaw:0)+(FMath::RandBool()?85.f:-85.f);}
+  if(Slot!=LastRoom){Release(TEXT("room_changed"));LastRoom=Slot;RememberedThreats.Reset();ObservedHealth=-1;SearchUntil=0;LastDamageAt=0;NextAwareness=Time+1500;}
+  if(Health>0&&ObservedHealth>=0&&Health<ObservedHealth-.5f){LastDamageAt=Time;if(Time>SearchUntil){SearchUntil=Time+1200;SearchYaw=(PC?PC->GetControlRotation().Yaw:0)+(FMath::RandBool()?85.f:-85.f);}}
   ObservedHealth=Health;
   RememberedThreats.RemoveAll([Time](const FRememberedThreat& T){return T.Until<Time;});
   TArray<FEtcRoomView> Views;if(Rooms)Rooms->GetRoomViews(Views);TMap<int32,int32> Risks;bool Danger=false;float Evac=-1;
@@ -367,9 +367,16 @@ bool HasControlLease(const APawn* Pawn){
     &&Brain->IsComponentTickEnabled()&&Brain->GetExternalStatus()==TEXT("running");
 }
 void UpdateAwarenessLook(APawn* Pawn,float DeltaTime){
-  if(!HasControlLease(Pawn)||HasVisibleEnemy||Active.Kind==TEXT("engage")||Active.Kind==TEXT("inspect_map"))return;
+  if(!HasControlLease(Pawn)||Active.Kind==TEXT("engage")||Active.Kind==TEXT("inspect_map"))return;
   auto* PC=Cast<APlayerController>(Pawn->GetController());if(!PC)return;
   const double Time=Now();
+  // Keep checking the last actually seen bearing while moving to shelter.
+  // This requests a look only; firing still requires a fresh visible target.
+  if((Active.Kind==TEXT("cover")||Time-LastDamageAt<5000)&&!RememberedThreats.IsEmpty()){
+    const auto* Recent=&RememberedThreats[0];for(const auto& T:RememberedThreats)if(T.Until>Recent->Until)Recent=&T;
+    if(Recent->Until>=Time){FVector Eye;FRotator Camera;PC->GetPlayerViewPoint(Eye,Camera);const FRotator Goal=PC->GetControlRotation()+((Recent->Eye-Eye).Rotation()-Camera).GetNormalized();if(auto* Aim=EtcJevController::Aim(PC))Aim->RequestPlayerLook(Goal,40);return;}
+  }
+  if(HasVisibleEnemy)return;
   if(Time>SearchUntil&&Time>=NextAwareness){SearchUntil=Time+FMath::FRandRange(650.f,1100.f);NextAwareness=Time+FMath::FRandRange(2800.f,5500.f);const float Arc=Pawn->GetVelocity().Size2D()>100?28.f:75.f;SearchYaw=PC->GetControlRotation().Yaw+FMath::FRandRange(-Arc,Arc);}
   if(Time>SearchUntil)return;
   // Damage supplies no omniscient bearing. Use short, smooth looks instead of

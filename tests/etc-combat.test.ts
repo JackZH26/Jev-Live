@@ -35,6 +35,18 @@ it('takes nearby cover after damage, then returns fire without repeatedly select
  o.executor={...o.executor!,objective:'shelter',status:'succeeded',reason:'cover_reached'};o.actions.find(a=>a.id==='shelter')!.distance=50;o.timestamp+=800;
  expect(p.choose(o,o.timestamp,false,true,'fight')?.id).toBe('fight');
 });
+it('keeps an in-progress nearby cover approach instead of swapping shelters each damage tick',()=>{
+ const p=new EtcPolicy(),o=state();o.enemies=[{id:'enemy',distance:1400,position:[1400,0,90],velocity:[0,0,0]}];
+ o.actions.push({id:'fight',kind:'engage',safe:true,distance:1400},{id:'a',kind:'cover',safe:true,distance:500},{id:'b',kind:'cover',safe:true,distance:700});
+ p.choose(o,time,false,true,'fight');o.self.health=80;o.timestamp+=50;expect(p.choose(o,o.timestamp,false,true)?.id).toBe('a');
+ o.executor={...o.executor!,objective:'a',status:'running'};o.actions.find(a=>a.id==='b')!.distance=400;o.timestamp+=200;
+ expect(p.choose(o,o.timestamp,false,true,'b')?.id).toBe('a');
+});
+it('rejects cloud advice to abandon a loaded favorable fight for distant cover',()=>{
+ const o=state();o.enemies=[{id:'enemy',distance:1400,position:[1400,0,90],velocity:[0,0,0]}];
+ o.actions.push({id:'fight',kind:'engage',safe:true,distance:1400},{id:'far',kind:'cover',safe:true,distance:4500});
+ expect(new EtcPolicy().choose(o,time,false,true,'far')?.id).toBe('fight');
+});
 it('does not heal or top up immediately after taking damage even if the attacker leaves the camera',()=>{
  const p=new EtcPolicy(),o=state();p.choose(o,time,false,true);o.self.health=90;o.self.magazine=4;o.timestamp+=50;
  expect(['heal','reload']).not.toContain(p.choose(o,o.timestamp,false,true)?.kind);

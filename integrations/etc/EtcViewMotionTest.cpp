@@ -19,6 +19,10 @@ bool FEtcViewMotionTest::RunTest(const FString& Parameters)
     const double Speed=Reverse.Velocity;Angle=Reverse.Step(Angle,-150,1./60);
     TestTrue(TEXT("direction switch decelerates rather than snapping velocity"),std::abs(Reverse.Velocity-Speed)<=850./60+.001);
     Reverse.Reset();TestEqual(TEXT("manual release discards velocity"),Reverse.Velocity,0.0);
+    Reverse.Velocity=220;Angle=0;
+    for(int I=0;I<12;++I){const double Previous=Reverse.Velocity;Angle=Reverse.Step(Angle,150,1./60,150,650);
+        TestTrue(TEXT("lower speed cap preserves bounded deceleration"),std::abs(Reverse.Velocity-Previous)<=650./60+.001);}
+    TestTrue(TEXT("settles below the new speed cap"),Reverse.Velocity<=150);
     return true;
 }
 #endif

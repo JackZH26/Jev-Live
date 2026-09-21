@@ -88,6 +88,11 @@ export class EtcPolicy {
     const nativeLoadedPrimary=o.executor?.kind==='shared-bot-v1'&&o.self.magazine>0&&!/StarterPistol|^$/.test(o.self.weapon);
     const eligible=o.actions.filter(a=>!['new_match','inspect_map','pick_room'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe&&this.completed.allows(a.id)&&!(a.kind==='equip'&&nativeLoadedPrimary));
     const escape=eligible.filter(a=>a.kind==='portal');
+    const nearbyCover=()=>{
+      const held=eligible.find(a=>a.id===this.active&&a.kind==='cover'&&a.distance>150&&a.distance<=1400);
+      if(held&&now-this.activeAt<3000&&o.executor?.status==='running')return held;
+      return eligible.filter(a=>a.kind==='cover'&&a.distance>150&&a.distance<=1400).sort((a,b)=>a.distance-b.distance)[0];
+    };
     const escapeOrder=(a:EtcAction,b:EtcAction)=>(a.destinationRisk??0)-(b.destinationRisk??0)||a.distance-b.distance;
     const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;
     // A yellow room without enemies is an evacuation order, including weak loadouts.
@@ -95,8 +100,8 @@ export class EtcPolicy {
     if(o.self.healing&&!threatened&&!o.self.danger)return wait;
     // Stabilize behind nearby verified cover, then allow a bounded counterattack.
     // Do not ping-pong between the same completed cover and an attack every tick.
-    if(underFire&&visible&&(low||now-this.coverAt>2500)){
-      const cover=eligible.filter(a=>a.kind==='cover'&&a.distance>150&&a.distance<=1400).sort((a,b)=>a.distance-b.distance)[0];
+    if(underFire&&visible&&(this.hurtAt>this.coverAt||now-this.coverAt>2500)){
+      const cover=nearbyCover();
       if(cover)return this.select(cover,now);
     }
     if(!threatened&&!o.self.danger){
@@ -121,7 +126,7 @@ export class EtcPolicy {
     // Moving uses the normal game's cast interruption. Do not restart a heal
     // each time incoming damage cancels it, or stand still awaiting cloud advice.
     if(underFire&&!visible){
-      const retreat=eligible.filter(a=>a.kind==='cover'&&a.distance>150).sort((a,b)=>a.distance-b.distance)[0]
+      const retreat=nearbyCover()
         ??escape.sort(escapeOrder)[0]
         ??eligible.find(a=>a.kind==='scan');
       if(retreat)return this.select(retreat,now);
@@ -152,6 +157,7 @@ export class EtcPolicy {
         ||!threatened&&eligible.some(a=>a.kind==='equip')
         ||!threatened&&weakLoadout&&supply&&supply.distance<=3000;
       const legal=tactical&&(tactical.kind!=='engage'||visible&&o.self.magazine>0&&!o.self.protected)
+        &&!(tactical.kind==='cover'&&tactical.distance>1400&&threatened&&o.self.magazine>0&&!low)
         &&!(defending&&tactical.kind==='portal')
         &&!(tactical.kind==='portal'&&(tactical.destinationRisk??0)>=2&&escape.some(a=>a.destinationRisk===0))
         &&(!threatened||!['loot','pickup','scan'].includes(tactical.kind));
@@ -183,7 +189,7 @@ export class EtcPolicy {
     const chosen=eligible.map(a=>({a,n:score(a)})).sort((a,b)=>b.n-a.n||a.a.id.localeCompare(b.a.id))[0];
     return this.select(chosen?.a??wait,now);
   }
-  private select(a:EtcAction|undefined,now:number){if(a&&a.id!==this.active){this.active=a.id;this.activeAt=now;this.progressAt=now;this.bestDistance=a.distance;}return a;}
+  private select(a:EtcAction|undefined,now:number){if(a&&a.id!==this.active){this.active=a.id;this.activeAt=now;this.progressAt=now;this.bestDistance=a.distance;if(a.kind==='cover')this.coveredObjective='';}return a;}
 }
 
 export class EtcMetrics {
