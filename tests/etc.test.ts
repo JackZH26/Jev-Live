@@ -297,6 +297,14 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
   await (game as any).tick();expect(game.gate.mode).toBe('manual');expect(resume).not.toHaveBeenCalled();
  });
+ it('waits for native acknowledgment of the pending epoch without mistaking it for takeover',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({autoRestart:true})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  game.autoplay.transitionMatch='match-1';game.autoplay.transitionUntil=Date.now()+120000;
+  vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({phase:'menu',mode:'manual',epoch:0}));
+  const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue(),resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
+  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(tick).toHaveBeenCalledOnce();expect(resume).not.toHaveBeenCalled();
+ });
  it('starts immediately after a result, retries within five seconds, and starts a fresh lobby without inherited cooldown',async()=>{
   let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
   const b=await bridge(),runner=new EtcAutoplay(b,{get:vi.fn()} as any),commands=vi.spyOn(b,'command').mockResolvedValue(true);

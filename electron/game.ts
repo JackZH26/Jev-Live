@@ -129,9 +129,16 @@ export class Game {
     await this.autoplay.resumeControl(this.gate.change('auto'));
    }
    if(this.autoplay.transitionUntil>0){
-    if(now>=this.autoplay.transitionUntil||o.epoch!==this.gate.epoch||o.executor?.reason==='manual_takeover'){
+    if(now>=this.autoplay.transitionUntil||o.epoch>this.gate.epoch){
      await this.setMode('manual');this.error=message('etc.lost');return;
     }
+    if(o.epoch<this.gate.epoch){
+     // A start may expire before native consumption. Retry the offered menu
+     // action, but never rearm gameplay from an unacknowledged epoch.
+     if(['menu','dead','ended'].includes(o.phase))await this.autoplay.tick(settings,this.gate.epoch);
+     return;
+    }
+    if(o.executor?.reason==='manual_takeover'){await this.setMode('manual');this.error=message('etc.lost');return;}
     // A new world ID appears before room generation/drop-in finishes. Keep the
     // bounded loading grace and let native input leases expire until play starts.
     if(o.phase==='loading'){

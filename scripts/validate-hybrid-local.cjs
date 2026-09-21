@@ -63,7 +63,9 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
     if(focus==='resume'){await control.resumeControl(++epoch);report.events.push({at:Date.now(),kind:'focus_resume',frame:o.frame});await fs.writeFile(path.join(out,'playback.json'),JSON.stringify({state:'playing',pid:child.pid,at:Date.now()}));await sleep(40);continue;}}
    if(!o.foreground){report.stopReason='focus_lost';report.focusLoss={at:Date.now(),phase:o.phase,mode:o.mode,frame:o.frame,observationAgeMs:Date.now()-o.timestamp,executor:o.executor};break;}
    if(control.transitionUntil>0){
-    if(Date.now()>=control.transitionUntil||o.epoch!==epoch||o.executor?.reason==='manual_takeover'){report.stopReason='transition_stopped';break;}
+    if(Date.now()>=control.transitionUntil||o.epoch>epoch){report.stopReason='transition_stopped';break;}
+    if(o.epoch<epoch){if(['menu','dead','ended'].includes(o.phase))await control.tick(settings,epoch);lastFresh=Date.now();await sleep(40);continue;}
+    if(o.executor?.reason==='manual_takeover'){report.stopReason='live_manual_takeover';break;}
     if(o.phase==='loading'&&!o.roomPick){lastFresh=Date.now();await sleep(40);continue;}
     if(o.mode==='manual'&&o.diagnostics.heldInputs!==0){await sleep(40);continue;}
     if(o.phase==='playing'||o.mode==='manual')await control.resumeControl(++epoch);
