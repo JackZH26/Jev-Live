@@ -120,6 +120,7 @@ export class Obs {
     for(const provider of settings.enabledPlatforms) {
       const client=this.client(provider);
       for(const inputName of ['ETC Game','ETC Audio']) await client.call('SetInputSettings',{inputName,inputSettings:{window:value,priority:2},overlay:true});
+      await this.restoreGameAudio(provider);
       await this.fit(provider);
     }
     await this.store.saveSettings({...settings,gameWindow:value});
@@ -128,6 +129,18 @@ export class Obs {
     const client=this.client(provider);
     const item=await client.call('GetSceneItemId',{sceneName:'JEV Program',sourceName:'ETC Game'});
     await client.call('SetSceneItemTransform',{sceneName:'JEV Program',sceneItemId:item.sceneItemId,sceneItemTransform:{positionX:0,positionY:0,boundsType:'OBS_BOUNDS_SCALE_INNER',boundsWidth:1920,boundsHeight:1080,alignment:5}});
+  }
+  private async restoreGameAudio(provider:Provider) {
+    const c=this.client(provider);
+    // Rehearsal shutdown can leave this owned source muted/hidden. Restore it on
+    // explicit capture/start, never every poll (which would fight live mixing).
+    const item=await c.call('GetSceneItemId',{sceneName:'JEV Program',sourceName:'ETC Audio'});
+    const tracks=await c.call('GetInputAudioTracks',{inputName:'ETC Audio'});
+    await c.call('SetSceneItemEnabled',{sceneName:'JEV Program',sceneItemId:item.sceneItemId,sceneItemEnabled:true});
+    await c.call('SetInputAudioTracks',{inputName:'ETC Audio',inputAudioTracks:{...tracks.inputAudioTracks,'1':true}});
+    await c.call('SetInputAudioMonitorType',{inputName:'ETC Audio',monitorType:'OBS_MONITORING_TYPE_NONE'});
+    await c.call('SetInputMute',{inputName:'ETC Audio',inputMuted:false});
+    // Preserve the user's game/host balance; do not reset gain or add desktop audio.
   }
   async preview(provider:Provider) { return (await this.client(provider).call('GetSourceScreenshot',{sourceName:'JEV Program',imageFormat:'jpg',imageWidth:960,imageCompressionQuality:65})).imageData; }
   async gamePreview(provider:Provider) { return (await this.client(provider).call('GetSourceScreenshot',{sourceName:'ETC Game',imageFormat:'jpg',imageWidth:960,imageCompressionQuality:65})).imageData; }
@@ -146,7 +159,7 @@ export class Obs {
     if(!/^rtmps?:\/\//.test(server)) throw new Error(message('error.destination'));
     await this.client(provider).call('SetStreamServiceSettings',{streamServiceType:'rtmp_custom',streamServiceSettings:{server,key,use_auth:false}});
   }
-  async start(provider:Provider,signal?:AbortSignal) { signal?.throwIfAborted();const c=this.client(provider);await c.call('StartStream');for(let i=0;i<60;i++){signal?.throwIfAborted();const s=await c.call('GetStreamStatus');if(s.outputActive&&!s.outputReconnecting){this.states[provider].active=true;return;}await delay(500,signal);}throw new Error(message('error.obsStart',{provider:providerNames[provider]})); }
+  async start(provider:Provider,signal?:AbortSignal) { signal?.throwIfAborted();const c=this.client(provider);await this.restoreGameAudio(provider);signal?.throwIfAborted();await c.call('StartStream');for(let i=0;i<60;i++){signal?.throwIfAborted();const s=await c.call('GetStreamStatus');if(s.outputActive&&!s.outputReconnecting){this.states[provider].active=true;return;}await delay(500,signal);}throw new Error(message('error.obsStart',{provider:providerNames[provider]})); }
   async stop(provider:Provider) {
     const c=this.client(provider); const s=await c.call('GetStreamStatus');
     if(s.outputActive) await c.call('StopStream');

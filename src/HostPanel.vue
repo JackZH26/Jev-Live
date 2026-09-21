@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Avatar from './Avatar.vue';
+import {etcContent,isEtc} from '../shared/game-content';
 import { defaultLayout, clampRect, type HostConfig, type HostSnapshot, type Layer, type LayerRect } from '../shared/hosting';
 import { providers, providerNames, type Provider } from '../shared/types';
 import { t as translate, translateMessage, type Locale, type MessageKey } from '../shared/i18n';
@@ -8,6 +9,7 @@ const props=defineProps<{locale:Locale}>();
 const t=(key:MessageKey)=>translate(props.locale,key),tr=(text:string)=>translateMessage(props.locale,text);
 const api=window.studio, s=ref<HostSnapshot>(), config=ref<HostConfig>(), provider=ref<Provider>('twitch'), selected=ref<Layer>('avatar');
 const preview=ref(''), notice=ref(''), pending=ref(false), stage=ref<HTMLElement>(), auth=ref('');
+const etcSelected=ref(false),pinCopied=ref(false);
 const languages=[['zh-CN','简体中文'],['zh-TW','繁體中文'],['ja','日本語'],['ko','한국어'],['en','English']];
 const layers:Layer[]=['game','avatar','chat','captions'];
 const layout=computed(()=>config.value!.layouts[provider.value]);
@@ -18,7 +20,7 @@ let timer:ReturnType<typeof setInterval>,polling=false,previewAt=0,audio:HTMLAud
 const voiceLevel=ref(0);
 function stopPreviewVoice(){cancelAnimationFrame(voiceFrame);audio?.pause();audio=undefined;void voiceContext?.close();voiceContext=undefined;voiceLevel.value=0;}
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value));
-async function refresh(){if(polling)return;polling=true;try{s.value=await api.hostSnapshot();if(!config.value)config.value=clone(s.value.config);auth.value=(await api.snapshot()).auth.twitch??'';if(Date.now()-previewAt>3500){previewAt=Date.now();preview.value=await api.gamePreview(provider.value).catch(()=>'');}}catch(e){notice.value=String(e);}finally{polling=false;}}
+async function refresh(){if(polling)return;polling=true;try{s.value=await api.hostSnapshot();if(!config.value)config.value=clone(s.value.config);const studio=await api.snapshot();auth.value=studio.auth.twitch??'';etcSelected.value=isEtc(studio.selectedGame?.appId);if(Date.now()-previewAt>3500){previewAt=Date.now();preview.value=await api.gamePreview(provider.value).catch(()=>'');}}catch(e){notice.value=String(e);}finally{polling=false;}}
 async function run(fn:()=>Promise<unknown>){if(pending.value)return;pending.value=true;notice.value='';try{await fn();await refresh();}catch(e){notice.value=e instanceof Error?e.message:String(e);}finally{pending.value=false;}}
 function normalize(){layout.value[selected.value]=clampRect(rectangle.value);}
 function drag(event:PointerEvent,layer:Layer,resize=false){selected.value=layer;const rect=layout.value[layer];if(rect.locked||!stage.value||event.button!==0)return;event.preventDefault();const target=event.currentTarget as HTMLElement;target.setPointerCapture(event.pointerId);const start={...rect},x=event.clientX,y=event.clientY,scale=1920/stage.value.clientWidth;const onMove=(e:PointerEvent)=>{const dx=(e.clientX-x)*scale,dy=(e.clientY-y)*scale;layout.value[layer]=clampRect(resize?{...start,width:Math.min(1920-start.x,start.width+dx),height:Math.min(1080-start.y,start.height+dy)}:{...start,x:start.x+dx,y:start.y+dy});};const end=()=>{target.removeEventListener('pointermove',onMove);target.removeEventListener('pointerup',end);target.removeEventListener('pointercancel',end);};target.addEventListener('pointermove',onMove);target.addEventListener('pointerup',end,{once:true});target.addEventListener('pointercancel',end,{once:true});}
@@ -49,6 +51,13 @@ onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmount
    </div></div>
   </section>
   <div class="host-grid">
+   <section v-if="etcSelected" class="card host-settings" data-testid="game-content"><h2>{{t('host.gameContent')}}</h2>
+    <fieldset :disabled="s.running||pending"><label class="check"><input type="checkbox" v-model="config.gameContent.introductions">{{t('host.gameIntros')}}</label><label class="check"><input type="checkbox" v-model="config.gameContent.wishlist">{{t('host.wishlistReminders')}}</label>
+     <div class="form-row"><label>{{t('host.introInterval')}}<input type="number" v-model.number="config.gameContent.introIntervalSec" min="90" max="1800"></label><label>{{t('host.wishlistInterval')}}<input type="number" v-model.number="config.gameContent.wishlistIntervalSec" min="300" max="3600"></label></div><button @click="run(save)">{{t('host.saveSettings')}}</button>
+    </fieldset><p class="hint">{{t('host.contentHint')}}</p>
+    <label>{{t('host.pinMessage')}}<textarea :value="etcContent.pinnedMessage" readonly rows="4" data-testid="pin-message"></textarea></label>
+    <button @click="run(async()=>{await api.copyGameAnnouncement();pinCopied=true;})">{{t(pinCopied?'host.pinCopied':'host.copyPin')}}</button><p class="hint">{{t('host.pinHint')}}</p>
+   </section>
    <section class="card host-settings"><h2>{{t('host.character')}}</h2><fieldset :disabled="s.running||pending">
     <div class="form-row"><label>{{t('host.name')}}<input v-model="config.avatar.name" maxlength="40"></label><label class="color-picker">{{t('host.color')}}<input type="color" v-model="config.avatar.color"></label></div>
     <div class="inline-buttons"><button @click="config.avatar.kind='builtin'">{{t('host.builtin')}}</button><button @click="run(importAvatar)">{{t('host.import')}}</button></div><p class="hint">{{t('host.assetHint')}}</p>

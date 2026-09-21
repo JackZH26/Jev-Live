@@ -1,0 +1,21 @@
+/** Curated against the GDD-derived UE design and public store copy. See docs/stream-content.md. */
+export const etcContent={
+ appIds:['5030940','5272970'],name:'Enter the Cube',storeUrl:'https://store.steampowered.com/app/5030940/',
+ pinnedMessage:'Playing Enter the Cube — a third-person battle royale inside a collapsing cube. Wishlist on Steam: https://store.steampowered.com/app/5030940/',
+ facts:[
+  {id:'core',keywords:/what.*game|how.*play|objective|battle royale|玩法|什么游戏|遊び方|どんなゲーム|무슨 게임/i,fact:'Enter the Cube is a third-person battle royale: loot weapons, travel between rooms through portals, and try to be the last survivor.',lines:["New here? Enter the Cube is a third-person battle royale. Loot up, cross portals, and try to be the last one standing!","The fun is choosing when to fight and when to move. One good escape through a portal can keep your run alive."]},
+  {id:'collapse',keywords:/collaps|shrinking|zone|circle|坍|缩圈|崩壊|붕괴/i,fact:'Rooms collapse over the match instead of using a conventional shrinking circle. Pay attention to warnings and plan an escape through connected rooms.',lines:["The cube loses rooms as the match goes on. I like having an exit in mind before the warning turns into a problem.","A lovely loot spot is only lovely while the room is safe. Keep an eye on the collapse warnings!"]},
+  {id:'portals',keywords:/portal|teleport|door|传送|傳送|ポータル|포털/i,fact:'Portals connect rooms. A crossing can put you in a different safe arrival spot in the destination room; do not assume every arrival is directly in front of its door.',lines:["Portals connect the rooms, so route choice matters. Check your surroundings after crossing; the next room can feel completely different.","A portal is a fresh decision: do I stay for more loot, or take a new route before this room gets crowded?"]},
+  {id:'layout',keywords:/random|layout|map|地图|地圖|随机|隨機|マップ|맵/i,fact:'Rooms have authored internal layouts. Matches vary which rooms are selected and how active portals connect them; not every wall is procedurally rearranged.',lines:["Learning a room pays off. Its interior has an authored layout, while the room selection and portal connections can change between matches.","Recognizing a familiar room helps, but the route through the cube can change. That is where the planning gets interesting."]},
+  {id:'rooms',keywords:/room|train|pool|chess|房间|房間|列车|台球|棋|部屋|방/i,fact:'Room themes include speeding trains, giant pool tables and shifting chessboards. Different environments change sightlines, cover and movement decisions. This does not confirm which room is currently visible.',lines:["This game goes from speeding trains to giant pool tables and shifting chessboards. Every room gives the fight a different flavor.","I love the room variety: the cover and routes that work in one place may feel very different after the next portal."]},
+  {id:'sniper',keywords:/sniper|broadcast|reveal|狙击|狙擊|スナイパー|저격/i,fact:'The special sniper carries a risk: holding it broadcasts the holder’s room, not an exact position. Switching to another weapon does not remove the risk while it is still carried.',lines:["That special sniper comes with a trade-off: holding it reveals your room. Big firepower can also bring company!","The sniper broadcast tells opponents which room to investigate, not your exact spot. Cover and movement still matter."]},
+  {id:'wishlist',keywords:/steam|wishlist|store|buy|download|心愿|心願|商店|下载|下載|ウィッシュ|찜/i,fact:'The game is Enter the Cube. Search that exact title on Steam and add it to your wishlist. The main store app is 5030940; the separate Playtest is not the wishlist page. No confirmed price or release date is supplied.',lines:[]}
+ ],
+ reminders:[
+  "Enjoying the room chaos? Search Enter the Cube on Steam and add it to your wishlist!",
+  "Quick little reminder while we have a breather: Enter the Cube is on Steam. A wishlist is a lovely way to keep track of it.",
+  "Want to keep an eye on this one? Search Enter the Cube on Steam and hit Add to your wishlist.",
+  "If this looks like your kind of battle royale, look up Enter the Cube on Steam and give it a wishlist!"
+ ]
+} as const;
+export function isEtc(appId:unknown){return typeof appId==='string'&&(etcContent.appIds as readonly string[]).includes(appId);}

@@ -1,5 +1,6 @@
 import { message, t, locales, type Locale } from '../shared/i18n';
-import { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Tray, Menu, nativeImage, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, safeStorage, shell, dialog, Tray, Menu, nativeImage, globalShortcut, clipboard } from 'electron';
+import {etcContent,isEtc} from '../shared/game-content';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
@@ -63,7 +64,7 @@ app.whenReady().then(async()=>{
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
   broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log,p=>obs.overlay(p,overlay.url(p),hosting.config.layouts[p]));await game.init();await broadcast.init();
-  hosting=new Hosting(store,auth,()=>JSON.stringify({game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,3000)??'':''}),()=>broadcast.state.youtubeId,()=>game.connected);
+  hosting=new Hosting(store,auth,()=>{const o=game.autoplay.observation;return JSON.stringify({appId:game.selected?.appId,game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',activity:o?{at:o.timestamp,match:o.matchId,enemies:o.enemies.length,health:o.self.health,shots:o.diagnostics.shots,danger:o.self.danger,traveling:o.self.traveling,healing:o.self.healing,reloading:o.self.reloading??false}:undefined,visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,2400)??'':''});},()=>broadcast.state.youtubeId,()=>game.connected);
   await hosting.init();overlay=new OverlayServer(hosting,join(__dirname,'../../dist'));await overlay.start();
   const applyLayouts=async()=>{for(const p of (await store.settings()).enabledPlatforms)if(obs.states[p].ready)await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);};
   window=new BrowserWindow({width:1480,height:960,minWidth:1080,minHeight:720,backgroundColor:'#f2f3f8',title:'JEV Studio',autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
@@ -115,6 +116,7 @@ app.whenReady().then(async()=>{
   handler('setupOBS',async()=>{await obs.setup();await applyLayouts();},message('busy.obs'));
   handler('windows',()=>obs.windows());handler('setCapture',async value=>{await obs.capture(z.string().min(1).max(1000).parse(value));await applyLayouts();},message('busy.capture'));
   handler('hostSnapshot',async()=>({...await hosting.snapshot(),assetUrl:overlay.assetURL()}));
+  handler('copyGameAnnouncement',async()=>{if(!isEtc(game.selected?.appId))throw new Error(message('error.steamSelection'));clipboard.writeText(etcContent.pinnedMessage);});
   handler('preflight',async()=>{
     await obs.poll();const settings=await store.settings(),accounts=await auth.accounts();
     const checks=streamChecks({settings,accounts,xSource:await xLive.summary(),outputs:obs.states,selectedGame:game.selected,gameConnected:game.connected} as Snapshot);
