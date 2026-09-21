@@ -2,7 +2,15 @@
 
 [中文](COMBAT_ACCEPTANCE_HANDOFF.md) · [Implementation](COMBAT_STRATEGY.en.md)
 
-September 21, 2026: implementation is committed, but complete acceptance of the latest revision remains pending. Preserve manual takeover and foreground-loss release.
+September 21 update: current strategy `7db03bed26ce`, implementation `0c80ed6`, consecutive rehearsal runner `7e22018`. The latest desktop package is `release/combat-20260921-r5/win-unpacked`; actual startup, dependencies and seven embedded strategy modules are verified. Paired local native candidate `20260921-10` has executable SHA-256 `8d284b8ffe40448ae7139df80eb6a558e555c195f48b9c919d24ff6c140d2fe3`. Shipping, cook, actual pak configuration and 137 runtime files passed. The Steam installation remains unchanged.
+
+All 214 desktop tests and type checking passed. The actual C++ controller tracks a 12-degree/s target with steady errors of 0.25/0.15/0.10 degrees at 30/60/120 Hz while preserving speed/acceleration limits. Changes include equipped-weapon distance, close automatics/distant sniper selection, loaded fallback, rocket stand-off, releasing old ADS on weapon changes, and shelter counterfire windows.
+
+Candidate 10 completed two single-match runs: 11th/0 kills/0 damage and 10th/0 kills/12 damage, both with confirmed input release. The first exposed a prolonged ice-room routing stall; the second fired 24 shots. The first consecutive rehearsal match finished 14th/0 kills/73 damage. Unfinished matches' kills do not establish final results. Victory or streak acceptance has not passed.
+
+The former private X event had ended. A new event was explicitly set to Private and started; its player confirms the new title, advancing video and increasing decoded audio. Private links and detailed receipts stay local. The older open desktop window operates OBS only; the new runner controls gameplay. The rehearsal is capped at 30 minutes, 1200 JEV requests or 20 matches. Focus loss releases input immediately; stale capture is hidden and a watcher subsequently stops the encoder. Consecutive demonstrations do not replace per-match release-confirmed streak acceptance. Speech still has latency and has not passed humanlike-hosting acceptance.
+
+The following is historical candidate 07/08 handoff material. Resume from candidate 10 and the strategy above, prioritizing routing and stalled supply acquisition before completed matching-version performance acceptance.
 
 ## Delivered
 
