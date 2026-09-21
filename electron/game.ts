@@ -128,7 +128,10 @@ export class Game {
     this.portalUntil=0;
     await this.autoplay.resumeControl(this.gate.change('auto'));
    }
-   if(o.matchId!==this.autoplay.transitionMatch&&now<this.autoplay.transitionUntil){
+   if(this.autoplay.transitionUntil>0){
+    if(now>=this.autoplay.transitionUntil||o.epoch!==this.gate.epoch||o.executor?.reason==='manual_takeover'){
+     await this.setMode('manual');this.error=message('etc.lost');return;
+    }
     // A new world ID appears before room generation/drop-in finishes. Keep the
     // bounded loading grace and let native input leases expire until play starts.
     if(o.phase==='loading'){
@@ -138,8 +141,13 @@ export class Game {
      }
      return;
     }
-    this.autoplay.transitionUntil=0;
-    await this.autoplay.change('auto',this.gate.change('auto'));
+    if(o.mode==='manual'&&o.diagnostics.heldInputs!==0)return;
+    if(o.matchId!==this.autoplay.transitionMatch){
+     this.autoplay.transitionUntil=0;
+     await this.autoplay.change('auto',this.gate.change('auto'));
+    }else if(o.mode==='manual')await this.autoplay.resumeControl(this.gate.change('auto'));
+    // The previous screen can still be visible if a short-lived mailbox command
+    // expired before consumption. Keep ticking so the bounded retry can run.
    }else if(o.mode==='manual'&&o.epoch===this.gate.epoch){
     const recovery=this.autoplay.recovery.poll(o,this.gate.epoch,now);
     if(recovery==='wait')return;

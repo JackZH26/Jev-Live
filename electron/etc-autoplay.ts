@@ -17,13 +17,13 @@ export class EtcAutoplay {
   readonly stats={jevRequests:0,jevResponses:0};
   transitionUntil=0;transitionMatch='';
   private played=false;private epoch=0;private frame=-1;private advice='';private adviceUntil=0;
-  private cloudAt=0;private request?:AbortController;private pending=false;private newMatchAt=0;
+  private cloudAt=0;private request?:AbortController;private pending=false;private newMatchAt=-Infinity;private newMatchWorld='';
   private cloudFailures=0;private cloudAfter=0;
   constructor(readonly bridge:EtcBridge,private store:Store){}
   async observe(pid:number|undefined,auto=false){this.observation=await this.bridge.read(pid);if(this.observation){this.metrics.observe(this.observation,auto);if(this.observation.mode==='auto')this.recovery.poll(this.observation,this.epoch,Date.now());}return this.observation;}
   async change(mode:'auto'|'manual',epoch:number){
     this.epoch=epoch;this.request?.abort();this.advice='';this.adviceUntil=0;this.tactics.reset();this.recovery.reset();
-    if(mode==='auto'){this.policy.reset();this.navigation.reset();this.cloudFailures=0;this.cloudAfter=0;this.played=false;this.frame=-1;this.newMatchAt=0;}
+    if(mode==='auto'){this.policy.reset();this.navigation.reset();this.cloudFailures=0;this.cloudAfter=0;this.played=false;this.frame=-1;this.newMatchAt=-Infinity;this.newMatchWorld='';}
     else this.transitionUntil=0;
     await this.bridge.command(mode,epoch,this.observation,'wait');
   }
@@ -35,11 +35,16 @@ export class EtcAutoplay {
     const advice=o.executor?this.tactics.advice(o,now):now<this.adviceUntil?this.advice:undefined;
     const action=this.navigation.review(o,now)??this.policy.choose(o,now,settings.autoRestart,this.played,advice,this.navigation.next(o));
     if(!action)return;
-    // One travel command per menu transition, not one OpenLevel per observation.
-    if(action.kind==='new_match'&&now-this.newMatchAt<10000)return;
+    // Start immediately on a fresh lobby/result screen. Retry an unconsumed
+    // command in 1.5s; never wait for cloud advice or carry an old lobby cooldown.
+    const world=JSON.stringify([o.session,o.processId,o.matchId,o.phase]);
+    if(action.kind==='new_match'&&world===this.newMatchWorld&&now-this.newMatchAt<1500)return;
     if(!await this.bridge.command('auto',epoch,o,action.id))return;
     this.metrics.decision(o.timestamp,Date.now());this.strategy=action.kind;
-    if(action.kind==='new_match'){this.newMatchAt=now;this.transitionUntil=now+120000;this.transitionMatch=o.matchId;}
+    if(action.kind==='new_match'){
+      if(world!==this.newMatchWorld||!this.transitionUntil){this.transitionUntil=now+120000;this.transitionMatch=o.matchId;}
+      this.newMatchAt=now;this.newMatchWorld=world;
+    }
     if(settings.decisionProvider==='jev'&&o.phase==='playing'&&!o.mapView?.open&&action.kind!=='inspect_map'&&!this.pending&&now>=this.cloudAfter&&(o.executor?this.tactics.shouldRequest(o,now,settings.decisionIntervalMs):now-this.cloudAt>=Math.max(800,settings.decisionIntervalMs))){
       this.cloudAt=now;void this.advise(o,epoch);
     }

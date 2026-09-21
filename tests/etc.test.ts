@@ -281,6 +281,35 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   await (game as any).tick();expect(game.autoplay.transitionUntil).toBe(0);expect(change).toHaveBeenCalledWith('auto',game.gate.epoch);expect(tick).toHaveBeenCalledTimes(1);
   observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
  });
+ it('retries a pending start on a still-visible lobby instead of blocking it behind loading grace',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({autoRestart:true})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  game.autoplay.transitionMatch='match-1';game.autoplay.transitionUntil=Date.now()+120000;
+  vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({phase:'menu'}));
+  const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  await (game as any).tick();expect(tick).toHaveBeenCalledOnce();expect(game.gate.mode).toBe('auto');
+ });
+ it('never rearms a native manual takeover during a pending rematch',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({autoRestart:true})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
+  game.autoplay.transitionMatch='match-1';game.autoplay.transitionUntil=Date.now()+120000;
+  vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({phase:'menu',mode:'manual',executor:{kind:'shared-bot-v1',status:'released',reason:'manual_takeover',objective:'',failures:0,pathStatus:0}}));
+  vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
+  await (game as any).tick();expect(game.gate.mode).toBe('manual');expect(resume).not.toHaveBeenCalled();
+ });
+ it('starts immediately after a result, retries within five seconds, and starts a fresh lobby without inherited cooldown',async()=>{
+  let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
+  const b=await bridge(),runner=new EtcAutoplay(b,{get:vi.fn()} as any),commands=vi.spyOn(b,'command').mockResolvedValue(true);
+  const settings=settingsSchema.parse({decisionProvider:'rules',autoRestart:true});
+  runner.observation=observation();await runner.change('auto',1);await runner.tick(settings,1);commands.mockClear();
+  const next=async(extra:Partial<EtcObservation>,ms:number)=>{now+=ms;runner.observation=observation({...extra,timestamp:now,frame:runner.observation!.frame+1});await runner.tick(settings,1);};
+  const result={phase:'ended' as const,result:{placement:1,won:true},actions:[action('wait'),action('new_match')]};
+  await next(result,50);expect(commands.mock.calls.at(-1)?.[3]).toBe('new_match');
+  await next(result,50);expect(commands).toHaveBeenCalledTimes(1);
+  await next(result,1450);expect(commands).toHaveBeenCalledTimes(2);
+  await next({phase:'menu',matchId:'lobby-next',actions:result.actions},50);expect(commands).toHaveBeenCalledTimes(3);
+  await next({phase:'dead',matchId:'round-next',result:null,actions:result.actions},50);expect(commands.mock.calls.at(-1)?.[3]).toBe('wait');
+ });
  it('uses the visible room-pick screen during an authorized loading transition without dropping the grace',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
   (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};
