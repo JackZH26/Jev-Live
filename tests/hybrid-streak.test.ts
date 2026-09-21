@@ -8,9 +8,10 @@ it('requires two consecutive authoritative firsts on identical versions',()=>{
  expect(evaluate([win(1),win(2,{runtimeHashes:{policy:'two'}})]).streak).toBe(1);
  expect(evaluate([win(1),win(2,{focusHelperHash:'new'})]).streak).toBe(1);
  expect(evaluate([win(1),win(2,{releaseHelperHash:'new'})]).streak).toBe(1);
+ expect(evaluate([win(1),win(2,{rehearsalFocusHash:'new'})]).streak).toBe(1);
 });
 it('losses and incomplete trials reset the streak instead of being skipped',()=>{
- for(const change of [{stopReason:'time_budget'},{manualRelease:false},{officialResult:null},{cloudStats:{jevResponses:0}},{summary:{matches:1,wins:0,lastPlacement:2}}]){
+ for(const change of [{liveDemonstration:true},{stopReason:'time_budget'},{manualRelease:false},{officialResult:null},{cloudStats:{jevResponses:0}},{summary:{matches:1,wins:0,lastPlacement:2}}]){
   expect(evaluate([win(1),win(2,change),win(3)]).streak).toBe(1);
  }
 });

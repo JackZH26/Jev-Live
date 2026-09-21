@@ -1,11 +1,11 @@
 // Recompute from EVERY chronological receipt; never cherry-pick two wins.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-function version(r){return JSON.stringify([r.sha256,r.runtimeHashes,r.graphicsHash,r.harnessHash,r.focusHelperHash??null,r.releaseHelperHash??null,r.provider]);}
+function version(r){return JSON.stringify([r.sha256,r.runtimeHashes,r.graphicsHash,r.harnessHash,r.focusHelperHash??null,r.releaseHelperHash??null,r.rehearsalFocusHash??null,r.provider]);}
 function evaluate(receipts){
  let streak=0,last='',best=0;const rows=[];
  for(const {file,r} of [...receipts].sort((a,b)=>a.r.startedAt.localeCompare(b.r.startedAt))){
   const key=version(r),changed=key!==last;if(changed)streak=0;
-  const complete=r.stopReason==='official_result'&&r.summary?.matches===1&&r.manualRelease===true;
+  const complete=!r.liveDemonstration&&r.stopReason==='official_result'&&r.summary?.matches===1&&r.manualRelease===true;
   const first=complete&&r.provider==='jev'&&r.cloudStats?.jevResponses>0&&r.summary.wins===1
    &&r.summary.lastPlacement===1&&r.officialResult?.won===true&&r.officialResult.placement===1;
   streak=first?streak+1:0;best=Math.max(best,streak);last=key;
