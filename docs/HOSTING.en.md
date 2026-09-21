@@ -2,6 +2,8 @@
 
 [简体中文](HOSTING.md) · [English](HOSTING.en.md)
 
+2026-09-21: See the [natural hosting proposal](NATURAL_HOSTING.en.md) and [chat rehearsal](CHAT_REPLAY.en.md). Hosting defaults to English; spoken replies follow supported comment languages. Real platform interaction requires separate acceptance.
+
 Creator: JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj). Follow along and say hello.
 
 ## Workflow

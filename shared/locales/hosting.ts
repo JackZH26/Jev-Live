@@ -1,4 +1,5 @@
 export const hosting=[
+ ['host.languageMismatch','回复语言不匹配，已跳过本条语音。','回覆語言不符，已略過本次語音。','返答の言語が一致しないため、この音声をスキップしました。','응답 언어가 맞지 않아 해당 음성을 건너뛰었습니다.','Reply language did not match; this speech was skipped.'],
  ['health.framesStalled','输出帧数已停止增长，请检查 OBS。','輸出影格數已停止增加，請檢查 OBS。','出力フレーム数が停止しています。OBS を確認してください。','출력 프레임 수가 멈췄습니다. OBS를 확인하세요.','Output frames stopped advancing. Check OBS.'],
  ['health.overlayStale','主持叠加层暂时失去连接。','主持疊加層暫時失去連線。','司会オーバーレイが応答していません。','진행자 오버레이 연결이 끊겼습니다.','Host overlay stopped responding.'],
  ['health.blackFrame','游戏画面持续接近全黑，请检查采集窗口。','遊戲畫面持續接近全黑，請檢查擷取視窗。','ゲーム映像が暗い状態が続いています。キャプチャを確認してください。','게임 화면이 계속 검게 표시됩니다. 캡처 창을 확인하세요.','Game capture remains almost black. Check the selected window.'],

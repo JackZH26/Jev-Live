@@ -2,6 +2,8 @@
 
 [简体中文](HOSTING.md) · [English](HOSTING.en.md)
 
+2026-09-21 新增：[自然主持改进方案](NATURAL_HOSTING.md)与[模拟评论演练](CHAT_REPLAY.md)。直播默认英语，评论语音按支持的评论语言回复；真实平台互动仍需单独验收。
+
 作者：JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj)，欢迎关注交流。
 
 ## 使用

@@ -10,7 +10,7 @@ export const hostConfigSchema=z.object({
  layouts:z.object({youtube:layoutSchema,twitch:layoutSchema,x:layoutSchema}).default(()=>({youtube:defaultLayout(),twitch:defaultLayout(),x:defaultLayout()})),
  avatar:z.object({kind:z.enum(['builtin','image','vrm']).default('builtin'),asset:z.string().regex(/^$|^[a-f0-9]{32}\.(png|webp|jpg|vrm)$/).default(''),name:z.string().trim().min(1).max(40).default('JEV'),color:z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#9b8cff')}).default(()=>({kind:'builtin' as const,asset:'',name:'JEV',color:'#9b8cff'})),
  persona:z.string().max(3000).default('A friendly, curious gaming companion. Keep reactions concise, varied and grounded in visible game information. Be honest when uncertain.'),
- language:z.enum(['zh-CN','zh-TW','ja','ko','en']).default('zh-CN'),voice:z.string().max(200).default(''),
+ language:z.enum(['zh-CN','zh-TW','ja','ko','en']).default('en'),voice:z.string().max(200).default(''),
  speechProvider:z.enum(['system','qwen','melo']).default('system'),neuralVoice:z.enum(['','aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']).default(''),
  pace:z.enum(['calm','balanced','lively']).default('balanced'),
  blockedWords:z.array(z.string().trim().min(1).max(50)).max(50).default([]),
@@ -20,9 +20,9 @@ export const hostConfigSchema=z.object({
  apiBase:z.string().max(500).refine(v=>!v||validModelBase(v)).default('http://127.0.0.1:11434'),model:z.string().max(150).refine(v=>!v||/^[\w.:/-]+$/.test(v)&&!/(?:cloud|https?:)/i.test(v)).default('qwen3.5:4b'),chatPlatforms:z.array(z.enum(['youtube','twitch'])).max(2).refine(a=>new Set(a).size===a.length).default(['youtube','twitch'])
 });
 export type HostConfig=z.infer<typeof hostConfigSchema>;
-export interface ChatMessage{id:string;platform:OAuthProvider;authorId:string;author:string;text:string;at:number;self:boolean}
+export interface ChatMessage{id:string;platform:OAuthProvider;authorId:string;author:string;text:string;at:number;self:boolean;simulation?:boolean}
 export interface ChatStatus{state:'off'|'connecting'|'connected'|'waiting'|'reauthorize'|'error';received:number;sent:number;error?:string}
-export interface Utterance{id:string;text:string;scope:Provider|'all';audio?:string;at:number;expires:number}
+export interface Utterance{id:string;text:string;scope:Provider|'all';audio?:string;at:number;expires:number;language?:HostConfig['language'];replyTo?:string}
 export const overlayEvents=['started','ended','stateError','audioError','recovered','expired','interrupted'] as const;
 export type OverlayEvent=typeof overlayEvents[number];
 export interface OverlayHealth{lastSeen:number;audioStarted:number;audioEnded:number;audioErrors:number;stateErrors:number;recovered:number;expired:number;interrupted:number;lastError?:{kind:'state'|'audio';code:string;at:number}}
