@@ -82,7 +82,11 @@ Retested on 2026-09-20: installed Steam candidate BuildID **25420188** successfu
 
 ## Win-rate benchmark
 
-First validate the complete path in a compatible Steam candidate: menu → drop → equipment → combat → portals → evacuation → official result → restart, plus focus loss, manual takeover and controller disconnect. Normal user acceptance must use a genuine Steam installation/launch.
+September 21 rematch fix: after an official result, the desktop asks SteamObserver to click the real recognized Return to Lobby button. Only after observing the lobby does it rearm native control and start the next match. Unconsumed clicks retry from fresh observations every 1.5 seconds; a 30-second return timeout stops control. Loading and room selection are separate from lobby dwell; the lobby has no artificial delay.
+
+Focus loss pauses commands while retaining the user's automatic-mode intent, without stealing focus. Resumption requires the same process/session/match/epoch, a focus-loss or lease-expiry release, zero held inputs and at least 750 ms of fresh stable foreground observations. Explicit manual takeover, a paused game, identity changes and other release reasons still stop control. A match interrupted by focus loss does not count as a complete automatic win.
+
+First validate the complete path in a compatible Steam candidate: menu → drop → equipment → combat → portals → evacuation → official result → lobby → restart, plus focus loss, manual takeover and controller disconnect. Normal user acceptance must use a genuine Steam installation/launch.
 
 Compare local-only and local+JEV on the same game version, bot count/difficulty, recording map seeds. Separate tuning seeds from held-out evaluation. Begin with 20 functional runs, then at least 100 held-out matches. Report win rate, placement distribution, kills, survival duration, hazard deaths, stuck time, observation/command latency, cloud latency and input release. Keep failed matches and never count early exits as wins.
 

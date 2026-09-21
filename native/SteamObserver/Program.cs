@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using Windows.Globalization;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
@@ -27,7 +28,9 @@ class Program
     [StructLayout(LayoutKind.Explicit)] struct UNION {[FieldOffset(0)]public MOUSE mi;[FieldOffset(0)]public KEY ki;}
     [StructLayout(LayoutKind.Sequential)] struct MOUSE {public int dx,dy;public uint data,flags,time;public UIntPtr extra;}
     [StructLayout(LayoutKind.Sequential)] struct KEY {public ushort vk,scan;public uint flags,time;public UIntPtr extra;}
-    record Command(string op,long epoch=0,string action="",int duration=0,double x=0,double y=0);
+    record Command(string op,long epoch=0,string action="",int duration=0,double x=0,double y=0,int processId=0,long observedAt=0);
+    record LobbyTarget(IntPtr Window,int ProcessId,long ObservedAt,double X,double Y);
+    static volatile LobbyTarget? lobbyTarget;
     static readonly object outputLock=new();
     static readonly ConcurrentQueue<Command> commands=new();
     static readonly HashSet<int> held=new();
@@ -51,6 +54,18 @@ class Program
         if(c.op=="stop"){enabled=false;epoch=Math.Max(epoch+1,c.epoch);Release();return;}
         if(c.op=="enable"){Release();epoch=c.epoch;enabled=true;return;}
         if(c.op=="focus"){if(window!=IntPtr.Zero)SetForegroundWindow(window);return;}
+        // A single result-screen click, independent of gameplay input enablement.
+        // Coordinates come only from this helper's fresh, unique OCR observation.
+        if(c.op=="return_lobby"){
+            var target=lobbyTarget;
+            if(target==null||c.epoch<epoch||c.processId!=processId||target.ProcessId!=processId||target.Window!=window
+                ||target.ObservedAt!=c.observedAt||Now()-target.ObservedAt>1500||!Foreground())return;
+            epoch=c.epoch;lobbyTarget=null;Release();
+            if(!GetClientRect(window,out var rect))return;var origin=new POINT();if(!ClientToScreen(window,ref origin))return;
+            SetCursorPos(origin.X+(int)(rect.Right*target.X),origin.Y+(int)(rect.Bottom*target.Y));
+            if(!Foreground())return;deadline=Environment.TickCount64+60;Hold(1);
+            Interlocked.Increment(ref actionCount);lastAction="return_lobby";return;
+        }
         if(c.op!="action"||!enabled||c.epoch!=epoch||!Foreground())return;
         Release();deadline=Environment.TickCount64+Math.Clamp(c.duration,20,400);
         switch(c.action){
@@ -83,8 +98,8 @@ class Program
         var ocr=OcrEngine.TryCreateFromLanguage(new Language("en-US"))??OcrEngine.TryCreateFromUserProfileLanguages();
         try{while(running){
             FindWindow();var target=window;
-            if(target==IntPtr.Zero){Emit(new{type="observation",connected=false,timestamp=Now(),heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(800);continue;}
-            if(IsIconic(target)){Emit(new{type="observation",connected=true,processId,foreground=false,timestamp=Now(),error="minimized",actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(500);continue;}
+            if(target==IntPtr.Zero){lobbyTarget=null;Emit(new{type="observation",connected=false,timestamp=Now(),heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(800);continue;}
+            if(IsIconic(target)){lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=false,timestamp=Now(),error="minimized",actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(500);continue;}
             var watch=Stopwatch.StartNew();
             try{
                 GetClientRect(target,out var rect);int width=rect.Right,height=rect.Bottom;
@@ -100,8 +115,11 @@ class Program
                 var lines=result?.Lines.Select(l=>new {text=l.Text,x=l.Words.Min(w=>w.BoundingRect.X)/scaled.Width,y=l.Words.Min(w=>w.BoundingRect.Y)/scaled.Height,
                     width=(l.Words.Max(w=>w.BoundingRect.Right)-l.Words.Min(w=>w.BoundingRect.Left))/scaled.Width,
                     height=(l.Words.Max(w=>w.BoundingRect.Bottom)-l.Words.Min(w=>w.BoundingRect.Top))/scaled.Height}).ToArray();
-                Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),width,height,lines,ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
-            }catch{Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
+                var at=Now();
+                var returns=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(RETURN TO LOBBY|BACK TO LOBBY|返回大厅|返回大廳)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
+                lobbyTarget=returns?.Length==1?new LobbyTarget(target,processId,at,returns[0].x+returns[0].width/2,returns[0].y+returns[0].height/2):null;
+                Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=at,width,height,lines,lobbyReturn=lobbyTarget==null?null:new {observedAt=at},ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
+            }catch{lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
             await Task.Delay(Math.Max(50,700-(int)watch.ElapsedMilliseconds));
         }}finally{running=false;input.Join(1000);}
     }

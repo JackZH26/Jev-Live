@@ -234,8 +234,8 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   vi.spyOn(game.autoplay,'change').mockResolvedValue();const decide=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
   await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(decide).not.toHaveBeenCalled();
  });
- it('never resumes a long stall, invalid identity, focus loss or explicit manual takeover',async()=>{
-  for(const failure of ['timeout','identity','focus','manual']){
+ it('never resumes a long stall, invalid identity or explicit manual takeover',async()=>{
+  for(const failure of ['timeout','identity','manual']){
    const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
    (game as any).selectedId='5272970';game.observation={connected:true,foreground:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
    game.autoplay.observation=observation();game.autoplay.bridge.lastReadFailure='age';
@@ -244,7 +244,6 @@ describe('ETC evaluation truthfulness and independent control',()=>{
    await (game as any).tick();
    if(failure==='timeout')(game as any).reconnectUntil=Date.now()-1;
    if(failure==='identity')game.autoplay.bridge.lastReadFailure='identity';
-   if(failure==='focus')observe.mockResolvedValue(observation({foreground:false}));
    if(failure==='manual')await game.setMode('manual');
    await (game as any).tick();expect(game.gate.mode).toBe('manual');expect(resume).not.toHaveBeenCalled();
   }
@@ -260,13 +259,13 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   await (game as any).tick();expect(resume).toHaveBeenCalledWith(2);expect(game.gate.mode).toBe('auto');
   observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
  });
- it('does not resume a portal journey after manual takeover or loss of foreground',async()=>{
+ it('pauses a portal journey on focus loss without issuing resume commands in the background',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
   (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');game.autoplay.strategy='portal';
   const o=observation();o.self.traveling=true;const observe=vi.spyOn(game.autoplay,'observe').mockResolvedValue(o);
   vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
   await (game as any).tick();observe.mockResolvedValue({...o,foreground:false});await (game as any).tick();
-  expect(game.gate.mode).toBe('manual');expect((game as any).portalUntil).toBe(0);expect(resume).not.toHaveBeenCalled();
+  expect(game.gate.mode).toBe('auto');expect((game as any).focusRecovery.pending).toBe(true);expect(resume).not.toHaveBeenCalled();
  });
  it('keeps a requested match loading grace through world replacement and rearms only after drop-in',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');

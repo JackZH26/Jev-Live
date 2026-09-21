@@ -1,5 +1,5 @@
 import { it,expect } from 'vitest';
-import { EtcLeaseRecovery } from '../electron/etc-recovery';
+import { EtcLeaseRecovery,EtcFocusRecovery } from '../electron/etc-recovery';
 import type { EtcObservation } from '../shared/etc';
 
 function observed():EtcObservation{return {session:'s',matchId:'m',processId:1,epoch:1,frame:1,timestamp:1000,phase:'playing',mode:'auto',foreground:true,diagnostics:{heldInputs:0},executor:{status:'running',reason:'accepted'}} as EtcObservation;}
@@ -40,4 +40,28 @@ it('a frame crossing the freshness deadline cannot rearm or contribute stability
   const {r,o}=leaseStop();o.timestamp=1050;o.frame++;expect(r.poll(o,1,1050)).toBe('wait');
   expect(r.poll(o,1,1301)).toBe('wait');
   o.timestamp=1350;o.frame++;expect(r.poll(o,1,1350)).toBe('wait');
+});
+
+it('pauses focus without rearming and resumes only after fresh stable foreground observations',()=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;expect(r.poll(o,1,1000)).toBe('wait');
+ o.mode='manual';o.executor={...o.executor!,status:'released',reason:'focus_lost'};
+ for(let i=1;i<=8;i++){o.foreground=true;o.timestamp=1000+i*125;o.frame++;expect(r.poll(o,1,o.timestamp)).toBe(i===7?'resume':i===8?'active':'wait');}
+});
+it('can return from focus pause after an official result in the same match',()=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);
+ o.foreground=true;o.phase='ended';o.result={placement:2,won:false};o.mode='manual';o.executor={...o.executor!,status:'released',reason:'lease_expired'};
+ for(let i=1;i<=4;i++){o.timestamp=2000+i*250;o.frame++;expect(r.poll(o,1,o.timestamp)).toBe(i===4?'resume':'wait');}
+});
+it.each(['match','session','pid','epoch','manual','paused'] as const)('focus recovery rejects changed %s',change=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);o.foreground=true;o.mode='manual';o.executor={...o.executor!,status:'released',reason:'focus_lost'};
+ if(change==='match')o.matchId='other';if(change==='session')o.session='other';if(change==='pid')o.processId=2;
+ if(change==='epoch')o.epoch=2;if(change==='manual')o.executor.reason='manual_takeover';if(change==='paused')o.phase='paused';
+ expect(r.poll(o,1,1000)).toBe('stop');
+});
+it('does not count stale, duplicate or background frames toward focus recovery',()=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);o.foreground=true;o.mode='manual';o.executor={...o.executor!,status:'released',reason:'focus_lost'};
+ o.timestamp=2000;o.frame++;expect(r.poll(o,1,2000)).toBe('wait');expect(r.poll(o,1,2750)).toBe('wait');
+ o.timestamp=2800;o.frame++;expect(r.poll(o,1,2800)).toBe('wait');
+ o.foreground=false;o.timestamp=2900;o.frame++;expect(r.poll(o,1,2900)).toBe('wait');
+ r.reset();expect(r.pending).toBe(false);
 });

@@ -5,7 +5,8 @@ import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { EtcAutoplay } from './etc-autoplay';
 import { EtcBridge } from './etc-bridge';
-import { ETC_APP_ID } from '../shared/etc';
+import { EtcFocusRecovery } from './etc-recovery';
+import { ETC_APP_ID, type EtcObservation } from '../shared/etc';
 import { Store } from './storage';
 import { Steam } from './steam';
 import type { GameState, PlayMode, GameAction } from '../shared/types';
@@ -16,7 +17,7 @@ export class ControlGate {
  permits(epoch:number,observedAt:number,now=Date.now()){return this.mode==='auto'&&epoch===this.epoch&&now-observedAt<2500&&observedAt<=now+500;}
 }
 export interface ScreenLine {text:string;x:number;y:number;width:number;height:number}
-export interface Observation {connected:boolean;timestamp:number;processId?:number;foreground?:boolean;lines?:ScreenLine[];error?:string;ocrAvailable?:boolean;actionCount?:number;lastAction?:string;heldInputs?:number;controlMode?:PlayMode}
+export interface Observation {connected:boolean;timestamp:number;processId?:number;foreground?:boolean;lines?:ScreenLine[];error?:string;ocrAvailable?:boolean;actionCount?:number;lastAction?:string;heldInputs?:number;controlMode?:PlayMode;lobbyReturn?:{observedAt:number}|null}
 export interface ScreenAction extends GameAction {x?:number;y?:number}
 /** Candidate menus come only from recognized text; never click guessed screen coordinates. */
 export function screenActions(observation:Observation,autoRestart:boolean):{phase:string;actions:ScreenAction[]} {
@@ -41,6 +42,8 @@ export class Game {
  private inFlight=false;private selectedId='';private settingsAt=0;private focusUntil=0;private modeRequest=0;private settingsCache?:Awaited<ReturnType<Store['settings']>>;
  private portalUntil=0;private portalMatch='';private portalRoom=-1;
  private reconnectUntil=0;private reconnectMatch='';
+ private focusRecovery=new EtcFocusRecovery();
+ private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
    ?process.env.JEV_TEST_ETC_BRIDGE_DIR:join(process.env.LOCALAPPDATA??store.directory,'JevLive','etc-bridge');
@@ -72,15 +75,26 @@ export class Game {
    if((await this.store.settings()).decisionProvider==='jev'&&!await this.store.get('jev.key'))throw new Error(message('error.jevKey'));
   }
   if(request!==this.modeRequest)return;
+  this.focusRecovery.reset();this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;
   const epoch=this.gate.change(mode);
   if(mode==='manual'){this.portalUntil=0;this.reconnectUntil=0;}
-  // SteamObserver remains an observer. ETC owns all gameplay input.
+  // ETC owns gameplay input. The helper only clicks its observed result-screen return button.
   this.send({op:'stop',epoch});
   this.focusUntil=mode==='auto'?Date.now()+1000:0;
   if(mode==='auto')this.send({op:'focus'});
   await this.autoplay.change(mode,epoch);
   if(request!==this.modeRequest)return;
   this.decision=message(mode==='auto'?'game.nextDecision':'game.playerControl');this.error='';this.log(message(mode==='auto'?'event.auto':'event.manual'));
+ }
+ private async returnToLobby(o:EtcObservation,now:number){
+  // Returning is driven by the real button, not the native new_match shortcut.
+  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyReturnAt=-Infinity;}
+  if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
+  const screen=this.observation;
+  if(!screen?.lobbyReturn||!screen.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
+  if(now-this.lobbyReturnAt<1500)return;
+  this.send({op:'return_lobby',epoch:this.gate.epoch,processId:o.processId,observedAt:screen.lobbyReturn.observedAt});
+  this.lobbyReturnAt=now;
  }
  private async tick(){
   if(this.inFlight)return;this.inFlight=true;
@@ -89,11 +103,13 @@ export class Game {
    const settings=this.settingsCache;
    if(this.selectedId!==ETC_APP_ID)return;
    const previous=this.autoplay.observation;
-   const o=await this.autoplay.observe(this.connected?this.pid:undefined,this.gate.mode==='auto');
+   const o=await this.autoplay.observe(this.connected?this.pid:undefined,this.gate.mode==='auto'&&!this.focusRecovery.pending);
    // File reads and model/streaming contention can yield long enough for a newer
    // frame to arrive. Recovery must compare that frame with the current clock.
    now=Date.now();
    if(!o){
+    if(this.gate.mode==='auto'&&this.focusRecovery.pending){this.state=null;return;}
+    if(this.gate.mode==='auto'&&this.returningLobby&&now<this.lobbyDeadline){this.state=null;return;}
     if(this.gate.mode==='auto'&&(now<this.autoplay.transitionUntil||now<this.portalUntil)){this.state=null;return;}
     const transient=['age','ENOENT','EACCES','EPERM','EBUSY'].includes(this.autoplay.bridge.lastReadFailure);
     if(this.gate.mode==='auto'&&transient&&this.connected&&this.observation?.foreground===true){
@@ -108,7 +124,26 @@ export class Game {
    this.state={version:o.version,timestamp:o.timestamp,session:o.session,map:o.map,phase:o.phase,health:o.self.health,position:o.self.position,mode:o.mode,epoch:o.epoch,ack:o.ack,lastAction:o.diagnostics.lastAction,actions:o.actions.map(a=>({id:a.id,kind:a.kind,label:a.kind}))};
    if(this.gate.mode!=='auto')return;
    if(!o.foreground&&now<this.focusUntil)return;
-   if(o.phase==='unsupported'||!o.foreground){await this.setMode('manual');this.error=message(o.phase==='unsupported'?'etc.offlineOnly':'steam.foreground');return;}
+   if(o.phase==='unsupported'){await this.setMode('manual');this.error=message('etc.offlineOnly');return;}
+   if(!o.foreground||this.focusRecovery.pending){
+    const focus=this.focusRecovery.poll(o,this.gate.epoch,now);
+    if(focus==='stop'){await this.setMode('manual');this.error=message('steam.foreground');return;}
+    if(focus!=='resume'){this.error=message('steam.foreground');return;}
+    this.reconnectUntil=0;this.portalUntil=0;this.error='';
+    await this.autoplay.resumeControl(this.gate.change('auto'));return;
+   }
+   // Native result screens may release their motor. Still use the visible
+   // Return to Lobby button before rearming the next world.
+   if(settings.autoRestart&&['dead','ended'].includes(o.phase)&&o.result){
+    if(o.mode==='manual'&&o.epoch===this.gate.epoch&&o.executor?.reason==='manual_takeover'&&!this.returningLobby){await this.setMode('manual');return;}
+    await this.returnToLobby(o,now);return;
+   }
+   if(this.returningLobby){
+    if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
+    if(o.phase!=='menu')return;
+    this.returningLobby=false;this.portalUntil=0;this.reconnectUntil=0;this.autoplay.transitionUntil=0;
+    await this.autoplay.change('auto',this.gate.change('auto'));return;
+   }
    if(this.reconnectUntil){
     if(now>=this.reconnectUntil||o.matchId!==this.reconnectMatch||o.epoch!==this.gate.epoch){await this.setMode('manual');this.error=message('etc.lost');return;}
     this.reconnectUntil=0;

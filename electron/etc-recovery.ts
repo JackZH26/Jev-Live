@@ -1,5 +1,30 @@
 import type { EtcObservation } from '../shared/etc';
 
+/** Keep the user's auto intent during focus loss; never steal focus or resume a takeover. */
+export class EtcFocusRecovery {
+  private identity='';private epoch=0;private stableAt=0;private frame=-1;private lastAt=0;
+  get pending(){return !!this.identity;}
+  reset(){this.identity='';this.epoch=0;this.stableAt=0;this.frame=-1;this.lastAt=0;}
+  poll(o:EtcObservation,epoch:number,now:number):'active'|'wait'|'resume'|'stop'{
+    const identity=JSON.stringify([o.session,o.processId,o.matchId]);
+    if(o.epoch!==epoch||['paused','unsupported'].includes(o.phase)||o.executor?.reason==='manual_takeover')return 'stop';
+    if(this.pending&&(this.identity!==identity||this.epoch!==epoch))return 'stop';
+    if(now-o.timestamp>250||o.timestamp>now+50){this.stableAt=0;return 'wait';}
+    if(!o.foreground){
+      if(!this.pending){this.identity=identity;this.epoch=epoch;}
+      this.stableAt=0;this.frame=o.frame;this.lastAt=now;return 'wait';
+    }
+    if(!this.pending)return 'active';
+    if(o.mode!=='manual'||o.diagnostics.heldInputs!==0){this.stableAt=0;return 'wait';}
+    if(!['focus_lost','lease_expired'].includes(o.executor?.reason??''))return 'stop';
+    if(o.frame===this.frame)return 'wait';
+    if(!this.stableAt||now-this.lastAt>250)this.stableAt=now;
+    this.frame=o.frame;this.lastAt=now;
+    if(now-this.stableAt<750)return 'wait';
+    this.reset();return 'resume';
+  }
+}
+
 /** Rearm only a confirmed lease stop in the same authorized, focused match. */
 export class EtcLeaseRecovery {
   private identity='';private started=0;private stable=0;private frame=-1;private lastAt=0;

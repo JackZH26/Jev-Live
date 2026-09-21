@@ -6,6 +6,8 @@ The desktop main process starts this helper over private standard input/output w
 
 Automatic input requires explicit enablement and the target window in the foreground. Allowed actions are bounded movement, turning, firing, reloading, interaction, jumping and recognized menu coordinates, at most 400 ms each. An independent input thread checks focus and leases every 10 ms without waiting for capture, OCR or network. Manual handover, parent exit and focus loss release automatic input; old control epochs are rejected. Windows `SendInput` remains subject to system integrity restrictions without bypassing elevated processes or anti-cheat.
 
+ETC gameplay remains owned by its native BOT. A separate `return_lobby` request clicks only the unique Return to Lobby button found by this helper. It requires the same PID, current control epoch, foreground focus and the exact OCR timestamp, no older than 1.5 seconds. The helper derives coordinates itself, consumes the observation once and releases the click after 60 ms. This does not enable gameplay input; missing or ambiguous OCR never uses guessed coordinates.
+
 Source builds require .NET 10 SDK: run `npm run build:native` in the repository root. Ignored `dist-native/` output is packaged with its self-contained runtime and third-party licenses; end users need no SDK. Build artifacts, game captures and installation manifests stay out of Git.
 
 Current candidates use OCR and ETC-specific rules, which cannot establish full spatial understanding, enemy positions or tactical quality. Game language, available OCR languages, HUD, window size and game updates affect recognition. Five-language UI support does not establish recognition of five game languages; the first game test uses English.
