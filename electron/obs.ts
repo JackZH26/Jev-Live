@@ -96,7 +96,9 @@ export class Obs {
       }
       const inputs=await client.call('GetInputList');
       if(!inputs.inputs.some(i=>i.inputName==='ETC Game')) await client.call('CreateInput',{sceneName:'JEV Program',inputName:'ETC Game',inputKind:'window_capture',inputSettings:{window:settings.gameWindow,method:2,priority:2,cursor:false,client_area:true},sceneItemEnabled:true});
+      else await client.call('SetInputSettings',{inputName:'ETC Game',inputSettings:{priority:2},overlay:true});
       if(!inputs.inputs.some(i=>i.inputName==='ETC Audio')) await client.call('CreateInput',{sceneName:'JEV Program',inputName:'ETC Audio',inputKind:'wasapi_process_output_capture',inputSettings:{window:settings.gameWindow,priority:2},sceneItemEnabled:true});
+      else await client.call('SetInputSettings',{inputName:'ETC Audio',inputSettings:{priority:2},overlay:true});
       await this.fit(provider);
       this.states[provider].ready=true;
       this.log(message('event.obsReady',{provider:providerNames[provider],fps:60}));
