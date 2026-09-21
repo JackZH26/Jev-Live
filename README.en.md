@@ -30,9 +30,11 @@ Cloud Jev has completed two exploratory Steam runs: API access and target adopti
 | Leak prevention | Git exclusions, commit/push scans and GitHub Actions checks |
 | Five languages | 简体中文, 繁體中文, 日本語, 한국어 and English across UI, notices, logs and tray |
 
-Original avatars / VRM, per-platform layout editing, local model commentary, local speech and YouTube / Twitch chat connectors are implemented. **Manual and automatic play share the host; only game control differs.** Real platform chat and complete endurance acceptance remain separate checks. See [hosting](docs/HOSTING.en.md) and [local model selection and measurements](docs/LOCAL_HOST.en.md).
+A built-in Live2D girl / VRM, English-only narration with the original Melo voice, per-platform layout editing, local model commentary, local speech and YouTube / Twitch chat connectors are implemented. **Manual and automatic play share the host; only game control differs.** Real platform chat and complete endurance acceptance remain separate checks. See [hosting](docs/HOSTING.en.md), [local model selection and measurements](docs/LOCAL_HOST.en.md) and [paused multilingual cloning experiment](docs/VOICE_CLONING.en.md).
 
 ## Run locally
+
+See [Live2D and English narration](docs/LIVE2D.en.md) for source artwork, the standard model and acceptance limits. Cubism Core is a separate download with its own license, outside this repository's MIT license.
 
 Source development requires Windows 10/11, Node.js 24, .NET 10 SDK, Steam and OBS Studio 32 (32.2.2 tested locally). The packaged directory includes the observer runtime, so streamers need neither the .NET SDK nor Unreal Engine. NVIDIA NVENC is the default encoder; select another encoder in each selected isolated OBS instance for other hardware.
 
@@ -41,6 +43,7 @@ git clone https://github.com/JackZH26/Jev-Live.git
 cd Jev-Live
 git config core.hooksPath .githooks
 npm ci
+npm run setup:live2d
 npm run build:native
 npm run build
 npm start

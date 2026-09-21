@@ -14,14 +14,15 @@ const out=path.resolve(process.argv[2]??'test-results/chat-lab-2026-09-21'),paus
   let before=await state();const first=before.messages[0];let s=await until(s=>s.utterance?.replyTo===first.id&&s.overlay.twitch.audioEnded>=1);
   samples.push({kind:'captured',comment:first.text,reply:s.utterance.text,language:s.utterance.language,timing:s.timing,utteranceId:s.utterance.id});console.log(JSON.stringify({sample:'captured',language:s.utterance.language,played:true}));
   const inputs=[['en','What game is this?'],['zh-CN','你会优先捡装备还是先找掩体？'],['zh-TW','你喜歡先找掩體還是找裝備？'],['ja','どの武器が好きですか？'],['ko','어떤 무기가 좋아요?'],['en','¿Cuál es tu arma favorita?']];
-  for(const [language,text] of inputs){
+  for(const [inputLanguage,text] of inputs){
+   const language='en';
    await until(s=>!s.utterance||Date.now()>s.utterance.expires+100);before=await state();
    const provider=samples.length%2?'youtube':'twitch',started=before.overlay[provider].audioStarted,ended=before.overlay[provider].audioEnded;
    const accepted=await api('message',{text,platform:provider}),message=accepted.messages.at(-1);
    s=await until(s=>s.utterance?.replyTo===message.id&&s.overlay[provider].audioStarted>started&&s.overlay[provider].audioEnded>ended);
    if(s.utterance.language!==language||!require('../dist-main/shared/reply-language').matchesReplyLanguage(s.utterance.text,language))throw Error('Incorrect output text or speech language');
    const other=provider==='youtube'?'twitch':'youtube';if(s.overlay[other].audioStarted!==before.overlay[other].audioStarted)throw Error('Reply leaked across platforms');
-   samples.push({kind:'synthetic',comment:text,reply:s.utterance.text,language:s.utterance.language,provider,timing:s.timing,utteranceId:s.utterance.id});console.log(JSON.stringify({sample:samples.length,language,played:true,modelMs:s.timing.modelMs,speechMs:s.timing.speechMs}));
+   samples.push({kind:'synthetic',comment:text,inputLanguage,reply:s.utterance.text,language:s.utterance.language,provider,timing:s.timing,utteranceId:s.utterance.id});console.log(JSON.stringify({sample:samples.length,inputLanguage,language,played:true,modelMs:s.timing.modelMs,speechMs:s.timing.speechMs}));
   }
   for(const language of ['en','zh-CN','zh-TW','ja','ko']){await page.selectOption('#language',language);if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile page overflows');}
   await page.selectOption('#language','zh-CN');await page.screenshot({path:path.join(out,'mobile.png'),fullPage:true});

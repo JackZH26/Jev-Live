@@ -14,7 +14,7 @@ import { XLive } from './x-live';
 import { Hosting } from './hosting';
 import { OverlayServer } from './overlay-server';
 import {streamChecks,type ReadinessReport} from '../shared/readiness';
-import {neuralHealth} from './neural-speech';
+import {hostConfigSchema} from '../shared/hosting';
 import {access} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {SessionHealth} from '../shared/session-health';
@@ -121,7 +121,7 @@ app.whenReady().then(async()=>{
     const installed=await access(join(settings.obsDirectory,'bin/64bit/obs64.exe')).then(()=>true,()=>false);
     checks.unshift({id:'obs-install',key:'setup.obsInstall',ready:installed,required:!settings.enabledPlatforms.every(p=>obs.states[p].ready),action:'obs'});
     let model=false;try{const url=hosting.config.apiBase.replace(/\/$/,'')+(hosting.config.modelProvider==='ollama'?'/api/tags':'/models');const r=await fetch(url,{signal:AbortSignal.timeout(2500),redirect:'error'});if(r.ok){const data=await r.json() as any;model=hosting.config.modelProvider==='ollama'?data.models?.some((m:any)=>m.name===hosting.config.model):data.data?.some((m:any)=>m.id===hosting.config.model);}}catch{}
-    const speech=!hosting.config.speech||(hosting.config.speechProvider!=='system'?await neuralHealth(hosting.config.speechProvider):hosting.voices.some(v=>hosting.config.voice?v.name===hosting.config.voice:v.language.split('-')[0]===hosting.config.language.split('-')[0]));
+    const speech=await hosting.speechReady();
     checks.push({id:'model',key:'setup.model',ready:!!model,required:false,action:'host'},{id:'voice',key:'setup.voice',ready:speech,required:false,action:'host'});
     if(hosting.config.chatPlatforms.includes('twitch')){let granted=false;try{const c=await auth.credentials('twitch'),scopes=typeof c.scope==='string'?c.scope.split(' '):c.scope??[];granted=['user:read:chat','user:write:chat'].every(scope=>scopes.includes(scope));}catch{}checks.push({id:'chat-twitch',key:'setup.chat',provider:'twitch',ready:granted,required:false,action:'host'});}
     return {at:Date.now(),checks,canStream:checks.filter(c=>c.required).every(c=>c.ready),canHost:checks.filter(c=>['model','voice','chat-twitch'].includes(c.id)).every(c=>c.ready)} satisfies ReadinessReport;
@@ -131,7 +131,8 @@ app.whenReady().then(async()=>{
   handler('saveHostKey',value=>hosting.key(value));
   handler('importAvatar',async()=>{if(hosting.running)throw new Error('host.stopFirst');const r=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'Avatar',extensions:['png','webp','jpg','jpeg','vrm']}]});if(r.canceled)return false;await hosting.importAsset(r.filePaths[0]);return true;});
   handler('startHost',()=>hosting.start());handler('stopHost',async()=>hosting.stop());
-  handler('testHostVoice',async()=>{await hosting.testVoice();return overlay.audioURL();});
+  handler('importVoiceReference',async()=>{if(hosting.running)throw new Error('host.stopFirst');const r=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'English voice reference',extensions:['wav']}]});if(r.canceled)return false;await hosting.importVoiceReference(r.filePaths[0]);return true;});
+  handler('testHostVoice',async language=>{await hosting.testVoice(language===undefined?undefined:hostConfigSchema.shape.language.parse(language));return overlay.audioURL();});
   handler('applyHostLayout',applyLayouts);handler('gamePreview',value=>obs.gamePreview(provider.parse(value)));
   handler('preview',value=>obs.preview(provider.parse(value)));
   handler('launchGame',()=>game.launch(),message('busy.game'));

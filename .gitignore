@@ -43,6 +43,7 @@ models/
 *.gguf
 host-assets/
 host-audio/
+voice-references/
 host.json
 __pycache__/
 *.py[cod]

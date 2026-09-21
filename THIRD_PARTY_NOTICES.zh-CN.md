@@ -1,8 +1,12 @@
 # 第三方声明
 
+内置角色现已替换为生成的分层美术与标准 Cubism 模型，不再使用旧 SVG；用户提供的参考图不随仓库分发。详见 [Live2D 与英文播报](docs/LIVE2D.md)。
+
+PixiJS、pixi-live2d-display 适用 MIT；后者嵌入的 Cubism Framework 适用 Live2D Open Software License Agreement。Cubism Core 为专有运行库，单独下载到 Git 忽略目录，不适用本项目 MIT 许可。本机测试包包含 Core，正式分发前须满足其发布与再分发条款。许可副本位于 `licenses/live2d/`，同时加入打包资源。
+
 本地主持阶段增加：Three.js / three-vrm（MIT，VRM 渲染）、grpc-js / proto-loader（Apache-2.0，YouTube 持续聊天）、Google 文档中的直播聊天协议字段子集（Apache-2.0 示例）。来源分别为 [Three.js](https://github.com/mrdoob/three.js)、[three-vrm](https://github.com/pixiv/three-vrm)、[grpc-node](https://github.com/grpc/grpc-node)、[Google 协议示例](https://developers.google.com/youtube/v3/live/streaming-live-chat)。
 
-Ollama（MIT）与 Qwen3.5-4B / Qwen3-4B-Instruct-2507 权重（Apache-2.0）单独下载，不包含在桌面包内。来源：[Ollama](https://github.com/ollama/ollama)、[Qwen](https://huggingface.co/Qwen)。内置 SVG 角色为本项目原创，适用仓库许可证。导入头像和 VRM 保留各自授权，不上传 Git 或分发；Windows 语音由操作系统提供，不随本项目再分发。设计中讨论的神经 TTS 未打包，也不代表已经验证。
+Ollama（MIT）与 Qwen3.5-4B / Qwen3-4B-Instruct-2507 权重（Apache-2.0）单独下载，不包含在桌面包内。来源：[Ollama](https://github.com/ollama/ollama)、[Qwen](https://huggingface.co/Qwen)。导入头像和 VRM 保留各自授权，不上传 Git 或分发；Windows 语音由操作系统提供，不随本项目再分发。设计中讨论的神经 TTS 未打包，也不代表已经验证。
 
 [简体中文](THIRD_PARTY_NOTICES.zh-CN.md) · [English](THIRD_PARTY_NOTICES.md)
 

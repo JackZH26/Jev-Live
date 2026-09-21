@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-21",
+  "scope": "Isolated local desktop package and production Chromium overlay; no real platform messages or stream restart",
+  "passed": true,
+  "unitTestsPassed": 224,
+  "testFilesPassed": 28,
+  "typeCheckPassed": true,
+  "packagedBuildTested": "english-live2d-20260921",
+  "uiLocalesTested": ["zh-CN", "zh-TW", "ja", "ko", "en"],
+  "voice": {
+    "provider": "melo",
+    "spokenLanguage": "en",
+    "oldCloneConfigMigrated": true,
+    "desktopPreviewPlayedToEnd": true,
+    "desktopPreviewNonSilentEnvelope": true,
+    "overlayPlaybackFinished": true,
+    "overlayAudioErrors": 0,
+    "overlayStateErrors": 0,
+    "multilingualInputEnglishReplySamplesPassed": 7,
+    "humanListeningQualityAccepted": false
+  },
+  "model": {
+    "editor": "Cubism 5.3.04 FREE",
+    "exportTarget": "Cubism 4.2",
+    "format": "moc3/model3.json",
+    "artMeshes": 15,
+    "texture": [2048, 2048],
+    "eyeLeftOpacityEndpointsPassed": true,
+    "eyeRightOpacityEndpointsPassed": true,
+    "mouthOpacityEndpointsPassed": true,
+    "swayChangesExportedVertices": true,
+    "breathChangesExportedVertices": true,
+    "runtimePageErrors": 0,
+    "vtubeStudioTested": false
+  },
+  "externalPosts": 0,
+  "publicDesktopDistribution": false
+}

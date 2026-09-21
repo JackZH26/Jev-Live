@@ -14,16 +14,18 @@ const layout=computed(()=>config.value!.layouts[provider.value]);
 const rectangle=computed(()=>layout.value[selected.value]);
 const blockedText=computed({get:()=>config.value?.blockedWords.join('\n')??'',set:value=>{if(config.value)config.value.blockedWords=value.split(/\r?\n/).map(v=>v.trim()).filter(Boolean).slice(0,50);}});
 const style=(r:LayerRect)=>({left:r.x/19.2+'%',top:r.y/10.8+'%',width:r.width/19.2+'%',height:r.height/10.8+'%',opacity:r.visible?1:.24});
-let timer:ReturnType<typeof setInterval>,polling=false,previewAt=0,audio:HTMLAudioElement|undefined;
+let timer:ReturnType<typeof setInterval>,polling=false,previewAt=0,audio:HTMLAudioElement|undefined,voiceContext:AudioContext|undefined,voiceFrame=0;
+const voiceLevel=ref(0);
+function stopPreviewVoice(){cancelAnimationFrame(voiceFrame);audio?.pause();audio=undefined;void voiceContext?.close();voiceContext=undefined;voiceLevel.value=0;}
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value));
 async function refresh(){if(polling)return;polling=true;try{s.value=await api.hostSnapshot();if(!config.value)config.value=clone(s.value.config);auth.value=(await api.snapshot()).auth.twitch??'';if(Date.now()-previewAt>3500){previewAt=Date.now();preview.value=await api.gamePreview(provider.value).catch(()=>'');}}catch(e){notice.value=String(e);}finally{polling=false;}}
 async function run(fn:()=>Promise<unknown>){if(pending.value)return;pending.value=true;notice.value='';try{await fn();await refresh();}catch(e){notice.value=e instanceof Error?e.message:String(e);}finally{pending.value=false;}}
 function normalize(){layout.value[selected.value]=clampRect(rectangle.value);}
 function drag(event:PointerEvent,layer:Layer,resize=false){selected.value=layer;const rect=layout.value[layer];if(rect.locked||!stage.value||event.button!==0)return;event.preventDefault();const target=event.currentTarget as HTMLElement;target.setPointerCapture(event.pointerId);const start={...rect},x=event.clientX,y=event.clientY,scale=1920/stage.value.clientWidth;const onMove=(e:PointerEvent)=>{const dx=(e.clientX-x)*scale,dy=(e.clientY-y)*scale;layout.value[layer]=clampRect(resize?{...start,width:Math.min(1920-start.x,start.width+dx),height:Math.min(1080-start.y,start.height+dy)}:{...start,x:start.x+dx,y:start.y+dy});};const end=()=>{target.removeEventListener('pointermove',onMove);target.removeEventListener('pointerup',end);target.removeEventListener('pointercancel',end);};target.addEventListener('pointermove',onMove);target.addEventListener('pointerup',end,{once:true});target.addEventListener('pointercancel',end,{once:true});}
 async function save(){await api.saveHostConfig(clone(config.value!));}
-async function voice(){await save();audio?.pause();const url=await api.testHostVoice();if(url){audio=new Audio(url);await audio.play();}}
+async function voice(){await save();stopPreviewVoice();const url=await api.testHostVoice();if(url){audio=new Audio();audio.crossOrigin='anonymous';audio.src=url;voiceContext=new AudioContext();const source=voiceContext.createMediaElementSource(audio),analyser=voiceContext.createAnalyser();analyser.fftSize=256;source.connect(analyser);analyser.connect(voiceContext.destination);const values=new Uint8Array(analyser.fftSize);const sample=()=>{analyser.getByteTimeDomainData(values);voiceLevel.value=Math.sqrt(values.reduce((sum,v)=>sum+(v-128)**2,0)/values.length)/128;voiceFrame=requestAnimationFrame(sample);};audio.onended=stopPreviewVoice;audio.onerror=stopPreviewVoice;await voiceContext.resume();await audio.play();sample();}}
 async function importAvatar(){await save();if(await api.importAvatar()){s.value=await api.hostSnapshot();config.value=clone(s.value.config);}}
-onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmounted(()=>{clearInterval(timer);audio?.pause();});
+onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmounted(()=>{clearInterval(timer);stopPreviewVoice();});
 </script>
 
 <template>
@@ -34,7 +36,7 @@ onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmount
    <div class="layout-workspace"><div><div ref="stage" class="layout-stage" :aria-label="t('host.layout')">
     <div v-for="layer in layers" :key="layer" class="scene-layer" :class="{chosen:selected===layer,locked:layout[layer].locked}" :style="style(layout[layer])" :data-layer="layer" @pointerdown="drag($event,layer)">
      <template v-if="layer==='game'"><img v-if="preview" :src="preview" alt=""><div v-else class="game-placeholder"><b>STEAM</b><span>{{t('host.game')}}</span></div></template>
-     <Avatar v-else-if="layer==='avatar'" :avatar="config.avatar" :url="s.assetUrl" :level="0"/>
+     <Avatar v-else-if="layer==='avatar'" :avatar="config.avatar" :url="s.assetUrl" :level="voiceLevel"/>
      <div v-else-if="layer==='chat'" class="chat-preview"><b>{{providerNames[provider]}}</b><p>{{t('host.previewChat')}}</p><p v-for="m in s.messages.filter(m=>m.platform===provider).slice(-3)" :key="m.id"><strong>{{m.author}}</strong> {{m.text}}</p></div>
      <div v-else class="caption-preview">{{s.utterance?.text||t('host.captions')}}</div>
      <span v-if="selected===layer" class="layer-name">{{t(('host.'+layer) as MessageKey)}}</span><button v-if="selected===layer&&!layout[layer].locked" class="resize-handle" :aria-label="t('host.resize')" @pointerdown.stop="drag($event,layer,true)"></button>
@@ -51,8 +53,8 @@ onMounted(async()=>{await refresh();timer=setInterval(refresh,1200);});onUnmount
     <div class="form-row"><label>{{t('host.name')}}<input v-model="config.avatar.name" maxlength="40"></label><label class="color-picker">{{t('host.color')}}<input type="color" v-model="config.avatar.color"></label></div>
     <div class="inline-buttons"><button @click="config.avatar.kind='builtin'">{{t('host.builtin')}}</button><button @click="run(importAvatar)">{{t('host.import')}}</button></div><p class="hint">{{t('host.assetHint')}}</p>
     <label>{{t('host.persona')}}<textarea v-model="config.persona" maxlength="3000" rows="3"></textarea></label>
-    <div class="form-row"><label>{{t('host.language')}}<select v-model="config.language"><option v-for="l in languages" :key="l[0]" :value="l[0]">{{l[1]}}</option></select></label><label v-if="config.speechProvider==='system'">{{t('host.voice')}}<select v-model="config.voice"><option value="">{{t('host.autoVoice')}}</option><option v-for="v in s.voices" :key="v.name" :value="v.name">{{v.name}} · {{v.language}}</option></select></label></div>
-    <div class="form-row"><label>{{t('host.speechProvider')}}<select v-model="config.speechProvider"><option value="system">{{t('host.systemVoice')}}</option><option value="melo">{{t('host.meloVoice')}}</option><option value="qwen">Qwen3-TTS · {{t('host.localModel')}}</option></select></label><label v-if="config.speechProvider==='qwen'">{{t('host.voice')}}<select v-model="config.neuralVoice"><option value="">{{t('host.autoVoice')}}</option><option v-for="v in ['aiden','dylan','eric','ono_anna','ryan','serena','sohee','uncle_fu','vivian']" :key="v" :value="v">{{v}}</option></select></label></div>
+    <p class="info-box" data-testid="english-voice-policy">{{t('host.englishOnly')}}</p>
+    <div class="form-row"><label>{{t('host.speechProvider')}}<select v-model="config.speechProvider" data-testid="speech-provider"><option value="melo">{{t('host.englishGirlVoice')}}</option><option value="system">{{t('host.systemVoice')}}</option></select></label><label v-if="config.speechProvider==='system'">{{t('host.voice')}}<select v-model="config.voice"><option value="">{{t('host.autoVoice')}}</option><option v-for="v in s.voices.filter(v=>v.language.startsWith('en'))" :key="v.name" :value="v.name">{{v.name}}</option></select></label></div>
     <label class="check"><input type="checkbox" v-model="config.speech">{{t('host.speech')}}</label><button :disabled="!config.speech" @click="run(voice)">{{t('host.testVoice')}}</button>
    </fieldset></section>
    <section class="card host-settings"><h2>{{t('host.localModel')}}</h2><fieldset :disabled="s.running||pending">

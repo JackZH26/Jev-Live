@@ -1,4 +1,4 @@
-# Chat replay and multilingual spoken replies
+# Chat replay with English-only speech
 
 [简体中文](CHAT_REPLAY.md) · [Natural hosting proposal](NATURAL_HOSTING.en.md)
 
@@ -8,9 +8,9 @@
 
 An isolated local rehearsal page reuses production `Chat → Hosting → Ollama → MeloTTS → OverlayAudio`. Simulation never connects or sends messages to real platforms. Existing YouTube/Twitch connectors remain available; local success does not certify real account reception, reply delivery or viewer playback. X chat is still unsupported.
 
-Default hosting is now English. Each comment independently selects Simplified Chinese, Traditional Chinese, Japanese or Korean when its supported writing system is detected; English and unsupported languages use English. Both model output and TTS follow the choice without changing subsequent ordinary commentary. Mixed scripts, Japanese containing only shared Han characters and very short comments remain ambiguous: this is lightweight rule-based detection, not a universal language classifier.
+All commentary and viewer replies use English. Comments may contain Chinese, Japanese, Korean or other text; the local model answers in English and Melo speaks with the original English voice. Listening feedback led to pausing cloning and language-dependent voice switching.
 
-The schema default does not overwrite every existing user's saved language preference. This user's English preference should also be applied to their saved profile. Cross-language replies use an automatic matching voice instead of retaining an unsuitable fixed voice. Traditional Chinese uses Chinese speech and does not certify a Taiwanese accent.
+Saved configurations migrate to English on load and save; old Qwen/cloning configurations migrate to Melo. The Windows voice option lists English voices only, and saved foreign-language Windows voices are excluded from English speech. The five UI languages remain.
 
 This machine's saved profile has been changed to English for its next configuration load. Viewer replies use a separate concise prompt without unrelated answers to other viewers; relevant same-viewer conversation can remain. A writing-system check rejects mismatched output before speech and reports an error. Early listening also exposed invented weapon terminology, leading to stricter constraints on specific game claims. These measures do not replace human assessment of factual accuracy and naturalness.
 
@@ -46,7 +46,9 @@ The acceptance script uses real model inference, real Melo audio and Chromium pl
 
 ## Acceptance limits
 
-Final local regression: 187 unit tests, type checks and build passed. Seven samples completed real generation, matching-language synthesis and Chromium playback start/end, with no cross-platform playback or model/audio errors. Text generation plus synthesis ranged from 5.57 to 12.18 seconds, median 8.08 seconds. These seven functional samples do not establish a latency distribution and exclude full queueing/platform transport.
+Latest 2026-09-21 update: speech is English-only using the original Melo English voice. Seven real generation/playback samples passed, including non-English inputs with English replies. See [Live2D and English narration](LIVE2D.en.md) for the avatar and desktop package checks. Pipeline success is not human content or listening-quality approval.
+
+Earlier multilingual version (now paused): 187 unit tests, type checks and build passed. Seven samples completed real generation, matching-language synthesis and Chromium playback start/end, with no cross-platform playback or model/audio errors. Text generation plus synthesis ranged from 5.57 to 12.18 seconds, median 8.08 seconds. These seven functional samples do not establish a latency distribution and exclude full queueing/platform transport.
 
 **The pipeline passed; content quality has not passed.** Transcript review still found an unsupported AR-15 claim in the first sample and awkward Chinese phrasing. Prompt constraints alone did not establish factual accuracy for the 4B model. Specific weapon/result claims need game-fact allowlists or evidence validation, appropriate knowledge and listening review. Problematic samples are retained rather than presented as human-level hosting.
 

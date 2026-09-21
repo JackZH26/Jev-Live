@@ -19,7 +19,8 @@
   "main": "dist-main/electron/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc -p tsconfig.main.json && node scripts/write-build-info.mjs && vite build",
+    "build": "node scripts/install-live2d-core.mjs --check && tsc -p tsconfig.main.json && node scripts/write-build-info.mjs && vite build",
+    "setup:live2d": "node scripts/install-live2d-core.mjs",
     "check": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
     "test": "vitest run",
     "start": "electron .",
@@ -30,9 +31,12 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.8.1",
+    "@pixi/unsafe-eval": "6.5.10",
     "@pixiv/three-vrm": "^3.5.5",
     "@typesafe-ai/sdk": "0.6.0",
     "obs-websocket-js": "5.0.8",
+    "pixi-live2d-display": "0.4.0",
+    "pixi.js": "6.5.10",
     "three": "^0.186.0",
     "vue": "3.5.43",
     "zod": "^4.1.0"
@@ -63,6 +67,10 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "licenses/live2d",
+        "to": "licenses/live2d"
+      },
       {
         "from": "dist-main/build-info.json",
         "to": "build-info.json"
@@ -111,6 +119,7 @@
           "install-melo.ps1",
           "download-melo.py",
           "install-local-voice.ps1",
+          "start-clone-voice.ps1",
           "download-local-voice.py"
         ]
       }
@@ -127,5 +136,8 @@
       "runAfterFinish": false,
       "artifactName": "JEV-Studio-${version}-Setup.${ext}"
     }
+  },
+  "overrides": {
+    "gh-pages": "6.3.0"
   }
 }

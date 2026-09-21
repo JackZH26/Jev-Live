@@ -2,7 +2,7 @@
 
 [简体中文](HOSTING.md) · [English](HOSTING.en.md)
 
-2026-09-21: See the [natural hosting proposal](NATURAL_HOSTING.en.md) and [chat rehearsal](CHAT_REPLAY.en.md). Hosting defaults to English; spoken replies follow supported comment languages. Real platform interaction requires separate acceptance.
+2026-09-21: All commentary and viewer replies now use English with the original Melo English female voice. Multilingual speech and cloning are paused; the five UI languages remain. See the [natural hosting proposal](NATURAL_HOSTING.en.md) and [chat rehearsal](CHAT_REPLAY.en.md). Real platform interaction requires separate acceptance.
 
 Creator: JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj). Follow along and say hello.
 
@@ -10,8 +10,8 @@ Creator: JackZH26 · 𝕏 [@jackzhj](https://x.com/jackzhj). Follow along and sa
 
 1. Select an installed Steam game, prepare selected OBS outputs and apply the actual game window. The test target is Enter the Cube Playtest, never a development editor.
 2. Open Avatar & automatic host. Select YouTube, Twitch or X; drag game/avatar/chat/captions and resize from the lower-right corner. Coordinates, visibility and locking are editable. Save & apply layout; platform layouts remain independent, with an optional copy-to-all action. Layouts can be saved while hosting is running.
-3. Use the original default avatar or import a licensed PNG / WebP / JPEG / self-contained VRM under 60 MB. Assets are copied to the local user-data directory and never uploaded or committed.
-4. Start Ollama as described in [local deployment](LOCAL_HOST.en.md), select the model/device, persona, language and an installed voice. Test speech, save, then start hosting. OBS Browser Sources mix speech and captions; audio monitoring is off to prevent echo, while stream audio remains enabled.
+3. Use the [built-in Live2D girl](LIVE2D.en.md), or import a licensed PNG / WebP / JPEG / self-contained VRM under 60 MB. Imported assets are copied to the local user-data directory and never uploaded or committed.
+4. Start Ollama and the local Melo service as described in [local deployment](LOCAL_HOST.en.md), then select the model/device and persona. The original local English female voice is the default. Replies and speech use English regardless of the comment language. Saved Qwen/cloning settings migrate automatically; private reference clips remain on disk. Test speech, then start hosting. OBS Browser Sources mix speech and captions; audio monitoring is off to prevent echo.
 5. Enable the desired chat platforms. Automatic text replies are off by default. Replies, speech and captions stay on the originating platform; generic game commentary may appear on all outputs.
 6. Hosting and broadcasting have independent switches. Preview the host before broadcasting. Stopping hosting keeps the manual game and stream running.
 
@@ -19,7 +19,9 @@ Hosting runs locally. YouTube uses official gRPC `streamList` receiving and REST
 
 X currently carries game, avatar and generic commentary without an X comment connector. It never displays YouTube/Twitch chat. Chat is text only; external images, URLs and HTML do not load automatically. Initial history can display without triggering replies. Self messages, duplicates and expired/deleted messages do not cause repeated responses.
 
-## Acceptance boundary, 2026-09-20
+## Historical acceptance boundary, 2026-09-20
+
+See [Live2D and English narration](LIVE2D.en.md) for the 2026-09-21 update. The table below preserves earlier results.
 
 | Item | Result |
 | --- | --- |

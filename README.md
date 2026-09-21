@@ -30,9 +30,11 @@
 | 防泄漏 | Git 忽略规则、提交 / 推送扫描、GitHub Actions 检查 |
 | 五种语言 | 简体中文、繁體中文、日本語、한국어、English；界面、提示、日志和托盘同步切换 |
 
-已接入原创头像 / VRM、分平台布局编辑、本机模型解说、本机语音和 YouTube / Twitch 聊天连接器。**自动玩 / 手动玩的区别只有游戏操作权，两者共用自动主持。** 真实平台聊天与长时间完整验收仍需逐项完成，详见 [角色与主持](docs/HOSTING.md)、[本地模型选型与实测](docs/LOCAL_HOST.md)。
+已接入内置 Live2D 少女 / VRM、全英文播报（原版 Melo 英文声线）、分平台布局编辑、本机模型解说、本机语音和 YouTube / Twitch 聊天连接器。**自动玩 / 手动玩的区别只有游戏操作权，两者共用自动主持。** 真实平台聊天与长时间完整验收仍需逐项完成，详见 [角色与主持](docs/HOSTING.md)、[本地模型选型与实测](docs/LOCAL_HOST.md)、[已暂停的多语言克隆实验](docs/VOICE_CLONING.md)。
 
 ## 本机启动
+
+新版少女的工程、运行模型和验收范围见 [Live2D 与英文播报](docs/LIVE2D.md)。Cubism Core 单独下载、独立许可，不属于仓库 MIT 许可。
 
 源码开发需要 Windows 10/11、Node.js 24、.NET 10 SDK、Steam、OBS Studio 32（本机 32.2.2）。桌面发行目录已包含观察程序运行时，主播无需安装 .NET SDK 或 Unreal Engine。默认 NVIDIA NVENC 编码；其他显卡需在所选隔离 OBS 中选择可用编码器。
 
@@ -41,6 +43,7 @@ git clone https://github.com/JackZH26/Jev-Live.git
 cd Jev-Live
 git config core.hooksPath .githooks
 npm ci
+npm run setup:live2d
 npm run build:native
 npm run build
 npm start
