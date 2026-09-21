@@ -10,13 +10,15 @@ ETC developers compile this native integration into the game. Players launch Ent
 ./Tools/Build.bat LyraGame Shipping
 ```
 
-The installer checks `shared-controller.patch`, `room-control.patch`, `awareness.patch` and `pendulum-path.patch`, reuses Bot Brain / Aim and room movement, then copies the bridge, controller adapter and tests into EtcCore. Repeated installation detects applied patches; source conflicts stop installation for review. Module Install/Uninstall hooks are retained. Legacy Steam v3 builds without `shared-bot-v1` retain the previous Studio policy; new executor deployment is never inferred from compilation.
+The installer checks `shared-controller.patch`, `room-control.patch`, `awareness.patch`, `pendulum-path.patch` and `combat-camera.patch`, reuses Bot Brain / Aim and room movement, then copies the bridge, controller adapter and tests into EtcCore. The patch chain is normalized and checked on a temporary copy before writing source; repeated installation is supported and source conflicts stop installation for review. Module Install/Uninstall hooks are retained. Legacy Steam v3 builds without `shared-bot-v1` retain the previous Studio policy; new executor deployment is never inferred from compilation.
 
 The player retains PlayerController, camera and HUD while sharing UE path following and Bot weapon, hazard and stationary-recovery logic. Jev selects leased tactical objectives. Local renewals run at approximately 20 Hz; renewing a target does not restart its path. Existing Bot strategy remains separate.
 
 Offline matches only. Sessions bind to the actual game PID. Manual takeover, focus loss and expired leases release automatic inputs. Never commit sessions or credentials. Feedback identifies the objective, status, reason, failure count and path state.
 
 Native constraints test: `Project.ETC.Jev.PlayerMotor`. Packaging, upload and actual Steam installation follow ETC's release workflow. This installer neither modifies the Steam installation nor publishes a game update. Compilation is not full-match acceptance.
+
+The combat/camera extension adds visible starting-room selection, capacity-aware reload, safe consumable selection, higher-rank primary replacement and player-only view arbitration. `Project.ETC.Jev.ViewMotion` exercises speed, acceleration, reversal, wrap and reset. Optional `diagnostics.view` and `diagnostics.motion` expose measured motion and held ADS for local acceptance, without changing opponent tuning. See the [combat execution contract](../../docs/COMBAT_STRATEGY.en.md).
 
 After installing a Steam build with this executor, run `scripts/validate-jev-cloud.cjs --run --launch --require-hybrid --seconds 180` under Electron with a built Studio runtime. The capability requirement rejects legacy games and records real movement and native feedback. It cannot be combined with the legacy experimental override. See [cloud validation](../../docs/CLOUD_JEV_VALIDATION.en.md).
 

@@ -1,8 +1,8 @@
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom027Waterpark.cpp
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom027Waterpark.cpp
 @@ -1,3 +1,4 @@
-+#include "Development/EtcJevController.h"
  #include "Rooms/EtcRoom027Waterpark.h"
++#include "Development/EtcJevController.h"
  #include "Character/LyraHealthComponent.h"
  #include "Components/AudioComponent.h"
 @@ -292,7 +293,7 @@
@@ -17,8 +17,8 @@
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom010FerryHazard.cpp
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom010FerryHazard.cpp
 @@ -1,3 +1,4 @@
-+#include "Development/EtcJevController.h"
  #include "Rooms/EtcRoom010FerryHazard.h"
++#include "Development/EtcJevController.h"
  #include "Components/BoxComponent.h"
  #include "Components/CapsuleComponent.h"
 @@ -239,7 +240,7 @@
@@ -33,8 +33,8 @@
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
 @@ -1,3 +1,4 @@
-+#include "Development/EtcJevController.h"
  #include "Rooms/EtcRoom011Abyss.h"
++#include "Development/EtcJevController.h"
  
  #include "Components/BoxComponent.h"
 @@ -398,7 +399,7 @@
@@ -49,8 +49,8 @@
 --- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom024LaserHazard.cpp
 +++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom024LaserHazard.cpp
 @@ -1,3 +1,4 @@
-+#include "Development/EtcJevController.h"
  #include "Rooms/EtcRoom024LaserHazard.h"
++#include "Development/EtcJevController.h"
  #include "AbilitySystem/Attributes/LyraCombatSet.h"
  #include "AbilitySystem/LyraAbilitySystemComponent.h"
 @@ -230,7 +231,7 @@

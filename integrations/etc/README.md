@@ -10,13 +10,15 @@ ETC 开发者把原生接入编译进游戏；玩家仍从 Steam 库启动 Enter
 ./Tools/Build.bat LyraGame Shipping
 ```
 
-安装器先检查 `shared-controller.patch`、`room-control.patch`、`awareness.patch` 和 `pendulum-path.patch`，复用现有 Bot Brain / Aim 及房间逐帧移动，再复制 Bridge、控制器适配层和测试源码到 EtcCore。重复安装会检测已应用补丁；源码冲突时停止，要求人工审查。保留模块 Install/Uninstall hook。旧版 Steam v3 桥接不具备 `shared-bot-v1` 能力时，Studio 继续使用原策略，不会假装新执行器已部署。
+安装器先检查 `shared-controller.patch`、`room-control.patch`、`awareness.patch`、`pendulum-path.patch` 和 `combat-camera.patch`，复用现有 Bot Brain / Aim 及房间逐帧移动，再复制 Bridge、控制器适配层和测试源码到 EtcCore。补丁链先在临时副本中按依赖顺序还原和检查，通过后才写入源码；支持重复安装，源码冲突时停止并要求审查。保留模块 Install/Uninstall hook。旧版 Steam v3 桥接不具备 `shared-bot-v1` 能力时，Studio 继续使用原策略，不会假装新执行器已部署。
 
 玩家保持 PlayerController、镜头和 HUD，共用 UE PathFollowing 与 Bot 的武器、危险处理、无位移检测。Jev 负责带有效期的战术目标。本机约 20 Hz 续期；相同目标不重启路径。原有 Bot 的战略逻辑仍保持独立。
 
 仅支持离线对局。会话绑定实际游戏 PID，手动接管、失焦、租约过期会释放自动输入。会话和密钥不得入库。执行反馈说明具体目标、状态、原因、失败次数和路径状态。
 
 原生约束测试为 `Project.ETC.Jev.PlayerMotor`。打包、上传和实际 Steam 安装沿用 ETC 发布流程；本安装脚本不会更新 Steam 安装文件或发布游戏。编译通过不等于完整比赛验收通过。
+
+战术与镜头扩展加入可见选房、按容量补弹、安全选择恢复道具、更换较弱主武器和玩家镜头统一控制。`Project.ETC.Jev.ViewMotion` 检查速度、加速度、反向、角度跨界及释放；可选字段 `diagnostics.view` 和 `diagnostics.motion` 记录镜头、姿态与 ADS 输入，供本地验收，不改变敌方难度。详见[战术执行约定](../../docs/COMBAT_STRATEGY.md)。
 
 安装含新执行器的 Steam 构建后，可以用 `scripts/validate-jev-cloud.cjs --run --launch --require-hybrid --seconds 180` 验证；需以 Electron 启动且使用已构建的 Studio。该参数拒绝缺少新能力的旧游戏，保留真实位移和原生反馈，不允许同时使用旧实验覆盖参数。详情见[云端验证](../../docs/CLOUD_JEV_VALIDATION.md)。
 

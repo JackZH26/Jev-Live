@@ -1,6 +1,6 @@
 import type {EtcAction,EtcObservation} from '../shared/etc';
 
-export const KNOWLEDGE_VERSION='etc-20260921-03';
+export const KNOWLEDGE_VERSION='etc-20260921-04';
 export interface RoomKnowledge {id:number;name:string;zh:string;crossingSeconds:number;rules:string[];rulesZh:string[];source:string}
 const room=(id:number,name:string,zh:string,crossingSeconds:number,source:string,rules:string[],rulesZh:string[]):RoomKnowledge=>({id,name,zh,crossingSeconds,source,rules,rulesZh});
 /** Authored mechanics, not live world state. Crossing times are conservative policy estimates, not promises. */
@@ -61,7 +61,10 @@ export const MATCH_RULES=[
  'The fixed starter pistol cannot be dropped or replaced. Main weapons occupy slots 2 and 3; improve the loadout through visible reachable supplies.',
  'Ordinary headgear protects one accepted ordinary-gun headshot; SR01 headshots bypass it. A helmet is not general invulnerability.',
  'Discrete collision hazards use the current 60 damage baseline, with explicit exceptions such as lethal falls, discharge/burn and push-only obstacles. Never generalize one room rule to all rooms.',
- 'Budgeted supply actions are brief opportunities before evacuation, not permission to defend a yellow room. They require a fresh map and time for the estimated crossing plus margin; damage immediately cancels them.',
+ 'When the current room turns yellow and there is no enemy, relocate to a connected white room before looting, topping up ammunition or healing. Active collapse always requires evacuation.',
+ 'While safe, replenish a partial magazine using its actual capacity, use available recovery items, and replace a weaker primary only after reaching a visible better weapon. Never discard the fixed sidearm.',
+ 'On incoming fire, seek nearby verified cover, then counterattack from its vicinity. Do not rush into open ground just to close distance. A missing sighting is not proof that an attacker has left.',
+ 'Balance survival with useful damage and eliminations: take favorable visible fights after preparing, avoid endless passive waiting, and never chase hidden opponents or sacrifice safe evacuation for damage.',
  'Use only offered actions. The local shared controller handles real-time avoidance; cloud objectives must not override its safety or normal game physics.'
 ];
 export class EtcKnowledge {
@@ -72,7 +75,7 @@ export class EtcKnowledge {
   const r=roomKnowledge(this.visited.get(o.self.room));
   return {version:KNOWLEDGE_VERSION,rules:MATCH_RULES,
    posture:canDefendRoom(o)?'Defend this safe terrain room with the stocked primary weapon. Watch for enemies and zone changes; unnecessary room hopping adds hazard exposure.':'Acquire supplies or plan safe movement using the current room mechanics.',
-   budgetedSupplyActions:(o.actions??[]).filter(a=>canResupplyBeforeEvacuation(o,a)).map(a=>a.id),
+   budgetedSupplyActions:[],
    currentRoom:r?{id:r.id,name:r.name,rules:r.rules,crossingEstimateSeconds:r.crossingSeconds,source:r.source}:null,
    knownRooms:[...this.visited].map(([slot,id])=>({slot,type:id,name:roomKnowledge(id)!.name})),
    uncertainty:'Crossing times are estimates, not live hazard phases. Unvisited archetypes and future random events remain unknown.'};

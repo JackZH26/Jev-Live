@@ -18,5 +18,6 @@ export const etc=[
  ['etc.heal','使用治疗物品','使用治療物品','回復アイテムを使用','회복 아이템 사용','Use healing item'],
  ['etc.equip','切换可用武器','切換可用武器','使用可能な武器に変更','사용 가능한 무기로 교체','Switch usable weapon'],
  ['etc.new_match','开始本地人机对战','開始本機人機對戰','オフライン BOT 戦を開始','오프라인 봇 대전 시작','Start offline bot match'],
+ ['etc.pick_room','选择物资与出口合适的起始房间','選擇物資與出口合適的起始房間','物資と出口を考慮して開始部屋を選択','보급품과 출구를 고려해 시작 방 선택','Choose a starting room with supplies and exits'],
  ['phase.unsupported','当前对局不支持自动玩','目前對局不支援自動玩','この対戦では自動操作は使用不可','현재 대전은 자동 조작 미지원','Autoplay unavailable in this match'],
 ] as const;

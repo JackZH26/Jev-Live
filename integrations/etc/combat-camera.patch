@@ -1,0 +1,220 @@
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotAimComponent.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "AI/EtcBotAimComponent.h"
+ #include "Weapons/EtcFlashExposureComponent.h"
++#include "Development/EtcJevBridge.h"
+ 
+ #include "AI/EtcBotDifficultySettings.h"
+ #include "AbilitySystem/LyraAbilitySystemComponent.h"
+@@ -26,6 +27,27 @@
+ 	Difficulty = InTier;
+ }
+ 
++void UEtcBotAimComponent::RequestPlayerLook(const FRotator& Rotation,int32 Priority,float HoldSeconds)
++{
++    if(!Cast<APlayerController>(GetOwner())||!GetWorld()||Rotation.ContainsNaN())return;
++    const double Now=GetWorld()->GetTimeSeconds();
++    if(Now<LookUntil&&Priority<LookPriority)return;
++    LookGoal=Rotation.GetNormalized();LookGoal.Pitch=FMath::Clamp(LookGoal.Pitch,-70.0,70.0);
++    LookPriority=Priority;LookUntil=Now+FMath::Clamp(HoldSeconds,0.05f,1.0f);
++}
++void UEtcBotAimComponent::ResetPlayerLook(){LookUntil=0;LookPriority=0;ViewYaw.Reset();ViewPitch.Reset();}
++float UEtcBotAimComponent::GetPlayerViewSpeed() const{return float(FMath::Sqrt(ViewYaw.Velocity*ViewYaw.Velocity+ViewPitch.Velocity*ViewPitch.Velocity));}
++void UEtcBotAimComponent::UpdatePlayerLook(float DeltaTime)
++{
++    auto* PC=Cast<APlayerController>(GetOwner());if(!PC)return;
++    if(!EtcJevBridge::HasControlLease(PC->GetPawn())){ResetPlayerLook();return;}
++    if(GetWorld()->GetTimeSeconds()>LookUntil){LookPriority=0;LookGoal=PC->GetControlRotation();}
++    const FRotator Current=PC->GetControlRotation();
++    const double Speed=LookPriority>=60?240:150, Acceleration=LookPriority>=60?1150:650;
++    const FRotator Next(ViewPitch.Step(Current.Pitch,LookGoal.Pitch,DeltaTime,110,500),ViewYaw.Step(Current.Yaw,LookGoal.Yaw,DeltaTime,Speed,Acceleration),0);
++    PC->SetControlRotation(Next);
++}
++
+ void UEtcBotAimComponent::SetTarget(AActor* NewTarget, bool bUrgent)
+ {
+ 	if (Target.Get() == NewTarget)
+@@ -149,6 +171,7 @@
+ 	{
+ 		bInsideFireGate = false;
+ 		UpdateAds();
++		UpdatePlayerLook(DeltaTime);
+ 		return;
+ 	}
+ 
+@@ -157,6 +180,7 @@
+ 		ReactionRemaining -= DeltaTime;
+ 		if (ReactionRemaining > 0.0f)
+ 		{
++			UpdatePlayerLook(DeltaTime);
+ 			return;
+ 		}
+ 		bAcquired = true;
+@@ -183,11 +207,11 @@
+ 	if (Player)
+ 	{
+ 		NewRot = Controller->GetControlRotation() + (NewRot - CameraRotation).GetNormalized();
+-		NewRot = FMath::RInterpConstantTo(Controller->GetControlRotation(), NewRot, DeltaTime, 360.0f);
++		RequestPlayerLook(NewRot,60);
+ 	}
+ 	const FVector Aimed = Player ? CameraRotation.Vector() : NewRot.Vector();
+-	Controller->SetControlRotation(NewRot);
+-	Pawn->SetActorRotation(FRotator(0.0f, NewRot.Yaw, 0.0f));
++	if(Player)UpdatePlayerLook(DeltaTime);
++	else {Controller->SetControlRotation(NewRot);Pawn->SetActorRotation(FRotator(0.0f, NewRot.Yaw, 0.0f));}
+ 
+ 	const float AngleDeg = FMath::RadiansToDegrees(FMath::Acos(
+ 		FMath::Clamp(FVector::DotProduct(Aimed, ToTarget), -1.0f, 1.0f)));
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/AI/EtcBotBrainComponent.cpp
+@@ -570,8 +570,8 @@
+ 	const float LookYaw = BaseYaw
+ 		+ static_cast<float>((ScoutLookDirectionIndex++ % 4) * 90);
+ 	const FRotator LookRotation(0.0f, LookYaw, 0.0f);
+-	Bot->SetControlRotation(LookRotation);
+-	Pawn->SetActorRotation(LookRotation);
++	if(bExternalControl){if(auto* Aim=EtcJevController::Aim(Bot))Aim->RequestPlayerLook(LookRotation,20,0.8f);}
++	else {Bot->SetControlRotation(LookRotation);Pawn->SetActorRotation(LookRotation);}
+ 	ScoutLookRemaining = FMath::FRandRange(
+ 		EtcBotMobilityRules::ScoutLookStepMinSeconds,
+ 		EtcBotMobilityRules::ScoutLookStepMaxSeconds);
+@@ -1568,7 +1568,9 @@
+ 		if (!Direction.IsNearlyZero())
+ 		{
+ 			const FRotator Facing = FMath::RInterpTo(Pawn->GetActorRotation(), Direction.Rotation(), DeltaTime, 12.f);
+-			Bot->SetControlRotation(Facing); Pawn->SetActorRotation(Facing);
++			if(bExternalControl){if(auto* Aim=EtcJevController::Aim(Bot))Aim->RequestPlayerLook(Direction.Rotation(),100);}
++			else Bot->SetControlRotation(Facing);
++			Pawn->SetActorRotation(Facing);
+ 		}
+ 	}
+ 	if (bTrainWindowWaiting || bChessWindowWaiting || bGenericHazardWaiting)
+@@ -1712,9 +1714,7 @@
+ 	if (bExternalControl && !TargetEnemy.IsValid() && !bGenericDirectMovement
+ 		&& !Pawn->GetVelocity().IsNearlyZero(10.0f))
+ 	{
+-		const FRotator Facing = FMath::RInterpConstantTo(Bot->GetControlRotation(),
+-			Pawn->GetVelocity().GetSafeNormal2D().Rotation(), DeltaTime, 360.0f);
+-		Bot->SetControlRotation(Facing);
++		if(auto* Aim=EtcJevController::Aim(Bot))Aim->RequestPlayerLook(Pawn->GetVelocity().GetSafeNormal2D().Rotation(),10);
+ 	}
+ 	UpdateCoverScoutLook(DeltaTime);
+ 
+@@ -1797,6 +1797,16 @@
+ 	}
+ 
+ 	if (bExternalControl && !bGenericDirectMovement) EtcJevBridge::UpdateAwarenessLook(Pawn, DeltaTime);
++	if(bExternalControl)if(auto* Character=Cast<ACharacter>(Pawn)){
++		// Crouch-walk the final approach to verified cover. Traversal and room
++		// hazard posture own the capsule whenever their directives are active.
++		const bool bWantCrouch=ExternalKind==TEXT("cover")&&ExternalStatus==TEXT("running")
++			&&FVector::Dist2D(Pawn->GetActorLocation(),ExternalGoal)<700
++			&&!bGenericHazardWindow&&!bRotorHazardWindow&&!bGenericDirectMovement
++			&&Character->GetCharacterMovement()->IsMovingOnGround();
++		if(bWantCrouch&&!bCombatCrouching){Character->Crouch();bCombatCrouching=true;}
++		else if(!bWantCrouch&&bCombatCrouching){if(!bLaserCrouching&&!bRotorCrouching)Character->UnCrouch();bCombatCrouching=false;}
++	}
+ 
+ 	bool bWantsToFire = false;
+ 	if (Mode == EEtcBotMode::Fight && bHasWeapon)
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Private/Rooms/EtcRoom011Abyss.cpp
+@@ -404,7 +404,11 @@
+         const FVector Dir=(Target-C->GetActorLocation()).GetSafeNormal2D();
+         if(Trip.bFaceTarget&&!Dir.IsNearlyZero())
+         {
+-            C->SetActorRotation(Dir.Rotation());if(C->GetController())C->GetController()->SetControlRotation(Dir.Rotation());
++            C->SetActorRotation(Dir.Rotation());
++            if(auto* Controller=C->GetController()){
++                if(C->IsPlayerControlled()){if(auto* Aim=EtcJevController::Aim(Controller))Aim->RequestPlayerLook(Dir.Rotation(),100);}
++                else Controller->SetControlRotation(Dir.Rotation());
++            }
+         }
+         C->AddMovementInput(Dir,Trip.SpeedScale,true);
+     }
+@@ -438,7 +442,10 @@
+         auto* Mutable=const_cast<ACharacter*>(C);
+         const FVector Direction=GetActorTransform().TransformVectorNoScale(Target-P).GetSafeNormal2D();
+         Mutable->SetActorRotation(Direction.Rotation());
+-        if(Mutable->GetController())Mutable->GetController()->SetControlRotation(Direction.Rotation());
++        if(auto* Controller=Mutable->GetController()){
++            if(Mutable->IsPlayerControlled()){if(auto* Aim=EtcJevController::Aim(Controller))Aim->RequestPlayerLook(Direction.Rotation(),100);}
++            else Controller->SetControlRotation(Direction.Rotation());
++        }
+         Mutable->AddMovementInput(Direction,1.f,true);
+         Out.bRequestTraversal=true;
+     };
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotAimComponent.h
+@@ -4,6 +4,7 @@
+ 
+ #include "AI/EtcBotTypes.h"
+ #include "Components/ActorComponent.h"
++#include "AI/EtcViewMotion.h"
+ 
+ #include "EtcBotAimComponent.generated.h"
+ 
+@@ -28,6 +29,11 @@
+ 	EEtcBotTier GetDifficulty() const { return Difficulty; }
+ 
+ 	void SetTarget(AActor* NewTarget, bool bUrgent = false);
++	/** Player-only view arbitration: travel=10, observation=20, combat=60, traversal=100. */
++	void RequestPlayerLook(const FRotator& Rotation, int32 Priority, float HoldSeconds=0.12f);
++	void ResetPlayerLook();
++	float GetPlayerViewSpeed() const;
++	int32 GetPlayerViewPriority() const { return LookPriority; }
+ 	/** Shelter runs use normal sprint speed; aiming resumes after reaching cover. */
+ 	void SetTraversalSprint(bool bValue) { bTraversalSprint = bValue; UpdateAds(); }
+ 	/** A ledge transfer owns facing until the normal navigation path resumes. */
+@@ -49,6 +55,11 @@
+ private:
+ 	void SampleCone();
+ 	void UpdateAds();
++	void UpdatePlayerLook(float DeltaTime);
++	EtcViewMotion::Axis ViewYaw, ViewPitch;
++	FRotator LookGoal=FRotator::ZeroRotator;
++	double LookUntil=0;
++	int32 LookPriority=0;
+ 	FVector AimPointAt(const AActor* Actor) const;
+ 
+ 	EEtcBotTier Difficulty = EEtcBotTier::Regular;
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/AI/EtcBotBrainComponent.h
+@@ -50,6 +50,7 @@
+ 	void FinishExternalObjective(const FString& Status, const FString& Reason);
+ 	bool ExternalLeaseExpired() const;
+ 	bool bExternalControl = false;
++	bool bCombatCrouching = false;
+ 	double ExternalUntil = 0;
+ 	FString ExternalId, ExternalKind, ExternalStatus = TEXT("released"), ExternalReason = TEXT("not_started");
+ 	TWeakObjectPtr<AActor> ExternalTarget;
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcMatchFlowSubsystem.h
+@@ -45,6 +45,8 @@
+ 
+ 	/** True after the local player has been dropped into a room. */
+ 	bool HasDroppedIn() const { return bDroppedIn; }
++	/** The same visible pick widget used by the player; exposes no hidden room state. */
++	UEtcRoomPickWidget* GetRoomPickForPlayer() const { return !bDroppedIn && PickCoverTicks>=5 ? PickWidget.Get() : nullptr; }
+ 	void NotifyOnlineDrop();
+ 
+ 	/** True when this world entered through the menu flow (?MapGenSeed=): the
+diff --git a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcRoomPickWidget.h b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcRoomPickWidget.h
+--- a/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcRoomPickWidget.h
++++ b/Plugins/GameFeatures/EtcCore/Source/EtcCoreRuntime/Public/UI/EtcRoomPickWidget.h
+@@ -102,6 +102,7 @@
+ 
+ 	const FEtcMapPlan& GetPlanForPaint() const { return Plan; }
+ 	int32 GetLockedSlotForPaint() const { return LockedSlot; }
++	int32 GetSecondsLeftForPlayer() const { return bFinished ? 0 : SecondsLeft; }
+ 	int32 GetHoveredSlotForPaint() const { return HoveredSlot; }
+ 	bool IsHotspotForPaint(int32 SlotIndex) const { return HotspotSlots.Contains(SlotIndex); }
+ 	const TArray<FEtcRoomPickChestMark>& GetChestMarksForPaint() const { return ChestMarks; }

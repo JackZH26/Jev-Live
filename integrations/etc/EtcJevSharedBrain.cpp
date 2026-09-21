@@ -64,6 +64,9 @@ void UEtcBotBrainComponent::StopExternalControl(const FString& Reason)
     if (!bExternalControl) { ExternalStatus = TEXT("released"); ExternalReason = Reason; return; }
     NotifyEliminated(); // Normal Bot cleanup releases fire, ADS, reload, traversal and movement.
     bExternalControl = false; ExternalUntil = 0;
+    if(auto* Aim=EtcJevController::Aim(Cast<AController>(GetOwner())))Aim->ResetPlayerLook();
+    if(bCombatCrouching)if(auto* PC=Cast<AController>(GetOwner()))if(auto* C=Cast<ACharacter>(PC->GetPawn()))C->UnCrouch();
+    bCombatCrouching=false;
     ExternalStatus = TEXT("released"); ExternalReason = Reason;
     ExternalTarget.Reset();
     SetComponentTickEnabled(false);
@@ -89,6 +92,7 @@ int32 UEtcBotBrainComponent::GetExternalHeldInputs() const
     return int32(bFireHeld) + int32(bFireAutoHeld) + int32(bReloadHeld)
         + int32(bRotorJumpPressed) + int32(bRotorCrouching) + int32(bGenericTraversalPressed)
         + int32(bHazardSprintPressed) + int32(bLaserCrouching) + int32(bLaserJumpPressed)
+        + int32(bCombatCrouching)
         + (Aim ? Aim->GetHeldInputCount() : 0);
 }
 
@@ -140,7 +144,12 @@ void UEtcBotBrainComponent::ReevaluateExternal()
         TargetEnemy = Enemy; Mode = EEtcBotMode::Fight;
         FVector Away = (Here - Enemy->GetActorLocation()).GetSafeNormal2D();
         if (Away.IsNearlyZero()) Away = -Pawn->GetActorForwardVector().GetSafeNormal2D();
-        MoveGoal = Enemy->GetActorLocation() + Away * (bHasWeapon && !bOutOfAmmo ? 900.0f : 1400.0f);
+        // Fire from the reached position whenever the visible target is already
+        // in effective range. Do not abandon nearby cover to hug every enemy.
+        const float Range=BestWeaponRank>=5?4500.f:BestWeaponRank>=3?2600.f:1200.f;
+        MoveGoal = FVector::Dist2D(Here,Enemy->GetActorLocation())<=Range && !bOutOfAmmo
+            ? FVector::ZeroVector : Enemy->GetActorLocation()+Away*Range*.8f;
+        if(MoveGoal.IsNearlyZero())EtcJevController::Stop(Controller);
         if (FVector::Dist(Here, Enemy->GetActorLocation()) < 200.0f) MoveGoal = Here + Away * 400.0f;
     }
     else if (ExternalKind == TEXT("cover"))

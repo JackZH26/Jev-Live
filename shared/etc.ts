@@ -8,10 +8,11 @@ const finite = z.number().finite();
 const vector = z.tuple([finite, finite, finite]);
 export const etcActionSchema = z.object({
   id: z.string().min(1).max(160),
-  kind: z.enum(['wait','scan','engage','cover','loot','pickup','portal','reload','heal','equip','new_match','inspect_map']),
+  kind: z.enum(['wait','scan','engage','cover','loot','pickup','portal','reload','heal','equip','new_match','inspect_map','pick_room']),
   distance: finite.nonnegative(), target: z.string().max(160).optional(),
   safe: z.boolean(), destination: z.number().int().optional(), rank: finite.optional(),
   destinationRisk:z.number().int().min(0).max(4).optional(),
+  replacementSlot:z.number().int().min(1).max(2).optional(),
 });
 export const etcObservationSchema = z.object({
   version: z.literal(ETC_PROTOCOL), appId: z.literal(ETC_APP_ID),
@@ -20,6 +21,7 @@ export const etcObservationSchema = z.object({
   phase: z.enum(['menu','loading','playing','dead','ended','paused','unsupported']),
   mode: z.enum(['manual','auto']), epoch: z.number().int().nonnegative(), ack: z.number().int().nonnegative(),
   foreground: z.boolean(), map: z.string().max(200),
+  roomPick:z.object({locked:z.number().int().min(-1),secondsLeft:finite.nonnegative(),rooms:z.array(z.object({id:z.number().int().nonnegative(),exits:z.number().int().nonnegative(),loot:finite.nonnegative(),hotspot:z.boolean()})).max(128)}).optional(),
   zone:z.object({phase:z.number().int().nonnegative(),stage:z.enum(['warning','collapse','complete']),secondsLeft:finite.min(-1)}).optional(),
   mapView:z.object({open:z.boolean(),revision:z.number().int().nonnegative(),observedAt:finite,
     phase:z.number().int().nonnegative(),stage:z.enum(['warning','collapse','complete']),
@@ -28,12 +30,17 @@ export const etcObservationSchema = z.object({
   }).optional(),
   self: z.object({position:vector, health:finite.nonnegative(), maxHealth:finite.positive(),
     magazine:z.number().int().min(-1), reserve:z.number().int().min(-1), weapon:z.string().max(160),
+    magazineCapacity:z.number().int().positive().optional(),reloading:z.boolean().optional(),
+    damageDealt:finite.nonnegative().optional(),gauzeActive:z.boolean().optional(),
+    consumables:z.tuple([z.number().int().nonnegative(),z.number().int().nonnegative(),z.number().int().nonnegative()]).optional(),
     protected:z.boolean(), traveling:z.boolean(), healing:z.boolean(), room:z.number().int(),roomType:z.number().int().min(1).max(98).optional(),
     danger:z.boolean(), evacuationSeconds:finite, kills:z.number().int().nonnegative(),grounded:z.boolean().optional()}),
   enemies: z.array(z.object({id:z.string().max(160),position:vector,velocity:vector,distance:finite.nonnegative()})).max(32),
   actions: z.array(etcActionSchema).max(128),
   result: z.object({placement:z.number().int().min(1),won:z.boolean()}).refine(r=>r.won===(r.placement===1)).nullable(),
   diagnostics:z.object({heldInputs:z.number().int().nonnegative(),shots:z.number().int().nonnegative(),
+    view:z.object({yaw:finite,pitch:finite,speed:finite.nonnegative(),owner:z.string().max(40)}).optional(),
+    motion:z.object({crouched:z.boolean(),adsHeld:z.boolean(),speed:finite.nonnegative()}).optional(),
     stuck:z.boolean(),observationMs:finite.nonnegative(),lastAction:z.string().max(160)}),
   executor:z.object({
     kind:z.literal('shared-bot-v1'), objective:z.string().max(160),
@@ -49,5 +56,5 @@ export interface EtcSummary {
   connected:boolean; protocol:number; frames:number; decisions:number; lastLatencyMs:number;
   p95LatencyMs:number; matches:number; wins:number; losses:number; interrupted:number;
   lastPlacement:number|null; shots:number; kills:number; room:number; health:number;
-  magazine:number; reserve:number; strategy:string;
+  magazine:number; reserve:number; strategy:string;damageDealt?:number;
 }

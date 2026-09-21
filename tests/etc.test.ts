@@ -33,11 +33,11 @@ it('timestamps a frame after awaited mailbox work without treating it as a futur
 });
 
 describe('ETC tactical priorities',()=>{
- it('allows only a brief, budgeted starter-weapon supply stop in a verified upcoming terrain room',()=>{
+ it('evacuates a yellow room ahead of supplies even with only the starter weapon',()=>{
   const p=new EtcPolicy(),o=observation({enemies:[]});o.self.weapon='ID_ETC_StarterPistol_C';o.self.roomType=5;o.self.danger=true;
   o.zone={phase:1,stage:'warning',secondsLeft:140};o.mapView={open:false,revision:1,observedAt:o.timestamp,phase:1,stage:'warning',rooms:[{id:1,number:7,x:0,y:0,w:1,h:1,risk:1,visited:true}],edges:[]};
   o.actions.find(a=>a.kind==='portal')!.destinationRisk=0;
-  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('loot');
+  expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('portal');
   o.self.health=90;o.timestamp+=50;
   expect(p.choose(o,o.timestamp,false,true,'loot')?.kind).toBe('portal');
   const safe=()=>new EtcPolicy().choose(o,o.timestamp,false,true,'loot')?.kind;
@@ -280,6 +280,15 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   observe.mockResolvedValue(observation({phase:'playing',mode:'manual',epoch:game.gate.epoch}));
   await (game as any).tick();expect(game.autoplay.transitionUntil).toBe(0);expect(change).toHaveBeenCalledWith('auto',game.gate.epoch);expect(tick).toHaveBeenCalledTimes(1);
   observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
+ });
+ it('uses the visible room-pick screen during an authorized loading transition without dropping the grace',async()=>{
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};
+  game.gate.change('auto');game.autoplay.transitionMatch='menu';game.autoplay.transitionUntil=Date.now()+120000;
+  const o=observation({phase:'loading',mode:'manual',epoch:game.gate.epoch,roomPick:{locked:-1,secondsLeft:8,rooms:[{id:0,exits:2,loot:4,hotspot:false}]}});
+  vi.spyOn(game.autoplay,'observe').mockResolvedValue(o);const resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  await (game as any).tick();expect(resume).toHaveBeenCalledOnce();expect(tick).toHaveBeenCalledOnce();expect(game.autoplay.transitionUntil).toBeGreaterThan(Date.now());
+  vi.spyOn(game.autoplay.bridge,'command').mockResolvedValue(true);await game.setMode('manual');await (game as any).tick();expect(tick).toHaveBeenCalledOnce();
  });
  it('manual takeover during loading cancels automatic rearming',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');

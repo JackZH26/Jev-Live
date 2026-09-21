@@ -131,7 +131,13 @@ export class Game {
    if(o.matchId!==this.autoplay.transitionMatch&&now<this.autoplay.transitionUntil){
     // A new world ID appears before room generation/drop-in finishes. Keep the
     // bounded loading grace and let native input leases expire until play starts.
-    if(o.phase==='loading')return;
+    if(o.phase==='loading'){
+     if(o.roomPick){
+      if(o.mode!=='auto')await this.autoplay.resumeControl(this.gate.change('auto'));
+      await this.autoplay.tick(settings,this.gate.epoch);
+     }
+     return;
+    }
     this.autoplay.transitionUntil=0;
     await this.autoplay.change('auto',this.gate.change('auto'));
    }else if(o.mode==='manual'&&o.epoch===this.gate.epoch){
