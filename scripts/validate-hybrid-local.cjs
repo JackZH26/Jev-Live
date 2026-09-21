@@ -4,11 +4,13 @@ const {app,safeStorage}=require('electron');const root=path.resolve(__dirname,'.
 const arg=(name,fallback)=>{const i=process.argv.indexOf(name);return i<0?fallback:process.argv[i+1];};
 const release=arg('--candidate','');
 const seconds=Number(arg('--seconds','1800')),requestBudget=Number(arg('--requests','1200'));
+const requestedMatches=Number(arg('--matches','1'));
 const cloud=process.argv.includes('--jev');process.env.TYPESAFE_LOG_LEVEL='off';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));let control,report={kind:'packaged-engineering-smoke-NOT-Steam-install',provider:cloud?'jev':'rules',startedAt:new Date().toISOString(),samples:[],events:[],cloudCalls:[],polls:[]},out,child,secret;
 app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  const artifact=JSON.parse(await fs.readFile(path.join(release,'artifact.json'),'utf8'));
- if(!path.isAbsolute(release)||!Number.isInteger(seconds)||seconds<10||seconds>3600||!Number.isInteger(requestBudget)||requestBudget<1||requestBudget>2400)throw Error('invalid_test_arguments');
+ if(!path.isAbsolute(release)||!Number.isInteger(seconds)||seconds<10||seconds>3600||!Number.isInteger(requestBudget)||requestBudget<1||requestBudget>2400||!Number.isInteger(requestedMatches)||requestedMatches<1||requestedMatches>20)throw Error('invalid_test_arguments');
+ report.requestedMatches=requestedMatches;report.officialResults=[];
  report.candidate=artifact.release;report.requestedSeconds=seconds;report.requestBudget=requestBudget;report.runtimeHashes={};
  for(const name of ['etc-autoplay','etc-policy','etc-tactics','etc-recovery','etc-bridge','etc-map','etc-knowledge'])report.runtimeHashes[name]=createHash('sha256').update(await fs.readFile(path.join(root,'dist-main/electron',name+'.js'))).digest('hex');
  report.harnessHash=createHash('sha256').update(await fs.readFile(__filename)).digest('hex');
@@ -20,7 +22,7 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
  out=path.join(root,'test-results','hybrid-smoke-'+Date.now());await fs.mkdir(out,{recursive:true});
  const dir=path.join(data,'etc-bridge');
  const {EtcBridge}=require('../dist-main/electron/etc-bridge');const {EtcAutoplay}=require('../dist-main/electron/etc-autoplay');const {Store,settingsSchema}=require('../dist-main/electron/storage');
- const store=new Store(data,safeStorage);await store.init();const settings=settingsSchema.parse({decisionProvider:cloud?'jev':'rules',decisionIntervalMs:2500,autoRestart:false});
+ const store=new Store(data,safeStorage);await store.init();const settings=settingsSchema.parse({decisionProvider:cloud?'jev':'rules',decisionIntervalMs:2500,autoRestart:requestedMatches>1});
  if(cloud){const desktop=new Store(path.join(process.env.APPDATA,'JEV Studio'),safeStorage);try{secret=await desktop.get('jev.key');}catch{}
  if(!secret)secret=execFileSync('powershell.exe',['-NoProfile','-Command',"$p=Join-Path $env:LOCALAPPDATA 'JevBrowserOperator/typesafe-api-key.dpapi'; $s=ConvertTo-SecureString ([IO.File]::ReadAllText($p)); [Console]::Write([System.Net.NetworkCredential]::new('', $s).Password)"],{windowsHide:true,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();
  if(!secret)throw Error('missing_jev_key');const get=store.get.bind(store);store.get=async key=>key==='jev.key'?secret:get(key);
@@ -54,7 +56,8 @@ app.disableHardwareAcceleration();app.whenReady().then(async()=>{
    await control.tick(settings,epoch);lastFresh=Date.now();
    if(o.frame!==report.lastMotionFrame){report.lastMotionFrame=o.frame;await fs.appendFile(path.join(out,'motion.ndjson'),JSON.stringify({at:Date.now(),timestamp:o.timestamp,frame:o.frame,matchId:o.matchId,phase:o.phase,mode:o.mode,room:o.self.room,traveling:o.self.traveling,view:o.diagnostics.view,motion:o.diagnostics.motion,roomPick:o.roomPick,action:o.diagnostics.lastAction})+'\n');}
    if(Date.now()-sampleAt>500){sampleAt=Date.now();report.samples.push({at:sampleAt,phase:o.phase,position:o.self.position,room:o.self.room,hp:o.self.health,magazine:o.self.magazine,shots:o.diagnostics.shots,action:o.diagnostics.lastAction,executor:o.executor,held:o.diagnostics.heldInputs,self:o.self,enemies:o.enemies,actions:o.actions,zone:o.zone,mapView:o.mapView,navigation:control.navigation.context(),knowledge:control.navigation.knowledge.context(o)});if(report.samples.length%20===0)console.log(JSON.stringify({at:sampleAt,phase:o.phase,room:o.self.room,hp:o.self.health,mag:o.self.magazine,shots:o.diagnostics.shots,enemies:o.enemies.length,offers:o.actions.reduce((a,x)=>(a[x.kind]=(a[x.kind]??0)+1,a),{}),action:o.diagnostics.lastAction,executor:o.executor}));}
-   if(control.summary.matches>0){report.stopReason='official_result';report.officialResult={...o.result,matchId:o.matchId,frame:o.frame,phase:o.phase};break;}
+   if(control.summary.matches>report.officialResults.length){report.officialResult={...o.result,matchId:o.matchId,frame:o.frame,phase:o.phase};report.officialResults.push({...report.officialResult,at:Date.now(),kills:control.summary.kills,damageDealt:control.summary.damageDealt,shots:control.summary.shots});await fs.writeFile(path.join(out,'results.json'),JSON.stringify(report.officialResults,null,2));console.log(JSON.stringify({officialResult:report.officialResults.at(-1),matches:control.summary.matches}));
+    if(control.summary.matches>=requestedMatches){report.stopReason=requestedMatches===1?'official_result':'demo_complete';break;}}
    if(report.samples.length>=savedSamples+20){savedSamples=report.samples.length;await fs.writeFile(path.join(out,'live.json'),JSON.stringify({pid:child.pid,candidate:report.candidate,summary:control.summary,cloudStats:control.stats,samples:report.samples.slice(-20),cloudCalls:report.cloudCalls.slice(-4)},null,2));}
    if(report.cloudCalls.length>=requestBudget){report.stopReason='request_budget';break;}
   }else if(Date.now()-lastFresh>15000){report.stopReason='no_fresh_state';break;}
