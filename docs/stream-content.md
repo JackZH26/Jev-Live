@@ -32,7 +32,11 @@ posting or pinning. Private rehearsals never auto-post promotional messages.
 - The official English Steam store description confirms third-person battle
   royale, collapsing cube, looting, portals, trains, pool tables and chessboards.
 - Curated topics: core loop, collapse, portals, authored room interiors with
-  changing connections, room variety, and the special sniper room broadcast.
+  changing connections, room variety, and looting decisions.
+- The GDD sniper room-broadcast proposal is **not** a current gameplay claim:
+  the current `EtcRoomStateSubsystem::GetSniperView()` returns an empty state.
+  It is excluded from spoken introductions; related questions receive an
+  explicit current-build limitation.
 - Omitted numerical player/room counts, damage/timing values and new design
   proposals that may differ from the installed candidate. Room themes are not
   claims about the room currently on screen.
