@@ -15,6 +15,35 @@ function state():EtcObservation{return {
 };}
 
 describe('hybrid tactical contract',()=>{
+  it('does not repeatedly select an acknowledged headgear pickup that remains offered',()=>{
+    const t=new EtcTactics(),p=new EtcPolicy(),o=state();o.enemies=[];
+    const item={id:'pickup_helmet',kind:'pickup' as const,distance:240,safe:true,rank:2};o.actions.push(item);
+    o.executor={...o.executor!,objective:item.id,status:'running'};
+    t.observe(o,1,at);expect(p.choose(o,at,false,true)?.id).toBe(item.id);
+    o.executor.status='succeeded';o.executor.reason='headgear_equipped';
+    for(const elapsed of [50,1000,52000]){o.timestamp=at+elapsed;t.observe(o,1,o.timestamp);
+      expect(t.options(o).some(a=>a.id===item.id)).toBe(false);
+      expect(p.choose(o,o.timestamp,false,true,item.id)?.id).not.toBe(item.id);
+    }
+    o.actions.push({...item,id:'pickup_different'});o.timestamp+=50;t.observe(o,1,o.timestamp);
+    expect(t.options(o).some(a=>a.id==='pickup_different')).toBe(true);
+    expect(p.choose(o,o.timestamp,false,true)?.id).toBe('pickup_different');
+  });
+  it('allows a genuinely reappearing pickup after its completed offer was absent',()=>{
+    const t=new EtcTactics(),o=state();const item={id:'pickup_item',kind:'pickup' as const,distance:200,safe:true};
+    o.actions.push(item);o.executor={...o.executor!,objective:item.id,status:'succeeded'};t.observe(o,1,at);
+    expect(t.options(o).some(a=>a.id===item.id)).toBe(false);
+    o.executor={...o.executor,objective:'scan',status:'running'};o.actions=o.actions.filter(a=>a.id!==item.id);
+    t.observe(o,1,at+100);t.observe(o,1,at+2100);o.actions.push(item);t.observe(o,1,at+2200);
+    expect(t.options(o).some(a=>a.id===item.id)).toBe(true);
+  });
+  it('leaves loaded-primary selection to the shared motor without blocking emergency switches',()=>{
+    const p=new EtcPolicy(),o=state();o.enemies=[];o.self.roomType=18;o.self.weapon='ID_ETC_GL01_C';o.self.magazine=2;o.self.reserve=4;
+    o.actions.push({id:'equip_2',kind:'equip',distance:0,safe:true,rank:3});
+    expect(p.choose(o,at,false,true)?.kind).not.toBe('equip');
+    o.timestamp+=50;o.self.magazine=0;expect(p.choose(o,o.timestamp,false,true)?.kind).toBe('equip');
+    o.timestamp+=50;o.self.magazine=12;o.self.weapon='ID_ETC_StarterPistol_C';expect(p.choose(o,o.timestamp,false,true)?.kind).toBe('equip');
+  });
   it('accepts an objective and keeps it across fresh renewals until its soft TTL',()=>{
     const t=new EtcTactics(),o=state();t.observe(o,1,at);
     expect(t.accept('portal',o,o,1,at)).toBe(true);

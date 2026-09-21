@@ -1,8 +1,10 @@
 import type { EtcObservation } from '../shared/etc';
 import {canDefendRoom} from './etc-knowledge';
+import {EtcCompletedActions} from './etc-policy';
 
 /** Cloud objectives are bounded leases, independent of the native input heartbeat. */
 export class EtcTactics {
+  private completed=new EtcCompletedActions();
   private match='';private session='';private epoch=-1;private room=-1;
   private intent='';private until=0;private requestedSignature='';private lastRequest=0;
   private failed=new Map<string,number>();
@@ -11,9 +13,10 @@ export class EtcTactics {
   private previous?:EtcObservation;private observedAt=0;private roomSince=0;private objectiveSince=0;
   private scoutMs=0;private distanceCm=0;private damageAt=0;private damageSequence=0;
   private discoveries=new Set<string>();
-  reset(){this.match='';this.session='';this.epoch=-1;this.room=-1;this.intent='';this.until=0;this.requestedSignature='';this.lastRequest=0;this.failed.clear();this.visits.clear();this.history=[];this.previous=undefined;this.observedAt=0;this.roomSince=0;this.objectiveSince=0;this.scoutMs=0;this.distanceCm=0;this.damageAt=0;this.damageSequence=0;this.discoveries.clear();}
+  reset(){this.completed.reset();this.match='';this.session='';this.epoch=-1;this.room=-1;this.intent='';this.until=0;this.requestedSignature='';this.lastRequest=0;this.failed.clear();this.visits.clear();this.history=[];this.previous=undefined;this.observedAt=0;this.roomSince=0;this.objectiveSince=0;this.scoutMs=0;this.distanceCm=0;this.damageAt=0;this.damageSequence=0;this.discoveries.clear();}
   observe(o:EtcObservation,epoch:number,now:number){
     if(o.matchId!==this.match||o.session!==this.session||epoch!==this.epoch){this.reset();this.match=o.matchId;this.session=o.session;this.epoch=epoch;}
+    this.completed.observe(o,now);
     if(this.room!==o.self.room){this.room=o.self.room;this.intent='';this.until=0;this.failed.clear();this.visits.set(this.room,(this.visits.get(this.room)??0)+1);this.roomSince=now;this.scoutMs=0;this.distanceCm=0;this.previous=undefined;this.discoveries.clear();}
     const previous=this.previous;
     if(previous&&o.phase==='playing'&&previous.phase==='playing'&&!o.self.traveling&&!previous.self.traveling){
@@ -39,7 +42,7 @@ export class EtcTactics {
   }
   options(o:EtcObservation){
     const defending=canDefendRoom(o)&&!o.enemies.length&&(!this.damageAt||o.timestamp-this.damageAt>5000);
-    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
+    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&this.completed.allows(a.id)&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
     if(defending)choices=choices.filter(a=>a.kind!=='portal');
     // An optional relocation must not enter active collapse while an observed
     // safe exit remains usable. A trapped player retains every open escape.

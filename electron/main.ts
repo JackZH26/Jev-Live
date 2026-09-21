@@ -20,6 +20,7 @@ import {createHash} from 'node:crypto';
 import {SessionHealth} from '../shared/session-health';
 import { providers } from '../shared/types';
 import type { Snapshot } from '../shared/types';
+import {readBuildInfo} from './build-info';
 
 app.setName('JEV Studio');
 // Keep an isolated test workspace from claiming the installed application's lock.
@@ -54,6 +55,7 @@ function allowedExternal(raw:string) {
 }
 
 app.whenReady().then(async()=>{
+  const build=readBuildInfo(app.isPackaged?process.resourcesPath:join(app.getAppPath(),'dist-main'),app.getVersion());
   const directory=process.env.JEV_TEST_DATA_DIR || app.getPath('userData');
   store=new Store(directory,safeStorage);await store.init();
   xLive=new XLive(store);
@@ -69,7 +71,7 @@ app.whenReady().then(async()=>{
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
   window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
   window.webContents.session.setPermissionCheckHandler(()=>false);
-  handler('snapshot',async()=>({settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,recovery:broadcast.recovery.status,health:health.issues,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
+  handler('snapshot',async()=>({build,settings:await store.settings(),accounts:await auth.accounts(),xSource:await xLive.summary(),outputs:obs.states,mode:game.gate.mode,game:game.connected?game.state:null,gameConnected:game.connected,gameError:game.error,gamePid:game.pid,decision:game.decision,busy,lastError,hasJevKey:!!await store.get('jev.key'),auth:auth.status,logs,broadcast:broadcast.state,recovery:broadcast.recovery.status,health:health.issues,steamGames:steam.games,selectedGame:game.selected,decisionStats:game.decisionStats,autoplay:game.autoplay.summary,gameInput:{foreground:game.autoplay.observation?.foreground??game.observation?.foreground??false,heldInputs:game.autoplay.observation?.diagnostics.heldInputs??game.observation?.heldInputs??0}} satisfies Snapshot));
   const gameId=z.string().regex(/^\d+$/).max(12);
   const requireGameIdle=()=>{if(broadcast.state.state!=='idle'||game.gate.mode==='auto')throw new Error(message('error.gameSelectionBusy'));};
   handler('scanSteam',()=>steam.scan(),message('steam.scan'));

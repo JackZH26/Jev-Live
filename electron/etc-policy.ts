@@ -1,8 +1,30 @@
 import { ETC_MAX_AGE_MS, type EtcAction, type EtcObservation } from '../shared/etc';
 import {canDefendRoom,canResupplyBeforeEvacuation} from './etc-knowledge';
 
+/** Retire acknowledged pickups/chests even when the native offer lingers. */
+export class EtcCompletedActions {
+  private identity='';private known=new Map<string,string>();
+  private completed=new Map<string,{at:number;absentAt?:number}>();
+  reset(){this.identity='';this.known.clear();this.completed.clear();}
+  observe(o:EtcObservation,now:number){
+    const identity=o.session+':'+o.matchId;if(identity!==this.identity){this.reset();this.identity=identity;}
+    const present=new Set(o.actions.map(a=>a.id));
+    for(const a of o.actions){this.known.set(a.id,a.kind);while(this.known.size>256)this.known.delete(this.known.keys().next().value!);}
+    for(const [id,entry] of this.completed){
+      if(present.has(id))entry.absentAt=undefined;else entry.absentAt??=now;
+      if(now-entry.at>120000||entry.absentAt!==undefined&&now-entry.absentAt>=2000)this.completed.delete(id);
+    }
+    const e=o.executor;
+    if(e?.status==='succeeded'&&['pickup','loot'].includes(this.known.get(e.objective)??'')&&!this.completed.has(e.objective)){
+      this.completed.set(e.objective,{at:now});while(this.completed.size>256)this.completed.delete(this.completed.keys().next().value!);
+    }
+  }
+  allows(id:string){return !this.completed.has(id);}
+}
+
 /** Only observed affordances enter the policy. No world actors, hidden HP or future collapse schedule. */
 export class EtcPolicy {
+  private completed=new EtcCompletedActions();
   private match = '';
   private lastRoom = -1;
   private visits = new Map<number,number>();
@@ -14,7 +36,7 @@ export class EtcPolicy {
   private seenAt=-Infinity;
   private progressAt=0;
   private bestDistance=Infinity;
-  reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;}
+  reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;this.completed.reset();}
   choose(o:EtcObservation, now:number, autoRestart:boolean, played:boolean, advice?:string, planned?:EtcAction):EtcAction|undefined {
     if(o.matchId!==this.match){this.reset();this.match=o.matchId;}
     const wait = o.actions.find(a=>a.kind==='wait');
@@ -24,6 +46,7 @@ export class EtcPolicy {
       return (!played||autoRestart)?o.actions.find(a=>a.kind==='new_match')??wait:wait;
     }
     if(o.phase!=='playing'||o.self.health<=0||o.self.traveling)return wait;
+    this.completed.observe(o,now);
     if(o.self.room!==this.lastRoom){this.lastRoom=o.self.room;this.visits.set(o.self.room,(this.visits.get(o.self.room)??0)+1);}
     if(o.executor?.status==='blocked'&&o.executor.objective){this.failed.set(o.executor.objective,now+5000);if(this.active===o.executor.objective)this.active='';}
     else if(!o.executor&&o.diagnostics.stuck&&this.active){this.failed.set(this.active,now+5000);this.active='';}
@@ -48,7 +71,11 @@ export class EtcPolicy {
     const underFire=now-this.hurtAt<5000, threatened=visible||underFire||now-this.seenAt<2000;
     const defending=canDefendRoom(o)&&!threatened;
     // Survival constraints have priority over cloud advice, loot and target persistence.
-    const eligible=o.actions.filter(a=>!['new_match','inspect_map'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe);
+    // The shared motor already selects its loaded primary. Repeated optional
+    // equip commands can fight that choice every tick (GL <-> AR in live traces).
+    // Keep starter upgrades and empty-weapon emergency switches available.
+    const nativeLoadedPrimary=o.executor?.kind==='shared-bot-v1'&&o.self.magazine>0&&!/StarterPistol|^$/.test(o.self.weapon);
+    const eligible=o.actions.filter(a=>!['new_match','inspect_map'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe&&this.completed.allows(a.id)&&!(a.kind==='equip'&&nativeLoadedPrimary));
     const escape=eligible.filter(a=>a.kind==='portal');
     const escapeOrder=(a:EtcAction,b:EtcAction)=>(a.destinationRisk??0)-(b.destinationRisk??0)||a.distance-b.distance;
     const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;

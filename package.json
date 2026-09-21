@@ -19,7 +19,7 @@
   "main": "dist-main/electron/main.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc -p tsconfig.main.json && vite build",
+    "build": "tsc -p tsconfig.main.json && node scripts/write-build-info.mjs && vite build",
     "check": "vue-tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
     "test": "vitest run",
     "start": "electron .",
@@ -63,6 +63,10 @@
       "package.json"
     ],
     "extraResources": [
+      {
+        "from": "dist-main/build-info.json",
+        "to": "build-info.json"
+      },
       {
         "from": "LICENSE",
         "to": "licenses/LICENSE"

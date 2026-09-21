@@ -85,11 +85,14 @@ export class Game {
  private async tick(){
   if(this.inFlight)return;this.inFlight=true;
   try{
-   const now=Date.now();if(!this.settingsCache||now-this.settingsAt>500){this.settingsCache=await this.store.settings();this.settingsAt=now;}
+   let now=Date.now();if(!this.settingsCache||now-this.settingsAt>500){this.settingsCache=await this.store.settings();this.settingsAt=now;}
    const settings=this.settingsCache;
    if(this.selectedId!==ETC_APP_ID)return;
    const previous=this.autoplay.observation;
    const o=await this.autoplay.observe(this.connected?this.pid:undefined,this.gate.mode==='auto');
+   // File reads and model/streaming contention can yield long enough for a newer
+   // frame to arrive. Recovery must compare that frame with the current clock.
+   now=Date.now();
    if(!o){
     if(this.gate.mode==='auto'&&(now<this.autoplay.transitionUntil||now<this.portalUntil)){this.state=null;return;}
     const transient=['age','ENOENT','EACCES','EPERM','EBUSY'].includes(this.autoplay.bridge.lastReadFailure);

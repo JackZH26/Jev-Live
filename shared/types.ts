@@ -28,6 +28,7 @@ export interface OutputState {
   frames: number; skipped: number; bytes: number; error?: string;
 }
 export interface Snapshot {
+  build?:{version:string;strategyRevision:string;commit:string;builtAt:string};
   settings: Settings; accounts: Record<OAuthProvider, Account | null>; xSource:XSourceSummary;
   outputs: Record<Provider, OutputState>; mode: PlayMode;
   game: GameState | null; gameConnected: boolean; gameError: string; gamePid?:number;

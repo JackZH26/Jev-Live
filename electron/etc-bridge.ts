@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import {performance} from 'node:perf_hooks';
 import { atomicWrite } from './storage';
 import { ETC_LEASE_MS, ETC_MAX_AGE_MS, etcObservationSchema, type EtcCommand, type EtcObservation } from '../shared/etc';
 
@@ -19,6 +20,7 @@ export class EtcBridge {
     this.heartbeatAt=now;if(this.pid!==pid){this.lastFrame=-1;this.latest=null;}this.pid=pid;
   }
   async read(pid:number|undefined,now=Date.now()):Promise<EtcObservation|null>{
+    const started=performance.now(),checkedAt=()=>now+Math.max(0,performance.now()-started);
     this.lastReadFailure='';
     await this.heartbeat(now,pid??0);
     try{
@@ -27,7 +29,7 @@ export class EtcBridge {
       const parsed=etcObservationSchema.safeParse(JSON.parse(raw));if(!parsed.success){this.lastReadFailure='schema';return null;}
       const o=parsed.data;
       if(!pid||o.processId!==pid||o.session!==this.session){this.lastReadFailure='identity';return null;}
-      if(now-o.timestamp>ETC_MAX_AGE_MS||o.timestamp>now+50){this.lastReadFailure='age';return null;}
+      const at=checkedAt();if(at-o.timestamp>ETC_MAX_AGE_MS||o.timestamp>at+50){this.lastReadFailure='age';return null;}
       if(o.frame<this.lastFrame){this.lastReadFailure='frame';return null;}
       this.lastFrame=o.frame;this.latest=o;return o;
     }catch(e){
@@ -35,7 +37,7 @@ export class EtcBridge {
       // UE's replace-file operation can briefly remove/lock state.json on Windows.
       // Reuse only an already authenticated, still-fresh frame during that gap.
       const o=this.latest;
-      if(['ENOENT','EACCES','EPERM','EBUSY'].includes(code)&&o&&pid===o.processId&&o.session===this.session&&now-o.timestamp<=ETC_MAX_AGE_MS&&o.timestamp<=now+50)return o;
+      const at=checkedAt();if(['ENOENT','EACCES','EPERM','EBUSY'].includes(code)&&o&&pid===o.processId&&o.session===this.session&&at-o.timestamp<=ETC_MAX_AGE_MS&&o.timestamp<=at+50)return o;
       return null;
     }
   }

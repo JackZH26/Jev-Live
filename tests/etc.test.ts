@@ -24,6 +24,14 @@ function observation(extra:Partial<EtcObservation>={}):EtcObservation {
 function choose(o:EtcObservation,advice?:string){return new EtcPolicy().choose(o,Date.now(),false,true,advice);}
 async function bridge(){const d=await mkdtemp(join(tmpdir(),'jev-etc-'));dirs.push(d);return new EtcBridge(d);}
 
+it('timestamps a frame after awaited mailbox work without treating it as a future frame',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'jev-etc-'));dirs.push(directory);let b:EtcBridge;
+ b=new EtcBridge(directory,async(file,value)=>{await writeFile(file,value);if(file.endsWith('session.json')){
+  await new Promise(r=>setTimeout(r,90));await writeFile(join(directory,'state.json'),JSON.stringify(observation({session:b.session,timestamp:Date.now()})));
+ }});
+ const started=Date.now(),o=await b.read(123,started);expect(o).not.toBeNull();expect(o!.timestamp-started).toBeGreaterThan(50);
+});
+
 describe('ETC tactical priorities',()=>{
  it('allows only a brief, budgeted starter-weapon supply stop in a verified upcoming terrain room',()=>{
   const p=new EtcPolicy(),o=observation({enemies:[]});o.self.weapon='ID_ETC_StarterPistol_C';o.self.roomType=5;o.self.danger=true;
@@ -215,6 +223,16 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(tick).not.toHaveBeenCalled();
   observe.mockResolvedValue(observation({mode:'manual'}));await (game as any).tick();expect(resume).toHaveBeenCalledWith(2);
   expect(game.gate.mode).toBe('auto');expect((game as any).reconnectUntil).toBe(0);
+ });
+ it('uses the clock after an asynchronous read when evaluating a confirmed lease stop',async()=>{
+  let clock=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>clock);
+  const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({})} as any,()=>{}, {games:[]} as any,'unused');
+  (game as any).selectedId='5272970';game.observation={connected:true,foreground:true,timestamp:clock,processId:123};game.gate.change('auto');
+  const o=observation();o.executor={kind:'shared-bot-v1',objective:'scan',status:'running',reason:'accepted',failures:0,pathStatus:0};
+  game.autoplay.recovery.poll(o,1,clock);
+  vi.spyOn(game.autoplay,'observe').mockImplementation(async()=>{clock+=120;return {...o,frame:2,timestamp:clock,mode:'manual',executor:{...o.executor!,status:'released',reason:'lease_expired'}};});
+  vi.spyOn(game.autoplay,'change').mockResolvedValue();const decide=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(decide).not.toHaveBeenCalled();
  });
  it('never resumes a long stall, invalid identity, focus loss or explicit manual takeover',async()=>{
   for(const failure of ['timeout','identity','focus','manual']){
