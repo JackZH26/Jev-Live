@@ -43,6 +43,7 @@ export class Game {
  private portalUntil=0;private portalMatch='';private portalRoom=-1;
  private reconnectUntil=0;private reconnectMatch='';
  private focusRecovery=new EtcFocusRecovery();
+ private focusSuspendedAt=0;
  private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
@@ -75,7 +76,7 @@ export class Game {
    if((await this.store.settings()).decisionProvider==='jev'&&!await this.store.get('jev.key'))throw new Error(message('error.jevKey'));
   }
   if(request!==this.modeRequest)return;
-  this.focusRecovery.reset();this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;
+  this.focusRecovery.reset();this.focusSuspendedAt=0;this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;
   const epoch=this.gate.change(mode);
   if(mode==='manual'){this.portalUntil=0;this.reconnectUntil=0;}
   // ETC owns gameplay input. The helper only clicks its observed result-screen return button.
@@ -126,9 +127,14 @@ export class Game {
    if(!o.foreground&&now<this.focusUntil)return;
    if(o.phase==='unsupported'){await this.setMode('manual');this.error=message('etc.offlineOnly');return;}
    if(!o.foreground||this.focusRecovery.pending){
+    this.focusSuspendedAt||=now;
     const focus=this.focusRecovery.poll(o,this.gate.epoch,now);
     if(focus==='stop'){await this.setMode('manual');this.error=message('steam.foreground');return;}
     if(focus!=='resume'){this.error=message('steam.foreground');return;}
+    // Background time is a pause, not a failed lobby click or loading attempt.
+    const pausedFor=now-this.focusSuspendedAt;this.focusSuspendedAt=0;
+    if(this.returningLobby)this.lobbyDeadline+=pausedFor;
+    if(this.autoplay.transitionUntil)this.autoplay.transitionUntil+=pausedFor;
     this.reconnectUntil=0;this.portalUntil=0;this.error='';
     await this.autoplay.resumeControl(this.gate.change('auto'));return;
    }

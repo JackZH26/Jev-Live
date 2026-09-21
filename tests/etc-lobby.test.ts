@@ -60,3 +60,11 @@ it('stops safely if lobby navigation times out or the game process changes',asyn
   expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);
  }
 });
+it('excludes time spent unfocused from the lobby return timeout',async()=>{
+ const {game,o,send,resume,tick}=setup();await tick();
+ o.foreground=false;await tick();o.mode='manual';o.executor!.reason='focus_lost';await tick(60000);
+ expect(game.gate.mode).toBe('auto');o.foreground=true;
+ for(let i=0;i<4;i++)await tick(250);
+ expect(resume).toHaveBeenCalledOnce();send.mockClear();o.mode='auto';o.epoch=game.gate.epoch;await tick();
+ expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby'}));expect(game.gate.mode).toBe('auto');
+});
