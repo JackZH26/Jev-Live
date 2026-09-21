@@ -102,10 +102,10 @@ describe('hybrid tactical contract',()=>{
     o.self.danger=false;o.actions.find(a=>a.id==='portal')!.safe=false;
     expect(t.options(o).some(a=>a.id==='red_door')).toBe(true);
   });
-  it('defends a stocked safe terrain room and restores relocation immediately on danger or damage',()=>{
+  it('patrols a stocked safe terrain room and restores relocation immediately on danger or damage',()=>{
     const t=new EtcTactics(),p=new EtcPolicy(),o=state();o.self.roomType=5;o.enemies=[];t.observe(o,1,at);
-    expect(t.options(o).some(a=>a.kind==='portal')).toBe(false);expect(t.options(o).some(a=>a.kind==='wait')).toBe(true);
-    expect(p.choose(o,at,false,true,'portal')?.kind).toBe('wait');
+    expect(t.options(o).some(a=>a.kind==='portal')).toBe(false);expect(t.options(o).some(a=>a.kind==='wait')).toBe(false);
+    expect(p.choose(o,at,false,true,'portal')?.kind).toBe('scan');
     o.self.danger=true;expect(t.options(o).some(a=>a.kind==='portal')).toBe(true);expect(p.choose(o,at,false,true,'wait')?.kind).toBe('portal');
     o.self.danger=false;o.self.health=88;o.timestamp=at+50;t.observe(o,1,o.timestamp);
     expect(t.options(o).some(a=>a.kind==='portal')).toBe(true);expect(p.choose(o,o.timestamp,false,true,'wait')?.kind).not.toBe('wait');
@@ -114,7 +114,7 @@ describe('hybrid tactical contract',()=>{
     const p=new EtcPolicy(),o=state();o.enemies=[];o.self.roomType=undefined;
     expect(p.choose(o,at,false,true,'portal')?.kind).toBe('portal');
     o.executor={...o.executor!,objective:'portal',status:'running'};o.self.roomType=5;o.timestamp=at+50;
-    expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('wait');
+    expect(p.choose(o,o.timestamp,false,true,'portal')?.kind).toBe('scan');
   });
   it('expires unproductive scouting without stopping the movement heartbeat',()=>{
     const t=new EtcTactics(),o=state();o.enemies=[];o.actions=o.actions.filter(a=>a.kind!=='engage');

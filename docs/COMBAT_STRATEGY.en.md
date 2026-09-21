@@ -10,7 +10,19 @@ The September 21, 2026 requirements cover official placement, eliminations and g
 2. Finish a physical airborne/traversal action; escape active danger. In a yellow room without enemies, move toward a connected white room before optional supplies, healing or ammunition maintenance.
 3. On damage, use visible/recently observed threats and nearby verified cover. Reach cover before a bounded counterattack window, avoiding per-tick cover/attack oscillation.
 4. Without enemies or recent incoming damage, use available recovery items, top up a partial magazine using its real capacity, then upgrade equipment. Threats interrupt maintenance.
-5. Take favorable visible fights from effective range, without automatically rushing out of cover. Alternate short defense with local observation instead of indefinite hiding or unnecessary hazard-room hopping.
+5. Take favorable visible fights from effective range, without automatically rushing out of cover. In a safe room without threats, check unopened chests and collect usable supplies; afterward, patrol nearby cover, inspect surroundings and reposition.
+
+## Safe-room resupply and cover patrol (September 21, 2026)
+
+Remove the stocked-loadout rule that held position for 18 seconds and allowed only three seconds of scouting. Full health and ammunition no longer suppress offered unopened chests or usable recovery items, grenades and ammunition. Collect nearby drops along the route, then inspect other chests; observed distant chests are no longer excluded by a 30-metre supply cutoff. Acknowledged completions retire processed targets. The game still checks inventory capacity and item usability.
+
+After resupply, verified safe terrain rooms maintain the native `scan` objective. The BOT selects reachable cover positions in the same room, briefly observes on arrival, then moves to another nearby position. Existing cover selection, randomized offsets and smooth camera control are reused; native observation pauses are approximately 0.75–1.65 seconds. A periodic desktop wait no longer cancels this patrol. JEV no longer receives stationary `wait` as a tactical option, and legacy waiting advice resolves to patrol. Unknown rooms retain their own hazard and route rules.
+
+A supply approach without meaningful displacement or approach progress for more than 6.5 seconds switches targets and cools down that target for 15 seconds. Moving detours retain the 20-second approach-progress budget. Native blocked feedback switches targets immediately. Ferry timing, climbing and portals do not use the short supply timeout. Missing paths never count as successful movement.
+
+Enemies, incoming damage and yellow-room evacuation still outrank resupply. Healing, reloading, combat aim and hazard timing permit necessary pauses. Manual takeover, foreground loss and stale observations still stop automatic inputs. Grenade collection does not imply a new throwing tactic.
+
+Regression coverage includes stocked-loadout resupply, successive chests and drops, sustained patrol, failure cooldown, detours, combat interruption and control release. These checks do not establish a higher match win rate; identify the executing desktop package by its strategy fingerprint.
 
 ## Execution contract
 

@@ -1,6 +1,6 @@
 import type {EtcAction,EtcObservation} from '../shared/etc';
 
-export const KNOWLEDGE_VERSION='etc-20260921-05';
+export const KNOWLEDGE_VERSION='etc-20260921-06';
 export interface RoomKnowledge {id:number;name:string;zh:string;crossingSeconds:number;rules:string[];rulesZh:string[];source:string}
 const room=(id:number,name:string,zh:string,crossingSeconds:number,source:string,rules:string[],rulesZh:string[]):RoomKnowledge=>({id,name,zh,crossingSeconds,source,rules,rulesZh});
 /** Authored mechanics, not live world state. Crossing times are conservative policy estimates, not promises. */
@@ -37,7 +37,7 @@ export const ROOM_KNOWLEDGE:ReadonlyArray<RoomKnowledge>=[
 export const roomKnowledge=(id:number|undefined)=>ROOM_KNOWLEDGE.find(r=>r.id===id);
 const terrainRooms=new Set([4,5,9,13,14,17,18,22,25]);
 // Verified terrain/cover rooms. Unknown types and active-mechanism rooms do
-// not gain a stationary-safety assumption from their map number or appearance.
+// not gain a safe local-patrol assumption from their map number or appearance.
 export function canDefendRoom(o:EtcObservation){return !o.self.danger
  &&terrainRooms.has(o.self.roomType??-1)
  &&!/(?:StarterPistol|^$)/.test(o.self.weapon)&&o.self.magazine>0&&o.self.reserve>=15;}
@@ -65,6 +65,8 @@ export const MATCH_RULES=[
  'Discrete collision hazards use the current 60 damage baseline, with explicit exceptions such as lethal falls, discharge/burn and push-only obstacles. Never generalize one room rule to all rooms.',
  'When the current room turns yellow and there is no enemy, relocate to a connected white room before looting, topping up ammunition or healing. Active collapse always requires evacuation.',
  'While safe, replenish a partial magazine using its actual capacity, use available recovery items, and replace a weaker primary only after reaching a visible better weapon. Never discard the fixed sidearm.',
+ 'In a safe room without threats, check offered unopened chests and collect usable recovery items, grenades and ammunition even with a stocked primary. Skip completed or temporarily blocked targets. Use only actual offered supplies, never hidden contents.',
+ 'After collecting available supplies, use scan for a continuous local cover patrol: approach reachable cover, briefly inspect surroundings with smooth looks, then reposition nearby. Tactical waiting means this active patrol, not standing idle. Healing, reloading, aiming and safe hazard timing may require purposeful pauses.',
  'On incoming fire, seek nearby verified cover, then counterattack from its vicinity. Do not rush into open ground just to close distance. A missing sighting is not proof that an attacker has left.',
  'Balance survival with useful damage and eliminations: take favorable visible fights after preparing, avoid endless passive waiting, and never chase hidden opponents or sacrifice safe evacuation for damage.',
  'Use only offered actions. The local shared controller handles real-time avoidance; cloud objectives must not override its safety or normal game physics.'
@@ -76,7 +78,7 @@ export class EtcKnowledge {
  context(o:EtcObservation){
   const r=roomKnowledge(this.visited.get(o.self.room));
   return {version:KNOWLEDGE_VERSION,rules:MATCH_RULES,
-   posture:canDefendRoom(o)?'Defend this safe terrain room with the stocked primary weapon. Watch for enemies and zone changes; unnecessary room hopping adds hazard exposure.':'Acquire supplies or plan safe movement using the current room mechanics.',
+   posture:canDefendRoom(o)?'Collect remaining offered supplies, then keep patrolling nearby cover in this safe terrain room. Briefly scan for arrivals and reposition; a stocked primary is not permission to stand idle. Avoid unnecessary hazard-room hopping.':'Acquire supplies or plan safe movement using the current room mechanics.',
    budgetedSupplyActions:[],
    currentRoom:r?{id:r.id,name:r.name,rules:r.rules,crossingEstimateSeconds:r.crossingSeconds,source:r.source}:null,
    knownRooms:[...this.visited].map(([slot,id])=>({slot,type:id,name:roomKnowledge(id)!.name})),

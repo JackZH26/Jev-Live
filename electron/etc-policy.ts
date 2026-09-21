@@ -36,10 +36,10 @@ export class EtcPolicy {
   private seenAt=-Infinity;
   private progressAt=0;
   private bestDistance=Infinity;
+  private movedAt=0;private moveAnchor?:EtcObservation['self']['position'];
   private coverAt=-Infinity;private coveredObjective='';private startRoom='';
   private coverStartedAt=-Infinity;private counterUntil=0;
-  private guardAt=0;private reconUntil=0;
-  reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;this.completed.reset();this.coverAt=-Infinity;this.coveredObjective='';this.startRoom='';this.coverStartedAt=-Infinity;this.counterUntil=0;this.guardAt=0;this.reconUntil=0;}
+  reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;this.movedAt=0;this.moveAnchor=undefined;this.completed.reset();this.coverAt=-Infinity;this.coveredObjective='';this.startRoom='';this.coverStartedAt=-Infinity;this.counterUntil=0;}
   choose(o:EtcObservation, now:number, autoRestart:boolean, played:boolean, advice?:string, planned?:EtcAction):EtcAction|undefined {
     if(o.matchId!==this.match){this.reset();this.match=o.matchId;}
     const wait = o.actions.find(a=>a.kind==='wait');
@@ -58,10 +58,10 @@ export class EtcPolicy {
     }
     if(o.phase!=='playing'||o.self.health<=0||o.self.traveling)return wait;
     this.completed.observe(o,now);
-    if(o.self.room!==this.lastRoom){this.lastRoom=o.self.room;this.visits.set(o.self.room,(this.visits.get(o.self.room)??0)+1);this.coverAt=-Infinity;this.coveredObjective='';this.coverStartedAt=-Infinity;this.counterUntil=0;this.guardAt=now;this.reconUntil=0;}
+    if(o.self.room!==this.lastRoom){this.lastRoom=o.self.room;this.visits.set(o.self.room,(this.visits.get(o.self.room)??0)+1);this.coverAt=-Infinity;this.coveredObjective='';this.coverStartedAt=-Infinity;this.counterUntil=0;}
     if(o.executor?.status==='running'&&o.executor.objective===this.coveredObjective)this.coveredObjective='';
     if(o.executor?.status==='succeeded'&&o.executor.reason==='cover_reached'&&this.coveredObjective!==o.executor.objective){this.coverAt=now;this.counterUntil=now+1600;this.coveredObjective=o.executor.objective;}
-    if(o.executor?.status==='blocked'&&o.executor.objective){this.failed.set(o.executor.objective,now+5000);if(this.active===o.executor.objective)this.active='';}
+    if(o.executor?.status==='blocked'&&o.executor.objective){const supply=o.actions.some(a=>a.id===o.executor!.objective&&['loot','pickup'].includes(a.kind));this.failed.set(o.executor.objective,now+(supply?15000:5000));if(this.active===o.executor.objective)this.active='';}
     else if(!o.executor&&o.diagnostics.stuck&&this.active){this.failed.set(this.active,now+5000);this.active='';}
     for(const [id,until] of this.failed)if(until<=now)this.failed.delete(id);
     const continuing=o.actions.find(a=>a.id===this.active);
@@ -72,8 +72,13 @@ export class EtcPolicy {
       if(physical&&['portal','loot','pickup','scan','cover'].includes(physical.kind))return this.select(physical,now);
     }
     if(continuing&&['portal','loot','pickup'].includes(continuing.kind)&&o.executor?.objective===this.active&&o.executor.status==='running'){
+      if(!this.moveAnchor)this.moveAnchor=[...o.self.position];
+      else if(Math.hypot(...o.self.position.map((v,i)=>v-this.moveAnchor![i]))>=60){this.moveAnchor=[...o.self.position];this.movedAt=now;}
       if(continuing.distance<this.bestDistance-100){this.bestDistance=continuing.distance;this.progressAt=now;}
-      else if(now-this.progressAt>20000){this.failed.set(this.active,now+5000);this.active='';}
+      const supply=continuing.kind!=='portal';
+      // A stationary supply approach gets a shorter timeout; a moving detour
+      // retains the existing route budget. Ferry/portal waits are not idleness.
+      if(now-this.progressAt>20000||supply&&now-Math.max(this.progressAt,this.movedAt)>6500){this.failed.set(this.active,now+(supply?15000:5000));this.active='';}
     }
     const visible=o.enemies.length>0, low=o.self.health/o.self.maxHealth<0.4;
     // Losing the camera view is not proof that the attacker has stopped firing.
@@ -127,16 +132,6 @@ export class EtcPolicy {
       const upgrade=eligible.filter(a=>a.kind==='pickup'&&a.replacementSlot!==undefined&&a.distance<=3000).sort((a,b)=>(b.rank??0)-(a.rank??0)||a.distance-b.distance)[0];
       if(upgrade)return this.select(upgrade,now);
     }
-    // A prepared player alternates holding cover with brief local observation,
-    // preserving opportunities to see/fight arrivals without hopping hazards.
-    if(defending){
-      const scan=eligible.find(a=>a.kind==='scan');
-      if(this.reconUntil&&now>=this.reconUntil){this.reconUntil=0;this.guardAt=now;}
-      if(scan&&(this.reconUntil>now||now-this.guardAt>=18000)){
-        if(!this.reconUntil)this.reconUntil=now+3000;
-        return this.select(scan,now);
-      }
-    }else {this.guardAt=now;this.reconUntil=0;}
     // Moving uses the normal game's cast interruption. Do not restart a heal
     // each time incoming damage cancels it, or stand still awaiting cloud advice.
     if(underFire&&!visible){
@@ -152,18 +147,31 @@ export class EtcPolicy {
       &&!(suggested&&['cover','portal'].includes(suggested.kind)&&suggested.distance<=600)){
       if(fight)return this.select(fight,now);
     }
-    const supply=eligible.filter(a=>a.distance<=3000&&(a.kind==='pickup'||a.kind==='loot')).sort((a,b)=>
-      (b.kind==='pickup'?35+(b.rank??0)*4:0)-(a.kind==='pickup'?35+(a.rank??0)*4:0)||a.distance-b.distance)[0];
+    // Offers already describe observable, usable supplies in this room. A
+    // stocked weapon does not mean spare recovery items/grenades/ammo are full.
+    // Clear nearby drops before the next chest, without crossing the whole
+    // room for one pickup when a much closer unopened chest is available.
+    const supply=eligible.filter(a=>a.kind==='pickup'||a.kind==='loot').sort((a,b)=>
+      (a.distance-(a.kind==='pickup'?400:0))-(b.distance-(b.kind==='pickup'?400:0))||a.id.localeCompare(b.id))[0];
     // Let a progressing movement finish a short execution window. A new sighting,
     // damage or room danger interrupts immediately; cloud chatter alone does not.
     if(!threatened&&!o.self.danger&&now-this.activeAt<5000&&o.executor?.status==='running'
       &&o.executor.objective===this.active&&continuing&&['loot','pickup','portal'].includes(continuing.kind)
-      &&(!defending||continuing.kind!=='portal')
+      &&(continuing.kind!=='portal'||!defending&&!supply)
       &&!(continuing.destinationRisk??0)&&eligible.includes(continuing))return continuing;
+    if(!threatened&&!o.self.danger){
+      const equip=eligible.find(a=>a.kind==='equip');
+      if(equip&&weakLoadout)return this.select(equip,now);
+      if(supply)return this.select(supply,now);
+      // Native scan is a persistent cover patrol: move, briefly inspect, then
+      // choose another nearby point. Never cancel it with a periodic wait.
+      const patrol=eligible.find(a=>a.kind==='scan');
+      if(patrol&&(defending||suggested?.kind==='wait'||suggested?.kind==='cover'))return this.select(patrol,now);
+    }
     // A capable native motor executes a real tactical objective, not a +10 hint.
     // Only immediate survival/maintenance overrides it; healthy fighters may retreat.
     if(o.executor?.kind==='shared-bot-v1'&&advice&&!o.self.danger){
-      const tactical=eligible.find(a=>a.id===advice&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
+      const tactical=eligible.find(a=>a.id===advice&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
       const emergency=visible&&low&&eligible.some(a=>a.kind==='cover')
         ||o.self.magazine===0&&eligible.some(a=>a.kind==='equip'||a.kind==='reload'&&o.self.reserve>0)
         ||!threatened&&o.self.health<o.self.maxHealth*.8&&eligible.some(a=>a.kind==='heal')
@@ -180,7 +188,7 @@ export class EtcPolicy {
       const distance=a.distance/100; // UE centimetres -> metres
       let n=-1000;
       switch(a.kind){
-        case 'wait': n=defending?65:-100;break;
+        case 'wait': n=-100;break;
         case 'scan': n=0;break;
         case 'engage': n=visible&&o.self.magazine>0&&!o.self.protected?90-distance*0.6: -1000;break;
         case 'cover': n=threatened?(low||o.self.magazine===0?160:65)-distance: -80;break;
@@ -202,7 +210,7 @@ export class EtcPolicy {
     const chosen=eligible.map(a=>({a,n:score(a)})).sort((a,b)=>b.n-a.n||a.a.id.localeCompare(b.a.id))[0];
     return this.select(chosen?.a??wait,now);
   }
-  private select(a:EtcAction|undefined,now:number){if(a&&a.id!==this.active){if(a.kind==='cover'){if(!Number.isFinite(this.coverStartedAt))this.coverStartedAt=now;}else this.coverStartedAt=-Infinity;this.active=a.id;this.activeAt=now;this.progressAt=now;this.bestDistance=a.distance;}return a;}
+  private select(a:EtcAction|undefined,now:number){if(a&&a.id!==this.active){if(a.kind==='cover'){if(!Number.isFinite(this.coverStartedAt))this.coverStartedAt=now;}else this.coverStartedAt=-Infinity;this.active=a.id;this.activeAt=now;this.progressAt=now;this.bestDistance=a.distance;this.movedAt=now;this.moveAnchor=undefined;}return a;}
 }
 
 export class EtcMetrics {

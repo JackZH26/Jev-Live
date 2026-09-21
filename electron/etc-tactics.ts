@@ -34,7 +34,7 @@ export class EtcTactics {
     if(!previous||previous.executor?.objective!==o.executor?.objective)this.objectiveSince=now;
     this.previous=structuredClone(o);this.observedAt=now;
     const e=o.executor;
-    if(e?.status==='blocked'&&e.objective)this.failed.set(e.objective,now+5000);
+    if(e?.status==='blocked'&&e.objective){const supply=o.actions.some(a=>a.id===e.objective&&['loot','pickup'].includes(a.kind));this.failed.set(e.objective,now+(supply?15000:5000));}
     if(e&&e.objective===this.intent&&['blocked','succeeded','released'].includes(e.status)){this.intent='';this.until=0;}
     for(const [id,until] of this.failed)if(until<=now)this.failed.delete(id);
     const item={room:o.self.room,health:Math.round(o.self.health),action:e?.objective??o.diagnostics.lastAction,status:e?.status??'legacy'};
@@ -42,7 +42,7 @@ export class EtcTactics {
   }
   options(o:EtcObservation){
     const defending=canDefendRoom(o)&&!o.enemies.length&&(!this.damageAt||o.timestamp-this.damageAt>5000);
-    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&this.completed.allows(a.id)&&(['engage','cover','loot','pickup','portal','scan'].includes(a.kind)||defending&&a.kind==='wait'));
+    let choices=o.actions.filter(a=>a.safe&&!this.failed.has(a.id)&&this.completed.allows(a.id)&&['engage','cover','loot','pickup','portal','scan'].includes(a.kind));
     if(defending)choices=choices.filter(a=>a.kind!=='portal');
     // An optional relocation must not enter active collapse while an observed
     // safe exit remains usable. A trapped player retains every open escape.

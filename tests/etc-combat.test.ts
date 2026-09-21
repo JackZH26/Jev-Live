@@ -85,8 +85,8 @@ it('selects supplies and multiple exits from the visible starting map and leaves
  expect(p.choose(o,time,false,false)?.id).toBe('pick1');o.roomPick.locked=1;expect(p.choose(o,time,false,false)?.id).toBe('wait');
  o.foreground=false;o.roomPick.locked=-1;expect(p.choose(o,time,false,false)?.id).toBe('wait');
 });
-it('interrupts prolonged safe guarding with bounded local reconnaissance, and evacuates immediately if warned',()=>{
- const p=new EtcPolicy(),o=state();expect(p.choose(o,time,false,true)?.kind).toBe('wait');
+it('maintains local cover reconnaissance without a stationary guard phase and evacuates immediately if warned',()=>{
+ const p=new EtcPolicy(),o=state();expect(p.choose(o,time,false,true)?.kind).toBe('scan');
  o.timestamp+=18001;expect(p.choose(o,o.timestamp,false,true,'wait')?.kind).toBe('scan');
  o.timestamp+=1000;expect(p.choose(o,o.timestamp,false,true,'wait')?.kind).toBe('scan');
  o.self.danger=true;expect(p.choose(o,o.timestamp,false,true,'scan')?.kind).toBe('portal');
