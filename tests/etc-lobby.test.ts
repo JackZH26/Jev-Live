@@ -68,3 +68,15 @@ it('excludes time spent unfocused from the lobby return timeout',async()=>{
  expect(resume).toHaveBeenCalledOnce();send.mockClear();o.mode='auto';o.epoch=game.gate.epoch;await tick();
  expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby'}));expect(game.gate.mode).toBe('auto');
 });
+
+it('retains an explicit background Auto request until focus returns, then continues through lobby',async()=>{
+ const {game,o,send,resume,decide,tick}=setup();o.foreground=false;o.mode='manual';o.epoch=0;o.ack=0;o.executor!.reason='manual_takeover';
+ game.observation!.foreground=false;
+ await game.setMode('auto');send.mockClear();await tick(60000);
+ expect(game.gate.mode).toBe('auto');expect(send).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();
+ game.observation!.foreground=true;o.foreground=true;
+ for(let i=0;i<4;i++)await tick(250);
+ expect(resume).toHaveBeenCalledWith(3);expect(send).not.toHaveBeenCalled();
+ o.epoch=game.gate.epoch;o.mode='auto';o.executor!.reason='accepted';await tick();
+ expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby',epoch:3}));
+});

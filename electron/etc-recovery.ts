@@ -3,12 +3,23 @@ import type { EtcObservation } from '../shared/etc';
 /** Keep the user's auto intent during focus loss; never steal focus or resume a takeover. */
 export class EtcFocusRecovery {
   private identity='';private epoch=0;private stableAt=0;private frame=-1;private lastAt=0;
+  private requestedFrom?:{epoch:number;ack:number};
   get pending(){return !!this.identity;}
-  reset(){this.identity='';this.epoch=0;this.stableAt=0;this.frame=-1;this.lastAt=0;}
+  reset(){this.identity='';this.epoch=0;this.stableAt=0;this.frame=-1;this.lastAt=0;this.requestedFrom=undefined;}
+  /** Explicit Auto requested in the background: the native auto command cannot be sent yet. */
+  waitForForeground(o:EtcObservation,epoch:number){
+    this.reset();this.identity=JSON.stringify([o.session,o.processId,o.matchId]);this.epoch=epoch;
+    this.requestedFrom={epoch:o.epoch,ack:o.ack};
+  }
   poll(o:EtcObservation,epoch:number,now:number):'active'|'wait'|'resume'|'stop'{
     const identity=JSON.stringify([o.session,o.processId,o.matchId]);
-    if(o.epoch!==epoch||['paused','unsupported'].includes(o.phase)||o.executor?.reason==='manual_takeover')return 'stop';
+    if(['paused','unsupported'].includes(o.phase))return 'stop';
     if(this.pending&&(this.identity!==identity||this.epoch!==epoch))return 'stop';
+    if(this.requestedFrom){
+      // Only the exact state preceding this explicit request is authorized.
+      // A subsequent manual command changes epoch/ack and cancels the request.
+      if(o.epoch!==this.requestedFrom.epoch||o.ack!==this.requestedFrom.ack)return 'stop';
+    }else if(o.epoch!==epoch||o.executor?.reason==='manual_takeover')return 'stop';
     if(now-o.timestamp>250||o.timestamp>now+50){this.stableAt=0;return 'wait';}
     if(!o.foreground){
       if(!this.pending){this.identity=identity;this.epoch=epoch;}
@@ -16,7 +27,7 @@ export class EtcFocusRecovery {
     }
     if(!this.pending)return 'active';
     if(o.mode!=='manual'||o.diagnostics.heldInputs!==0){this.stableAt=0;return 'wait';}
-    if(!['focus_lost','lease_expired'].includes(o.executor?.reason??''))return 'stop';
+    if(!this.requestedFrom&&!['focus_lost','lease_expired'].includes(o.executor?.reason??''))return 'stop';
     if(o.frame===this.frame)return 'wait';
     if(!this.stableAt||now-this.lastAt>250)this.stableAt=now;
     this.frame=o.frame;this.lastAt=now;

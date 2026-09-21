@@ -86,6 +86,8 @@ September 21 rematch fix: after an official result, the desktop asks SteamObserv
 
 Focus loss pauses commands while retaining the user's automatic-mode intent, without stealing focus. Resumption requires the same process/session/match/epoch, a focus-loss or lease-expiry release, zero held inputs and at least 750 ms of fresh stable foreground observations. Explicit manual takeover, a paused game, identity changes and other release reasons still stop control. A match interrupted by focus loss does not count as a complete automatic win.
 
+An explicit Auto request made while the game is already in the background waits for stable foreground observations before obtaining a native control lease. No gameplay input is sent while waiting. The request binds the original session, process, match, epoch and acknowledgment; subsequent manual takeover or identity changes cancel it. Background pauses do not consume lobby-return or loading timeouts.
+
 First validate the complete path in a compatible Steam candidate: menu → drop → equipment → combat → portals → evacuation → official result → lobby → restart, plus focus loss, manual takeover and controller disconnect. Normal user acceptance must use a genuine Steam installation/launch.
 
 Compare local-only and local+JEV on the same game version, bot count/difficulty, recording map seeds. Separate tuning seeds from held-out evaluation. Begin with 20 functional runs, then at least 100 held-out matches. Report win rate, placement distribution, kills, survival duration, hazard deaths, stuck time, observation/command latency, cloud latency and input release. Keep failed matches and never count early exits as wins.

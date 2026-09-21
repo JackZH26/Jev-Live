@@ -67,6 +67,7 @@ export class Game {
  async launch(){if(!this.selected)throw new Error(message('error.steamSelection'));if(!this.process)await this.observe();if(this.selectedId===ETC_APP_ID)await this.autoplay.bridge.heartbeat();await this.steam.launch(this.selected.appId);this.log(message('event.steamLaunched',{name:this.selected.name}));}
  async setMode(mode:PlayMode){
   const request=++this.modeRequest;
+  let authorized:EtcObservation|null=null;
   if(mode==='auto'){
    if(this.selectedId!==ETC_APP_ID)throw new Error(message('error.autoUnsupported'));
    if(!this.connected)throw new Error(message('error.gameFirst'));
@@ -74,6 +75,7 @@ export class Game {
    if(!o)throw new Error(message('etc.unavailable'));
    if(o.phase==='unsupported')throw new Error(message('etc.offlineOnly'));
    if((await this.store.settings()).decisionProvider==='jev'&&!await this.store.get('jev.key'))throw new Error(message('error.jevKey'));
+   authorized=o;
   }
   if(request!==this.modeRequest)return;
   this.focusRecovery.reset();this.focusSuspendedAt=0;this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;
@@ -82,6 +84,7 @@ export class Game {
   // ETC owns gameplay input. The helper only clicks its observed result-screen return button.
   this.send({op:'stop',epoch});
   this.focusUntil=mode==='auto'?Date.now()+1000:0;
+  if(authorized&&!authorized.foreground){this.focusRecovery.waitForForeground(authorized,epoch);this.focusSuspendedAt=Date.now();}
   if(mode==='auto')this.send({op:'focus'});
   await this.autoplay.change(mode,epoch);
   if(request!==this.modeRequest)return;

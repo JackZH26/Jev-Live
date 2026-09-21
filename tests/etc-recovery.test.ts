@@ -65,3 +65,19 @@ it('does not count stale, duplicate or background frames toward focus recovery',
  o.foreground=false;o.timestamp=2900;o.frame++;expect(r.poll(o,1,2900)).toBe('wait');
  r.reset();expect(r.pending).toBe(false);
 });
+
+it('defers an explicit background Auto request until the original native state is stably foreground',()=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;o.mode='manual';o.epoch=0;o.ack=0;o.executor!.reason='manual_takeover';
+ r.waitForForeground(o,10);expect(r.poll(o,10,1000)).toBe('wait');
+ o.timestamp=61000;o.frame++;expect(r.poll(o,10,61000)).toBe('wait');
+ o.foreground=true;
+ for(let i=1;i<=4;i++){o.timestamp=61000+i*250;o.frame++;expect(r.poll(o,10,o.timestamp)).toBe(i===4?'resume':'wait');}
+ expect(r.pending).toBe(false);
+});
+it.each(['epoch','ack','match','session','pid','manual'] as const)('cancels a pending background Auto request after changed %s',change=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;o.mode='manual';o.ack=1;o.executor!.reason='manual_takeover';
+ r.waitForForeground(o,10);o.foreground=true;
+ if(change==='epoch')o.epoch++;if(change==='ack')o.ack++;if(change==='match')o.matchId='other';
+ if(change==='session')o.session='other';if(change==='pid')o.processId++;if(change==='manual')r.reset();
+ expect(r.poll(o,10,1000)).toBe('stop');
+});
