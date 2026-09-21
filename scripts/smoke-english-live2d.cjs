@@ -55,6 +55,12 @@ const {_electron:electron,chromium}=require('playwright'),fs=require('node:fs/pr
   browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
   const overlay=await browser.newPage({viewport:{width:1920,height:1080}});overlay.on('pageerror',e=>errors.push(e.stack));overlay.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
   await overlay.goto(overlayURL);await overlay.waitForSelector('[data-avatar-kind=live2d][data-avatar-state=ready]',{timeout:45000});
+  // Real 300 ms state polling must preserve the canvas and model between updates.
+  let statePolls=0;const trackState=response=>{if(response.url().includes('/state/twitch'))statePolls++;};overlay.on('response',trackState);
+  await overlay.evaluate(()=>{const root=document.querySelector('.avatar-stage');window.avatarStability={canvas:root.querySelector('canvas'),replacements:0};const probe=window.avatarStability;probe.observer=new MutationObserver(records=>{for(const r of records)for(const n of r.removedNodes)if(n.nodeName==='CANVAS')probe.replacements++;});probe.observer.observe(root,{childList:true});});
+  await overlay.waitForTimeout(5000);
+  const avatarStability=await overlay.evaluate(()=>{const probe=window.avatarStability;probe.observer.disconnect();return{sameCanvas:probe.canvas===document.querySelector('.avatar-stage canvas'),replacements:probe.replacements};});overlay.off('response',trackState);
+  assert(statePolls>=10,'Stability check must include repeated real state updates');assert(avatarStability.sameCanvas,'State polling must retain the Live2D canvas');assert.equal(avatarStability.replacements,0,'State polling must not destroy the rig');
   // Generate after loading so the clip cannot expire during renderer startup.
   await page.evaluate(()=>window.studio.testHostVoice());
   const deadline=Date.now()+30000;while(Date.now()<deadline){if((await page.evaluate(()=>window.studio.hostSnapshot())).overlay.twitch.audioEnded>=1)break;await new Promise(r=>setTimeout(r,150));}
@@ -62,7 +68,7 @@ const {_electron:electron,chromium}=require('playwright'),fs=require('node:fs/pr
   const health=await page.evaluate(()=>window.studio.hostSnapshot().then(s=>s.overlay.twitch));
   assert(health.audioEnded>=1,'Actual audio must finish playing');assert.equal(health.audioErrors,0);assert.equal(health.stateErrors,0);assert.deepEqual(errors,[]);
   assert(!consoleErrors.some(e=>/Content Security Policy|EvalError|Live2D/i.test(e)),consoleErrors.join('\n'));
-  const report={passed:true,uiLocales:5,spokenLanguage:'en',speechProvider:'melo',previewVoice,rig,health,errors,consoleErrors,externalPosts:0,profile:data,executable:process.env.JEV_TEST_EXE||'development Electron'};
+  const report={passed:true,uiLocales:5,spokenLanguage:'en',speechProvider:'melo',previewVoice,rig,avatarStability:{...avatarStability,statePolls},health,errors,consoleErrors,externalPosts:0,profile:data,executable:process.env.JEV_TEST_EXE||'development Electron'};
   await fs.writeFile(path.join(out,'acceptance.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }catch(e){console.error({errors,consoleErrors});throw e;}finally{await browser?.close();if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}}
 })().catch(e=>{console.error(e);process.exitCode=1;});
