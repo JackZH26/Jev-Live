@@ -20,10 +20,11 @@ export class EtcAutoplay {
   private played=false;private epoch=0;private frame=-1;private advice='';private adviceUntil=0;
   private cloudAt=0;private request?:AbortController;private pending=false;private newMatchAt=-Infinity;private newMatchWorld='';
   private cloudFailures=0;private cloudAfter=0;
+  private nativeRequestedAt=0;
   constructor(readonly bridge:EtcBridge,private store:Store){}
   async observe(pid:number|undefined,auto=false){this.observation=await this.bridge.read(pid);if(this.observation){this.metrics.observe(this.observation,auto);if(this.observation.mode==='auto')this.recovery.poll(this.observation,this.epoch,Date.now());}return this.observation;}
   async change(mode:'auto'|'manual',epoch:number){
-    this.epoch=epoch;this.request?.abort();this.advice='';this.adviceUntil=0;this.tactics.reset();this.recovery.reset();
+    this.epoch=epoch;this.request?.abort();this.advice='';this.adviceUntil=0;this.tactics.reset();this.recovery.reset();this.nativeRequestedAt=0;
     if(mode==='auto'){this.policy.reset();this.navigation.reset();this.cloudFailures=0;this.cloudAfter=0;this.played=false;this.frame=-1;this.newMatchAt=-Infinity;this.newMatchWorld='';}
     else this.transitionUntil=0;
     await this.bridge.command(mode,epoch,this.observation,'wait');
@@ -31,6 +32,19 @@ export class EtcAutoplay {
   async tick(settings:Settings,epoch:number){
     const o=this.observation,now=Date.now();if(!o||epoch!==this.epoch||o.frame===this.frame)return;
     this.frame=o.frame;if(o.phase==='playing')this.played=true;
+    if(settings.decisionProvider==='native-pro'&&o.phase==='playing'){
+      this.request?.abort();this.advice='';this.adviceUntil=0;
+      if(o.capabilities?.nativePro!==1){this.strategy='native_failed';return;}
+      if(o.self.traveling)return;
+      const confirmed=o.mode==='auto'&&o.epoch===epoch&&o.executor?.control==='native-pro'
+        &&o.executor.tier==='Pro'&&o.executor.status==='running';
+      if(confirmed)this.nativeRequestedAt=0;
+      else {this.nativeRequestedAt||=now;if(now-this.nativeRequestedAt>=2000){this.strategy='native_failed';return;}}
+      if(await this.bridge.command('auto',epoch,o,'wait',now,'native-pro')){
+        this.metrics.decision(o.timestamp,Date.now());this.strategy=confirmed?'native_pro':'native_starting';
+      }
+      return; // No cloud advice, map interruption or local tactical override.
+    }
     this.tactics.observe(o,epoch,now);
     this.navigation.observe(o,now);
     const advice=o.executor?this.tactics.advice(o,now):now<this.adviceUntil?this.advice:undefined;
@@ -51,7 +65,7 @@ export class EtcAutoplay {
     }
   }
   async resumeControl(epoch:number){
-    this.epoch=epoch;this.frame=-1;this.request?.abort();this.advice='';this.adviceUntil=0;this.tactics.reset();
+    this.epoch=epoch;this.frame=-1;this.request?.abort();this.advice='';this.adviceUntil=0;this.tactics.reset();this.nativeRequestedAt=0;
     await this.bridge.command('auto',epoch,this.observation,'wait');
   }
   private async advise(o:EtcObservation,epoch:number){
@@ -78,7 +92,9 @@ export class EtcAutoplay {
     return {connected:!!o,protocol:o?.version??0,frames:m.frames,decisions:m.decisions,lastLatencyMs:m.lastLatencyMs,p95LatencyMs:m.p95LatencyMs,
       matches:m.matches,wins:m.wins,losses:m.losses,interrupted:m.interrupted,lastPlacement:m.lastPlacement,
       shots:o?.diagnostics.shots??0,kills:o?.self.kills??0,room:o?.self.room??-1,health:o?.self.health??-1,
-      magazine:o?.self.magazine??-1,reserve:o?.self.reserve??-1,strategy:this.strategy,...(o?.self.damageDealt!==undefined?{damageDealt:o.self.damageDealt}:{})};
+      magazine:o?.self.magazine??-1,reserve:o?.self.reserve??-1,strategy:this.strategy,
+      controller:o?.executor?.control,tier:o?.executor?.tier,brainMode:o?.executor?.brainMode,
+      ...(o?.self.damageDealt!==undefined?{damageDealt:o.self.damageDealt}:{})};
   }
   async close(epoch:number){this.epoch=epoch;this.request?.abort();await this.bridge.close(epoch);}
 }

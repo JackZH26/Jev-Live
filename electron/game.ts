@@ -75,6 +75,7 @@ export class Game {
    const o=await this.autoplay.observe(this.pid,this.gate.mode==='auto');
    if(!o)throw new Error(message('etc.unavailable'));
    if(o.phase==='unsupported')throw new Error(message('etc.offlineOnly'));
+   if((await this.store.settings()).decisionProvider==='native-pro'&&o.capabilities?.nativePro!==1)throw new Error(message('etc.nativeUnavailable'));
    if((await this.store.settings()).decisionProvider==='jev'&&!await this.store.get('jev.key'))throw new Error(message('error.jevKey'));
    authorized=o;
   }
@@ -131,6 +132,7 @@ export class Game {
    if(this.gate.mode!=='auto')return;
    if(!o.foreground&&now<this.focusUntil)return;
    if(o.phase==='unsupported'){await this.setMode('manual');this.error=message('etc.offlineOnly');return;}
+   if(settings.decisionProvider==='native-pro'&&o.capabilities?.nativePro!==1){await this.setMode('manual');this.error=message('etc.nativeUnavailable');return;}
    if(!o.foreground||this.focusRecovery.pending){
     this.focusSuspendedAt||=now;
     const focus=this.focusRecovery.poll(o,this.gate.epoch,now);
@@ -183,7 +185,7 @@ export class Game {
    }
    // A positively observed portal journey can suspend game frames while the
    // destination streams in. Never extend this grace from stale telemetry.
-   if(!this.portalUntil&&o.self.traveling&&this.autoplay.strategy==='portal'){
+   if(!this.portalUntil&&o.self.traveling&&(this.autoplay.strategy==='portal'||settings.decisionProvider==='native-pro')){
     this.portalUntil=now+15000;this.portalMatch=o.matchId;this.portalRoom=o.self.room;
    }
    if(this.portalUntil){
@@ -230,6 +232,7 @@ export class Game {
    }
    if(this.gate.mode!=='auto')return;
    await this.autoplay.tick(settings,this.gate.epoch);
+   if(this.autoplay.strategy==='native_failed'){await this.setMode('manual');this.error=message('etc.nativeFailed');return;}
    if(this.gate.mode!=='auto')return;
    this.decision=message(('etc.'+this.autoplay.strategy) as MessageKey);
   }finally{this.inFlight=false;}

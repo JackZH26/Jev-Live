@@ -27,14 +27,21 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
    if(lobbyAt&&o.phase==='loading'){summary.lobbyDelays.push({at:new Date(now).toISOString(),seconds:(now-lobbyAt)/1000,afterResult:!!current?.finished});lobbyAt=0;}
    if(o.phase==='playing'&&current?.id!==o.matchId){
     if(current&&!current.finished)summary.interrupted.push({...current,reason:'match changed without result'});
-    current={id:o.matchId,startedAt:now,eligible:true,rooms:[],mechanicalSightings:0,mechanicalEngageFrames:0,hurtEvents:0,stalledMs:0,phase:o.phase,kills:0,damage:0};
+    current={id:o.matchId,startedAt:now,eligible:true,rooms:[],mechanicalSightings:0,mechanicalEngageFrames:0,hurtEvents:0,stalledMs:0,phase:o.phase,kills:0,damage:0,playingSamples:0,nativeSamples:0,nativeDecisions:0,brainModes:{}};
    }
    const machines=o.enemies.filter(e=>/EtcMechanicalPawn/i.test(e.id));
    if(current?.id===o.matchId&&!current.finished){
+    if(o.phase==='playing'){
+     current.playingSamples++;
+     if(o.executor?.control==='native-pro'&&o.executor.tier==='Pro'&&o.executor.status==='running')current.nativeSamples++;
+     current.nativeDecisions=Math.max(current.nativeDecisions,o.executor?.nativeDecisions??0);
+     if(o.executor?.brainMode)current.brainModes[o.executor.brainMode]=(current.brainModes[o.executor.brainMode]??0)+1;
+     if(summary.provider==='native-pro'&&now-current.startedAt>3000&&(current.nativeSamples===0||current.nativeDecisions===0))throw Error('Native Pro never actually began deciding');
+    }
     if(!o.foreground)current.eligible=false;
     if(!current.rooms.includes(o.self.room)&&o.self.room>=0)current.rooms.push(o.self.room);
     if(machines.length)current.mechanicalSightings++;
-    if(/engage_.*EtcMechanicalPawn/i.test(o.diagnostics.lastAction))current.mechanicalEngageFrames++;
+    if(/engage_.*EtcMechanicalPawn/i.test(o.diagnostics.lastAction)||o.executor?.brainMode==='Fight'&&/EtcMechanicalPawn/i.test(o.executor?.target??''))current.mechanicalEngageFrames++;
     if(previous?.matchId===o.matchId&&o.self.health<previous.self.health-.5)current.hurtEvents++;
     if(previous?.matchId===o.matchId&&o.self.room===previous.self.room&&o.phase==='playing'&&!o.self.healing&&!o.self.reloading&&Math.hypot(...o.self.position.map((v,i)=>v-previous.self.position[i]))<3)current.stalledMs+=Math.min(1000,now-previous.sampledAt);
     current.kills=o.self.kills;current.damage=o.self.damageDealt??0;current.phase=o.phase;

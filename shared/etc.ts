@@ -21,6 +21,7 @@ export const etcObservationSchema = z.object({
   phase: z.enum(['menu','loading','playing','dead','ended','paused','unsupported']),
   mode: z.enum(['manual','auto']), epoch: z.number().int().nonnegative(), ack: z.number().int().nonnegative(),
   foreground: z.boolean(), map: z.string().max(200),
+  capabilities:z.object({nativePro:z.literal(1).optional()}).optional(),
   roomPick:z.object({locked:z.number().int().min(-1),secondsLeft:finite.nonnegative(),rooms:z.array(z.object({id:z.number().int().nonnegative(),exits:z.number().int().nonnegative(),loot:finite.nonnegative(),hotspot:z.boolean()})).max(128)}).optional(),
   zone:z.object({phase:z.number().int().nonnegative(),stage:z.enum(['warning','collapse','complete']),secondsLeft:finite.min(-1)}).optional(),
   mapView:z.object({open:z.boolean(),revision:z.number().int().nonnegative(),observedAt:finite,
@@ -47,14 +48,18 @@ export const etcObservationSchema = z.object({
     status:z.enum(['running','succeeded','blocked','paused','released']),
     reason:z.string().max(80), failures:z.number().int().nonnegative(),
     pathStatus:z.number().int().min(0).max(3),
+    control:z.enum(['manual','external','native-pro']).optional(),tier:z.enum(['','Pro']).optional(),
+    brainMode:z.string().max(40).optional(),
+    nativeDecisions:z.number().int().nonnegative().optional(),target:z.string().max(160).optional(),
   }).optional(),
 });
 export type EtcObservation = z.infer<typeof etcObservationSchema>;
 export type EtcAction = z.infer<typeof etcActionSchema>;
-export interface EtcCommand {version:3;session:string;matchId:string;token:string;id:number;epoch:number;mode:'auto'|'manual';frame:number;expiresAt:number;action:string}
+export interface EtcCommand {version:3;session:string;matchId:string;token:string;id:number;epoch:number;mode:'auto'|'manual';frame:number;expiresAt:number;action:string;controller?:'external'|'native-pro'}
 export interface EtcSummary {
   connected:boolean; protocol:number; frames:number; decisions:number; lastLatencyMs:number;
   p95LatencyMs:number; matches:number; wins:number; losses:number; interrupted:number;
   lastPlacement:number|null; shots:number; kills:number; room:number; health:number;
   magazine:number; reserve:number; strategy:string;damageDealt?:number;
+  controller?:'manual'|'external'|'native-pro';tier?:''|'Pro';brainMode?:string;
 }

@@ -15,7 +15,7 @@ export const settingsSchema = z.object({
   title: z.string().trim().min(1).max(100).default('Enter the Cube · JEV Studio'),
   youtubePrivacy: z.enum(['private', 'unlisted', 'public']).default('private'),
   enabledPlatforms:z.array(z.enum(providers)).max(providers.length).refine(v=>new Set(v).size===v.length).default(['youtube','twitch']),
-  decisionProvider: z.enum(['rules', 'jev']).default('rules'),
+  decisionProvider: z.enum(['rules', 'jev', 'native-pro']).default('rules'),
   decisionIntervalMs: z.number().int().min(300).max(5000).default(800),
   presentation:z.enum(['host','gameplay']).default('host'),
   autoRestart: z.boolean().default(false), bitrate: z.number().int().min(1500).max(8000).default(6000)

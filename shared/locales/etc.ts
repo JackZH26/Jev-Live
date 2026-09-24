@@ -1,4 +1,9 @@
 export const etc=[
+ ['settings.nativePro','游戏原生 Pro BOT','遊戲原生 Pro BOT','ゲーム内 Pro BOT','게임 내 Pro BOT','Native Pro BOT'],
+ ['etc.nativeUnavailable','此 Steam 游戏版本尚不支持完整原生 Pro 托管，请更新 Playtest。','此 Steam 遊戲版本尚不支援完整原生 Pro 託管，請更新 Playtest。','この Steam 版は Pro BOT の完全操作に未対応です。Playtest を更新してください。','이 Steam 버전은 Pro BOT 전체 제어를 지원하지 않습니다. Playtest를 업데이트하세요.','This Steam build does not support full native Pro control. Update the Playtest.'],
+ ['etc.nativeFailed','游戏未确认 Pro 接管，已恢复手动控制。','遊戲未確認 Pro 接管，已恢復手動控制。','ゲームが Pro 制御を確認しなかったため、手動操作に戻しました。','게임에서 Pro 제어를 확인하지 못해 수동 제어로 전환했습니다.','The game did not confirm Pro takeover; manual control restored.'],
+ ['etc.native_pro','原生 Pro 正在控制','原生 Pro 正在控制','Pro BOT が操作中','Pro BOT 제어 중','Native Pro in control'],
+ ['etc.native_starting','等待游戏确认 Pro 接管','等待遊戲確認 Pro 接管','Pro 制御の確認待ち','Pro 제어 확인 대기 중','Waiting for native Pro confirmation'],
  ['etc.unavailable','当前 Steam 游戏未连接 ETC 自动玩接口 v3，请安装包含该接口的游戏版本。','目前 Steam 遊戲未連接 ETC 自動玩介面 v3，請安裝包含此介面的遊戲版本。','ETC 自動プレイ API v3 に未接続です。対応する Steam ゲーム版が必要です。','ETC 자동 플레이 API v3에 연결되지 않았습니다. 지원하는 Steam 게임 버전이 필요합니다.','ETC autoplay API v3 is unavailable. Install a Steam game build containing this integration.'],
  ['etc.offlineOnly','ETC 自动玩目前仅支持本地人机对战。','ETC 自動玩目前僅支援本機人機對戰。','ETC 自動プレイは現在オフライン BOT 戦専用です。','ETC 자동 플레이는 현재 오프라인 봇 대전 전용입니다.','ETC autoplay currently supports offline bot matches.'],
  ['etc.lost','ETC 实时状态中断，已交还手动控制。','ETC 即時狀態中斷，已交還手動控制。','ETC の状態更新が途絶えたため手動操作に戻りました。','ETC 상태 갱신이 중단되어 수동 조작으로 전환했습니다.','ETC telemetry stopped; manual control restored.'],

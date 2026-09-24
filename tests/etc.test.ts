@@ -22,6 +22,46 @@ function observation(extra:Partial<EtcObservation>={}):EtcObservation {
    diagnostics:{heldInputs:0,shots:0,stuck:false,observationMs:1,lastAction:''},...extra};
 }
 function choose(o:EtcObservation,advice?:string){return new EtcPolicy().choose(o,Date.now(),false,true,advice);}
+
+describe('native Pro ownership',()=>{
+ const settings=settingsSchema.parse({decisionProvider:'native-pro'});
+ it('renews native control without tactical or map decisions and reports only game-confirmed ownership',async()=>{
+  const b=await bridge(),runner=new EtcAutoplay(b,{get:vi.fn()} as any);
+  const commands=vi.spyOn(b,'command').mockResolvedValue(true);
+  runner.observation=observation({capabilities:{nativePro:1}});await runner.change('auto',1);commands.mockClear();
+  const tactical=vi.spyOn(runner.policy,'choose'),map=vi.spyOn(runner.navigation,'review');
+  await runner.tick(settings,1);
+  expect(commands).toHaveBeenLastCalledWith('auto',1,runner.observation,'wait',expect.any(Number),'native-pro');
+  expect(runner.strategy).toBe('native_starting');expect(tactical).not.toHaveBeenCalled();expect(map).not.toHaveBeenCalled();expect(runner.stats.jevRequests).toBe(0);
+  runner.observation=observation({capabilities:{nativePro:1},frame:2,executor:{kind:'shared-bot-v1',control:'native-pro',tier:'Pro',brainMode:'Fight',status:'running',objective:'native_pro',reason:'native_pro_active',failures:0,pathStatus:0}});
+  await runner.tick(settings,1);expect(runner.strategy).toBe('native_pro');expect(runner.summary).toMatchObject({controller:'native-pro',tier:'Pro',brainMode:'Fight'});
+  await runner.change('manual',2);expect(commands).toHaveBeenLastCalledWith('manual',2,runner.observation,'wait');
+  runner.observation.frame++;await runner.tick(settings,1);expect(commands).toHaveBeenLastCalledWith('manual',2,runner.observation,'wait');
+ });
+ it('rejects an older game rather than running external rules under a Pro label',async()=>{
+  const b=await bridge(),runner=new EtcAutoplay(b,{} as any),commands=vi.spyOn(b,'command').mockResolvedValue(true);
+  runner.observation=observation();await runner.change('auto',1);commands.mockClear();await runner.tick(settings,1);
+  expect(runner.strategy).toBe('native_failed');expect(commands).not.toHaveBeenCalled();
+ });
+ it('requires an actual native acknowledgment within two seconds',async()=>{
+  let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
+  const b=await bridge(),runner=new EtcAutoplay(b,{} as any);vi.spyOn(b,'command').mockResolvedValue(true);
+  runner.observation=observation({capabilities:{nativePro:1}});await runner.change('auto',1);await runner.tick(settings,1);
+  now+=2100;runner.observation=observation({capabilities:{nativePro:1},frame:2});await runner.tick(settings,1);expect(runner.strategy).toBe('native_failed');
+ });
+ it('retains normal room selection before the native combat takeover',async()=>{
+  const b=await bridge(),runner=new EtcAutoplay(b,{} as any),commands=vi.spyOn(b,'command').mockResolvedValue(true);
+  runner.observation=observation({phase:'loading',capabilities:{nativePro:1},roomPick:{locked:-1,secondsLeft:8,rooms:[{id:2,loot:8,exits:3,hotspot:false}]},actions:[action('wait'),action('pick_room',{id:'pick_room_2',destination:2})]});
+  await runner.change('auto',1);await runner.tick(settings,1);expect(commands.mock.calls.at(-1)?.[3]).toBe('pick_room_2');expect(commands.mock.calls.at(-1)?.[5]).toBeUndefined();
+ });
+ it('serializes explicit native ownership only for a capable authenticated game',async()=>{
+  const b=await bridge();const o=observation({session:b.session,capabilities:{nativePro:1}});
+  expect(await b.command('auto',1,o,'wait',Date.now(),'native-pro')).toBe(true);
+  expect(JSON.parse(await readFile(join(b.directory,'command.json'),'utf8'))).toMatchObject({controller:'native-pro',mode:'auto',action:'wait'});
+  expect(await b.command('auto',1,observation({session:b.session}),'wait',Date.now(),'native-pro')).toBeUndefined();
+  await b.command('manual',2,o);expect(JSON.parse(await readFile(join(b.directory,'command.json'),'utf8')).controller).toBeUndefined();
+ });
+});
 async function bridge(){const d=await mkdtemp(join(tmpdir(),'jev-etc-'));dirs.push(d);return new EtcBridge(d);}
 
 it('timestamps a frame after awaited mailbox work without treating it as a future frame',async()=>{

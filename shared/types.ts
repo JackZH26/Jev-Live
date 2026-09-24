@@ -14,7 +14,7 @@ export interface Settings {
   obsDirectory: string; gameWindow: string; steamAppId:string; addedSteamGames:string[];
   title: string; youtubePrivacy: 'private' | 'unlisted' | 'public';
   enabledPlatforms: Provider[];
-  decisionProvider: 'rules' | 'jev'; decisionIntervalMs: number;
+  decisionProvider: 'rules' | 'jev' | 'native-pro'; decisionIntervalMs: number;
   autoRestart: boolean; bitrate: number;
   presentation: Presentation;
 }

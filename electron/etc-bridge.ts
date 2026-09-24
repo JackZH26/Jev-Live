@@ -41,7 +41,7 @@ export class EtcBridge {
       return null;
     }
   }
-  async command(mode:'auto'|'manual',epoch:number,o:EtcObservation|null,action='',now=Date.now()){
+  async command(mode:'auto'|'manual',epoch:number,o:EtcObservation|null,action='',now=Date.now(),controller?:'native-pro'){
     if(epoch<this.latestEpoch||(this.closing&&mode==='auto'))return;
     this.latestEpoch=epoch;
     const id=++this.id;
@@ -50,6 +50,7 @@ export class EtcBridge {
       const at=Math.max(now,Date.now());
       if(mode==='auto'&&(!o||at-o.timestamp>ETC_MAX_AGE_MS||o.timestamp>at+50||!o.foreground||o.session!==this.session))return;
       const command:EtcCommand={version:3,session:this.session,matchId:o?.matchId??'',token:this.token,id,epoch,mode,frame:o?.frame??0,expiresAt:at+ETC_LEASE_MS,action};
+      if(mode==='auto'&&controller){if(o?.capabilities?.nativePro!==1)return;command.controller=controller;}
       await mkdir(this.directory,{recursive:true});
       await this.write(join(this.directory,'command.json'),JSON.stringify(command));
       return true;
