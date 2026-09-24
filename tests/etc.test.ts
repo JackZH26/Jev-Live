@@ -280,13 +280,14 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   await (game as any).tick();expect(game.autoplay.transitionUntil).toBe(0);expect(change).toHaveBeenCalledWith('auto',game.gate.epoch);expect(tick).toHaveBeenCalledTimes(1);
   observe.mockResolvedValue(null);await (game as any).tick();expect(game.gate.mode).toBe('manual');
  });
- it('retries a pending start on a still-visible lobby instead of blocking it behind loading grace',async()=>{
+ it('clicks the observed BOT MATCH button on a still-visible lobby without a native level shortcut',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({autoRestart:true})} as any,()=>{}, {games:[]} as any,'unused');
   (game as any).selectedId='5272970';game.observation={connected:true,timestamp:Date.now(),processId:123};game.gate.change('auto');
   game.autoplay.transitionMatch='match-1';game.autoplay.transitionUntil=Date.now()+120000;
   vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({phase:'menu'}));
-  const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
-  await (game as any).tick();expect(tick).toHaveBeenCalledOnce();expect(game.gate.mode).toBe('auto');
+  game.observation!.foreground=true;game.observation!.botMatch={observedAt:Date.now()};
+  const send=vi.spyOn(game as any,'send').mockImplementation(()=>{}),tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue();
+  await (game as any).tick();expect(tick).not.toHaveBeenCalled();expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'bot_match'}));expect(game.gate.mode).toBe('auto');
  });
  it('never rearms a native manual takeover during a pending rematch',async()=>{
   const game=new Game({directory:'.',settings:async()=>settingsSchema.parse({autoRestart:true})} as any,()=>{}, {games:[]} as any,'unused');
@@ -302,7 +303,7 @@ describe('ETC evaluation truthfulness and independent control',()=>{
   game.autoplay.transitionMatch='match-1';game.autoplay.transitionUntil=Date.now()+120000;
   vi.spyOn(game.autoplay,'observe').mockResolvedValue(observation({phase:'menu',mode:'manual',epoch:0}));
   const tick=vi.spyOn(game.autoplay,'tick').mockResolvedValue(),resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
-  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(tick).toHaveBeenCalledOnce();expect(resume).not.toHaveBeenCalled();
+  await (game as any).tick();expect(game.gate.mode).toBe('auto');expect(tick).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();
  });
  it('starts immediately after a result, retries within five seconds, and starts a fresh lobby without inherited cooldown',async()=>{
   let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);

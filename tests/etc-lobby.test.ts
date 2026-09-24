@@ -29,7 +29,8 @@ it.each([0,.5,.999999])('waits a single sampled 5–8 second lobby delay after r
  o.phase='menu';o.mode='manual';o.result=null;await tick();expect(change).not.toHaveBeenCalled();
  const delay=5000+Math.floor(random*3001);await tick(delay-1);expect(change).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();
  await tick(1);expect(change).toHaveBeenCalledWith('auto',2);expect(decide).not.toHaveBeenCalled();
- o.mode='auto';o.epoch=game.gate.epoch;await tick();expect(decide).toHaveBeenCalledOnce();
+ o.mode='auto';o.epoch=game.gate.epoch;game.observation!.botMatch={observedAt:o.timestamp};await tick();
+ expect(decide).not.toHaveBeenCalled();expect(send).toHaveBeenLastCalledWith(expect.objectContaining({op:'bot_match',epoch:2}));
 });
 it('manual control cancels a lobby countdown and never starts a match later',async()=>{
  const {game,o,change,decide,tick}=setup();await tick();o.phase='menu';o.result=null;await tick();

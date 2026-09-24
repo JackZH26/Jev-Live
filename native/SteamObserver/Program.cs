@@ -31,6 +31,7 @@ class Program
     record Command(string op,long epoch=0,string action="",int duration=0,double x=0,double y=0,int processId=0,long observedAt=0);
     record LobbyTarget(IntPtr Window,int ProcessId,long ObservedAt,double X,double Y);
     static volatile LobbyTarget? lobbyTarget;
+    static volatile LobbyTarget? botTarget;
     static readonly object outputLock=new();
     static readonly ConcurrentQueue<Command> commands=new();
     static readonly HashSet<int> held=new();
@@ -56,15 +57,15 @@ class Program
         if(c.op=="focus"){if(window!=IntPtr.Zero)SetForegroundWindow(window);return;}
         // A single result-screen click, independent of gameplay input enablement.
         // Coordinates come only from this helper's fresh, unique OCR observation.
-        if(c.op=="return_lobby"){
-            var target=lobbyTarget;
+        if(c.op=="return_lobby"||c.op=="bot_match"){
+            var target=c.op=="return_lobby"?lobbyTarget:botTarget;
             if(target==null||c.epoch<epoch||c.processId!=processId||target.ProcessId!=processId||target.Window!=window
                 ||target.ObservedAt!=c.observedAt||Now()-target.ObservedAt>1500||!Foreground())return;
-            epoch=c.epoch;lobbyTarget=null;Release();
+            epoch=c.epoch;lobbyTarget=null;botTarget=null;Release();
             if(!GetClientRect(window,out var rect))return;var origin=new POINT();if(!ClientToScreen(window,ref origin))return;
             SetCursorPos(origin.X+(int)(rect.Right*target.X),origin.Y+(int)(rect.Bottom*target.Y));
             if(!Foreground())return;deadline=Environment.TickCount64+60;Hold(1);
-            Interlocked.Increment(ref actionCount);lastAction="return_lobby";return;
+            Interlocked.Increment(ref actionCount);lastAction=c.op;return;
         }
         if(c.op!="action"||!enabled||c.epoch!=epoch||!Foreground())return;
         Release();deadline=Environment.TickCount64+Math.Clamp(c.duration,20,400);
@@ -118,7 +119,9 @@ class Program
                 var at=Now();
                 var returns=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(RETURN TO LOBBY|BACK TO LOBBY|返回大厅|返回大廳)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
                 lobbyTarget=returns?.Length==1?new LobbyTarget(target,processId,at,returns[0].x+returns[0].width/2,returns[0].y+returns[0].height/2):null;
-                Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=at,width,height,lines,lobbyReturn=lobbyTarget==null?null:new {observedAt=at},ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
+                var bots=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(BOT MATCH|人机对战|人機對戰)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
+                botTarget=bots?.Length==1?new LobbyTarget(target,processId,at,bots[0].x+bots[0].width/2,bots[0].y+bots[0].height/2):null;
+                Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=at,width,height,lines,lobbyReturn=lobbyTarget==null?null:new {observedAt=at},botMatch=botTarget==null?null:new {observedAt=at},ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
             }catch{lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
             await Task.Delay(Math.Max(50,700-(int)watch.ElapsedMilliseconds));
         }}finally{running=false;input.Join(1000);}

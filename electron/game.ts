@@ -17,7 +17,7 @@ export class ControlGate {
  permits(epoch:number,observedAt:number,now=Date.now()){return this.mode==='auto'&&epoch===this.epoch&&now-observedAt<2500&&observedAt<=now+500;}
 }
 export interface ScreenLine {text:string;x:number;y:number;width:number;height:number}
-export interface Observation {connected:boolean;timestamp:number;processId?:number;foreground?:boolean;lines?:ScreenLine[];error?:string;ocrAvailable?:boolean;actionCount?:number;lastAction?:string;heldInputs?:number;controlMode?:PlayMode;lobbyReturn?:{observedAt:number}|null}
+export interface Observation {connected:boolean;timestamp:number;processId?:number;foreground?:boolean;lines?:ScreenLine[];error?:string;ocrAvailable?:boolean;actionCount?:number;lastAction?:string;heldInputs?:number;controlMode?:PlayMode;lobbyReturn?:{observedAt:number}|null;botMatch?:{observedAt:number}|null}
 export interface ScreenAction extends GameAction {x?:number;y?:number}
 /** Candidate menus come only from recognized text; never click guessed screen coordinates. */
 export function screenActions(observation:Observation,autoRestart:boolean):{phase:string;actions:ScreenAction[]} {
@@ -45,6 +45,7 @@ export class Game {
  private focusRecovery=new EtcFocusRecovery();
  private focusSuspendedAt=0;
  private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;
+ private botStartAt=-Infinity;private botDeadline=0;
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
    ?process.env.JEV_TEST_ETC_BRIDGE_DIR:join(process.env.LOCALAPPDATA??store.directory,'JevLive','etc-bridge');
@@ -79,6 +80,7 @@ export class Game {
   }
   if(request!==this.modeRequest)return;
   this.focusRecovery.reset();this.focusSuspendedAt=0;this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;
+  this.botStartAt=-Infinity;this.botDeadline=0;
   const epoch=this.gate.change(mode);
   if(mode==='manual'){this.portalUntil=0;this.reconnectUntil=0;}
   // ETC owns gameplay input. The helper only clicks its observed result-screen return button.
@@ -138,6 +140,7 @@ export class Game {
     const pausedFor=now-this.focusSuspendedAt;this.focusSuspendedAt=0;
     if(this.returningLobby)this.lobbyDeadline+=pausedFor;
     if(this.lobbyReadyAt)this.lobbyReadyAt+=pausedFor;
+    if(this.botDeadline)this.botDeadline+=pausedFor;
     if(this.autoplay.transitionUntil)this.autoplay.transitionUntil+=pausedFor;
     this.reconnectUntil=0;this.portalUntil=0;this.error='';
     await this.autoplay.resumeControl(this.gate.change('auto'));return;
@@ -157,6 +160,22 @@ export class Game {
     this.returningLobby=false;this.portalUntil=0;this.reconnectUntil=0;this.autoplay.transitionUntil=0;
     await this.autoplay.change('auto',this.gate.change('auto'));return;
    }
+   if(o.phase==='menu'){
+    if(o.epoch>this.gate.epoch||o.epoch===this.gate.epoch&&o.mode==='manual'&&o.executor?.reason==='manual_takeover'){await this.setMode('manual');this.error=message('etc.lost');return;}
+    if(o.epoch<this.gate.epoch)return;
+    // Use the actual BOT MATCH button so the game's menu/loading coordinator
+    // tears down its input layer. Direct OpenLevel can leave an invisible menu
+    // active, hiding both the M map and the new elimination card.
+    this.botDeadline||=now+30000;
+    if(now>=this.botDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
+    const screen=this.observation;
+    if(!screen?.botMatch||!screen.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
+    if(now-this.botStartAt<1500)return;
+    this.send({op:'bot_match',epoch:this.gate.epoch,processId:o.processId,observedAt:screen.botMatch.observedAt});
+    this.botStartAt=now;this.autoplay.transitionUntil=now+120000;this.autoplay.transitionMatch=o.matchId;
+    this.autoplay.strategy='new_match';return;
+   }
+   this.botDeadline=0;this.botStartAt=-Infinity;
    if(this.reconnectUntil){
     if(now>=this.reconnectUntil||o.matchId!==this.reconnectMatch||o.epoch!==this.gate.epoch){await this.setMode('manual');this.error=message('etc.lost');return;}
     this.reconnectUntil=0;

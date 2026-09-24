@@ -35,6 +35,16 @@ it('never uses a collapsed edge or accepts a cloud goal from a different snapsho
 it('does not fabricate a route before a real map snapshot and clears previous matches',()=>{
  const p=new EtcMapPlanner(),o=state();p.observe(o,now);expect(p.route).toBeUndefined();snapshot(o);p.observe(o,now);expect(p.route).toBeDefined();o.matchId='new';delete o.mapView;p.observe(o,now);expect(p.route).toBeUndefined();
 });
+it('releases an unavailable map immediately and backs off while local actions continue',()=>{
+ const p=new EtcMapPlanner(),o=state();p.observe(o,now);expect(p.review(o,now)?.kind).toBe('inspect_map');
+ o.timestamp+=1800;o.executor={...o.executor!,objective:'inspect_map',status:'blocked',reason:'map_unavailable'};
+ p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
+ expect(new EtcPolicy().choose(o,o.timestamp,false,true)?.kind).toBe('portal');
+ o.timestamp+=14000;p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
+ o.timestamp+=1100;o.executor!.objective='portal_a';p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)?.kind).toBe('inspect_map');
+ o.timestamp+=1800;o.executor!.objective='inspect_map';p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
+ o.timestamp+=16000;p.observe(o,o.timestamp);expect(p.review(o,o.timestamp)).toBeUndefined();
+});
 it('budgets known hazard traversal and requests the pre-refresh map early enough',()=>{
  const p=new EtcMapPlanner(),o=snapshot(state());o.self.roomType=11;p.observe(o,now);
  expect(p.routes.find(r=>r.goal===3)?.seconds).toBe(55);

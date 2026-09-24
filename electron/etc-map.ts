@@ -8,10 +8,10 @@ export class EtcMapPlanner {
   private lastRoom=-1;
   private match='';private key='';private before=new Set<string>();private revision=0;
   private health:number|undefined;private hurtUntil=0;private pending='';private requestAt=0;
-  private lastBlocked=0;private reviewCooldown=0;private preferred:number|undefined;
+  private lastBlocked=0;private reviewCooldown=0;private failedReviews=0;private preferred:number|undefined;
   view:MapView|undefined;routes:RoomRoute[]=[];route:RoomRoute|undefined;
   reason='initial';lastReviewReason='';
-  reset(){this.match='';this.key='';this.before.clear();this.revision=0;this.health=undefined;this.hurtUntil=0;this.pending='';this.requestAt=0;this.lastBlocked=0;this.reviewCooldown=0;this.preferred=undefined;this.view=undefined;this.routes=[];this.route=undefined;this.reason='initial';this.lastReviewReason='';}
+  reset(){this.match='';this.key='';this.before.clear();this.revision=0;this.health=undefined;this.hurtUntil=0;this.pending='';this.requestAt=0;this.lastBlocked=0;this.reviewCooldown=0;this.failedReviews=0;this.preferred=undefined;this.view=undefined;this.routes=[];this.route=undefined;this.reason='initial';this.lastReviewReason='';}
   observe(o:EtcObservation,now:number){
     if(this.match!==o.matchId){this.reset();this.match=o.matchId;}
     if(this.lastRoom!==o.self.room&&this.route?.rooms.length===1)this.preferred=undefined;
@@ -26,9 +26,13 @@ export class EtcMapPlanner {
       this.view=structuredClone(m);this.revision=m.revision;
       this.lastReviewReason=this.pending||'manual_map';
       if(this.pending==='before_refresh'&&`${m.phase}:${m.stage}`===key)this.before.add(key);
-      this.pending='';this.reviewCooldown=now+2500;
+      this.pending='';this.failedReviews=0;this.reviewCooldown=now+2500;
     }
-    if(this.pending&&now-this.requestAt>4000){this.pending='';this.reviewCooldown=now+2000;}
+    // A offered map action can fail in a shipped client. Repeatedly renewing
+    // that blocked action freezes the opening instead of collecting a weapon.
+    if(this.pending&&(now-this.requestAt>4000||o.executor?.objective==='inspect_map'&&o.executor.status==='blocked')){
+      this.pending='';this.failedReviews++;this.reviewCooldown=now+Math.min(60000,15000*2**(this.failedReviews-1));
+    }
     this.routes=this.compute(o);
     this.route=this.routes.find(r=>r.goal===this.preferred)??this.routes[0];
     if(this.route)this.preferred=this.route.goal;
