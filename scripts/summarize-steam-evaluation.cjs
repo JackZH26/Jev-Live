@@ -49,12 +49,40 @@ function summarize(source) {
   };
 }
 
+// A recovery starts a new receipt. Aggregate compatible runs without rewriting
+// the interrupted receipt or presenting it as a completed uninterrupted run.
+function combineCohorts(sources) {
+  if (!Array.isArray(sources) || !sources.length) throw Error('No cohorts supplied');
+  const first = sources[0];
+  const identity = s => [s.steamBuild, s.build?.strategyRevision, s.provider];
+  const expected = identity(first);
+  if (expected.some(v => typeof v !== 'string' || !v)) throw Error('Missing cohort identity');
+  const seen = new Set();
+  for (const source of sources) {
+    if (identity(source).some((v, i) => v !== expected[i])) throw Error('Cannot combine different builds, strategies or providers');
+    summarize(source);
+    for (const r of [...source.results, ...source.interrupted]) {
+      if (!r.id || seen.has(r.id)) throw Error('Overlapping or missing match identity');
+      seen.add(r.id);
+    }
+  }
+  return {
+    label: sources.map(s => s.label).join(' + '), steamBuild: first.steamBuild,
+    build: first.build, provider: first.provider,
+    complete: sources.every(s => s.complete === true), released: sources.every(s => s.released === true),
+    results: sources.flatMap(s => s.results), interrupted: sources.flatMap(s => s.interrupted),
+    lobbyDelays: sources.flatMap(s => s.lobbyDelays ?? [])
+  };
+}
+
 if (require.main === module) {
   try {
-    if (process.argv.length !== 3) throw Error('Usage: node scripts/summarize-steam-evaluation.cjs <summary.json>');
-    const file = path.resolve(process.argv[2]);
-    const summary = summarize(JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')));
+    if (process.argv.length < 3) throw Error('Usage: node scripts/summarize-steam-evaluation.cjs <summary.json> [compatible-summary.json ...]');
+    const sources = process.argv.slice(2).map(file => JSON.parse(fs.readFileSync(path.resolve(file), 'utf8').replace(/^\uFEFF/, '')));
+    const summary = summarize(sources.length === 1 ? sources[0] : combineCohorts(sources));
+    if (sources.length > 1) summary.sourceRuns = sources.map(s => ({ label: s.label,
+      complete: s.complete === true, completedMatches: s.results.length, interruptedMatches: s.interrupted.length }));
     console.log(JSON.stringify(summary, null, 2));
   } catch (e) { console.error(e.message); process.exitCode = 1; }
 }
-module.exports = { summarize, wilson };
+module.exports = { summarize, wilson, combineCohorts };

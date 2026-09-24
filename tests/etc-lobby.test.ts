@@ -36,6 +36,17 @@ it('manual control cancels a lobby countdown and never starts a match later',asy
  const {game,o,change,decide,tick}=setup();await tick();o.phase='menu';o.result=null;await tick();
  await game.setMode('manual');change.mockClear();await tick(9000);expect(change).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();
 });
+it('keeps returning after a confirmed result even if lingering healing reports playing again',async()=>{
+ const {game,o,send,decide,resume,tick}=setup();game.observation!.lobbyReturn=null;
+ await tick();expect(send).not.toHaveBeenCalled();
+ // Actual Steam observation: gauze ticks after elimination, HP becomes 2,
+ // phase flips to playing and result is null before the menu transition.
+ o.phase='playing';o.result=null;o.self.health=2;o.mode='manual';o.executor!.reason='lease_expired';
+ game.observation!.lobbyReturn={observedAt:o.timestamp};await tick(1600);
+ expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby',epoch:1,processId:123}));
+ expect(decide).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();
+ send.mockClear();game.observation!.lobbyReturn=null;await tick(1600);expect(send).not.toHaveBeenCalled();
+});
 it.each(['missing','wrongPid','background','captureError','noResult'] as const)('does not guess a result button after %s',fault=>{
  const {game,o,send,decide,tick}=setup();
  if(fault==='missing')game.observation!.lobbyReturn=null;

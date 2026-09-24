@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summarize, wilson } = require('./summarize-steam-evaluation.cjs');
+const { summarize, wilson, combineCohorts } = require('./summarize-steam-evaluation.cjs');
 const match = (id, placement, damage = 0) => ({ id, placement, damage, kills: 0,
   won: placement === 1, finished: true, eligible: true, durationSeconds: 20 });
 const cohort = results => ({ results, interrupted: [], complete: true, released: true });
@@ -31,4 +31,20 @@ test('separates actual lobby waits from first start and loading', () => {
   assert.equal(summarize(input).lobbyWaitsWithin5To8Seconds, true);
   input.lobbyDelays.push({ afterResult: true, waitSeconds: 9, seconds: 12 });
   assert.equal(summarize(input).lobbyWaitsWithin5To8Seconds, false);
+});
+
+test('combines recovery runs without turning an interrupted run into a pass', () => {
+  const identity = { steamBuild: '25507242', build: { strategyRevision: 'native-r2' }, provider: 'native-pro' };
+  const first = { ...identity, ...cohort([match('a', 47)]), label: 'first', complete: false,
+    interrupted: [{ id: 'b', reason: 'focus lost', placement: 40 }] };
+  const second = { ...identity, ...cohort([match('c', 32, 102)]), label: 'resumed' };
+  const result = summarize(combineCohorts([first, second]));
+  assert.equal(result.completedMatches, 2); assert.equal(result.interruptedMatches, 1);
+  assert.equal(result.complete, false); assert.equal(result.released, true);
+  assert.equal(result.averagePlayerDamage, 51); assert.equal(first.results.length, 1);
+  assert.throws(() => combineCohorts([first, { ...second, steamBuild: 'another' }]), /different/);
+  assert.throws(() => combineCohorts([first, { ...second, provider: 'local' }]), /different/);
+  assert.throws(() => combineCohorts([first, { ...second, build: { strategyRevision: 'other' } }]), /different/);
+  assert.throws(() => combineCohorts([{ ...first, steamBuild: undefined }]), /identity/);
+  assert.throws(() => combineCohorts([first, { ...second, results: [match('b', 1)] }]), /Overlapping/);
 });

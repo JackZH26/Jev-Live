@@ -155,7 +155,14 @@ export class Game {
    }
    if(this.returningLobby){
     if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
-    if(o.phase!=='menu')return;
+    if(o.phase!=='menu'){
+     // A confirmed elimination is terminal even if a lingering heal raises
+     // raw HP and the bridge briefly reports playing with no result again.
+     // Keep retrying only a freshly observed Return to Lobby button; never
+     // renew gameplay control while this bounded return is pending.
+     if(['playing','dead','ended'].includes(o.phase))await this.returnToLobby(o,now);
+     return;
+    }
     this.lobbyReadyAt||=now+5000+Math.floor(Math.random()*3001);
     if(now<this.lobbyReadyAt){this.decision=message('etc.nextMatchIn',{seconds:Math.ceil((this.lobbyReadyAt-now)/1000)});return;}
     this.lobbyReadyAt=0;
