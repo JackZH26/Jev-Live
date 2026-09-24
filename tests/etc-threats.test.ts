@@ -31,6 +31,13 @@ it('takes nearby cover against three visible firing lanes',()=>{
  const o=state();for(let i=0;i<3;i++)enemy(o,'enemy'+i,1800+i*200);o.actions.push(a('cover','cover',500));
  expect(new EtcPolicy().choose(o,o.timestamp,false,true)?.kind).toBe('cover');
 });
+it('defends against a visible shooter in yellow while preserving imminent evacuation',()=>{
+ const o=state();o.self.danger=true;o.zone={phase:1,stage:'warning',secondsLeft:100};enemy(o,'enemy',800);
+ expect(new EtcPolicy().choose(o,o.timestamp,false,true)?.kind).toBe('engage');
+ o.zone.secondsLeft=10;expect(new EtcPolicy().choose(o,o.timestamp,false,true)?.kind).toBe('portal');
+ o.zone.secondsLeft=100;o.enemies=[];o.actions=o.actions.filter(a=>a.kind!=='engage');
+ expect(new EtcPolicy().choose(o,o.timestamp,false,true)?.kind).toBe('portal');
+});
 it('clears damage pressure between matches and after its brief window',()=>{
  const o=state(),p=new EtcThreats();p.observe(o,o.timestamp);o.self.health=50;o.timestamp+=50;expect(p.observe(o,o.timestamp).lethalPressure).toBe(true);
  o.timestamp+=1600;expect(p.observe(o,o.timestamp).lethalPressure).toBe(false);o.matchId='next';o.self.health=40;expect(p.observe(o,o.timestamp).burstDamage).toBe(0);

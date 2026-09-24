@@ -21,6 +21,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   while(Date.now()-started<minutes*60000){
    let o;try{o=JSON.parse(await fs.readFile(matchFile,'utf8'));}catch{await sleep(100);continue;}
    const now=Date.now();if(o.processId!==summary.pid||o.session!==summary.session)throw Error('Steam control identity changed');
+   if(o.phase==='playing'&&!/^L_ETC_Match(?:_|$)/.test(o.map))throw Error('Unexpected non-match map: '+o.map);
    if(now-o.timestamp>1000){if(now-o.timestamp>15000)throw Error('Steam telemetry stopped');await sleep(100);continue;}
    if(o.phase==='menu'&&!lobbyAt)lobbyAt=now;
    if(lobbyAt&&o.phase==='loading'){summary.lobbyDelays.push({at:new Date(now).toISOString(),seconds:(now-lobbyAt)/1000,afterResult:!!current?.finished});lobbyAt=0;}

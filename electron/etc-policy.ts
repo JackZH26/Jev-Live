@@ -110,8 +110,10 @@ export class EtcPolicy {
     };
     const escapeOrder=(a:EtcAction,b:EtcAction)=>(a.destinationRisk??0)-(b.destinationRisk??0)||a.distance-b.distance;
     const weakLoadout=/StarterPistol|^$/.test(o.self.weapon)||o.self.magazine<=0&&o.self.reserve<=0;
-    // A yellow room without enemies is an evacuation order, including weak loadouts.
-    if(o.self.danger&&escape.length)return this.select(planned&&escape.includes(planned)?planned:escape.sort(escapeOrder)[0],now);
+    // Yellow alone is not permission to run past a visible shooter without
+    // defending ourselves. Imminent collapse still overrides the firing window.
+    const urgentZone=o.self.danger&&(!visible||o.self.evacuationSeconds>=0||!o.zone||o.zone.stage!=='warning'||o.zone.secondsLeft<30);
+    if(urgentZone&&escape.length)return this.select(planned&&escape.includes(planned)?planned:escape.sort(escapeOrder)[0],now);
     if(o.self.healing&&!threatened&&!o.self.danger)return wait;
     // Burst damage and several firing lanes can make a formerly favorable burst
     // lethal. This interrupts target persistence and cloud advice immediately.
@@ -138,6 +140,11 @@ export class EtcPolicy {
     // Stabilize behind nearby verified cover, then allow a bounded counterattack.
     // Do not ping-pong between the same completed cover and an attack every tick.
     if(underFire&&visible&&(this.hurtAt>this.coverAt||now-this.coverAt>2500)){
+      // A failed shelter approach at critical health needs an actual exit,
+      // instead of spending the remainder of the match cycling exposed cover.
+      const retreat=low&&now-this.coverStartedAt>4500&&Number.isFinite(this.coverStartedAt)
+        ?escape.filter(a=>a.destinationRisk===0&&a.distance<=3000).sort(escapeOrder)[0]:undefined;
+      if(retreat)return this.select(retreat,now);
       const cover=nearbyCover();
       if(cover)return this.select(cover,now);
     }
@@ -218,8 +225,8 @@ export class EtcPolicy {
         case 'loot': n=(weakLoadout?90:o.self.reserve>=30&&/AR0|MG0|SR0/.test(o.self.weapon)?10:40)-distance*0.5;break;
         case 'portal': n=Math.max(5,30-distance*0.1-Math.min(20,6*(this.visits.get(a.destination??-1)??0)))-30*(a.destinationRisk??0)+(planned?.id===a.id?5:0);break;
       }
-      if(o.self.danger&&a.kind!=='portal')n-=200;
-      if(visible&&['loot','pickup','portal'].includes(a.kind)&&!o.self.danger)n-=80;
+      if(urgentZone&&a.kind!=='portal')n-=200;
+      if(visible&&['loot','pickup','portal'].includes(a.kind)&&!urgentZone)n-=80;
       // Bounded tactical advice cannot reverse immediate survival priorities.
       if(a.id===advice&&!o.self.danger&&!low)n+=10;
       if(a.id===this.active&&now-this.activeAt<1200)n+=8;

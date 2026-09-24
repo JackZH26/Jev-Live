@@ -32,6 +32,7 @@ class Program
     record LobbyTarget(IntPtr Window,int ProcessId,long ObservedAt,double X,double Y);
     static volatile LobbyTarget? lobbyTarget;
     static volatile LobbyTarget? botTarget;
+    static LobbyTarget? previousBotTarget;
     static readonly object outputLock=new();
     static readonly ConcurrentQueue<Command> commands=new();
     static readonly HashSet<int> held=new();
@@ -120,7 +121,12 @@ class Program
                 var returns=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(RETURN TO LOBBY|BACK TO LOBBY|返回大厅|返回大廳)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
                 lobbyTarget=returns?.Length==1?new LobbyTarget(target,processId,at,returns[0].x+returns[0].width/2,returns[0].y+returns[0].height/2):null;
                 var bots=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(BOT MATCH|人机对战|人機對戰)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
-                botTarget=bots?.Length==1?new LobbyTarget(target,processId,at,bots[0].x+bots[0].width/2,bots[0].y+bots[0].height/2):null;
+                var candidate=bots?.Length==1?new LobbyTarget(target,processId,at,bots[0].x+bots[0].width/2,bots[0].y+bots[0].height/2):null;
+                // Lobby entrance animation can move a freshly recognized button.
+                // Require the same position in two successive captures before clicking.
+                botTarget=candidate!=null&&previousBotTarget!=null&&candidate.ProcessId==previousBotTarget.ProcessId
+                    &&at-previousBotTarget.ObservedAt<=1500&&Math.Abs(candidate.X-previousBotTarget.X)<.003&&Math.Abs(candidate.Y-previousBotTarget.Y)<.003?candidate:null;
+                previousBotTarget=candidate;
                 Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=at,width,height,lines,lobbyReturn=lobbyTarget==null?null:new {observedAt=at},botMatch=botTarget==null?null:new {observedAt=at},ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
             }catch{lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
             await Task.Delay(Math.Max(50,700-(int)watch.ElapsedMilliseconds));
