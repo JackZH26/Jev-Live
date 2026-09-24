@@ -17,6 +17,7 @@ export const settingsSchema = z.object({
   enabledPlatforms:z.array(z.enum(providers)).max(providers.length).refine(v=>new Set(v).size===v.length).default(['youtube','twitch']),
   decisionProvider: z.enum(['rules', 'jev']).default('rules'),
   decisionIntervalMs: z.number().int().min(300).max(5000).default(800),
+  presentation:z.enum(['host','gameplay']).default('host'),
   autoRestart: z.boolean().default(false), bitrate: z.number().int().min(1500).max(8000).default(6000)
 });
 export async function atomicWrite(path: string, value: string | Buffer) {

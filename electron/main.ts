@@ -63,10 +63,13 @@ app.whenReady().then(async()=>{
   currentLocale=(await store.settings()).locale;
   const steam=new Steam(url=>shell.openExternal(url));
   auth=new OAuth(store,url=>shell.openExternal(url),log);obs=new Obs(store,log);game=new Game(store,log,steam,join(app.isPackaged?process.resourcesPath:app.getAppPath(),'dist-native','SteamObserver.exe'));
-  broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log,p=>obs.overlay(p,overlay.url(p),hosting.config.layouts[p]));await game.init();await broadcast.init();
+  broadcast=new Broadcast(store,obs,auth,new Platforms(auth),log,async p=>{
+    if((await store.settings()).presentation==='gameplay')await obs.gameplay(p);
+    else await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);
+  });await game.init();await broadcast.init();
   hosting=new Hosting(store,auth,()=>{const o=game.autoplay.observation;return JSON.stringify({appId:game.selected?.appId,game:game.selected?.name??'',connected:game.connected,phase:game.connected?game.state?.phase??'unknown':'unknown',activity:o?{at:o.timestamp,match:o.matchId,enemies:o.enemies.length,health:o.self.health,shots:o.diagnostics.shots,danger:o.self.danger,traveling:o.self.traveling,healing:o.self.healing,reloading:o.self.reloading??false}:undefined,visibleText:game.connected?game.observation?.lines?.map(l=>l.text).join(' ').slice(0,2400)??'':''});},()=>broadcast.state.youtubeId,()=>game.connected);
   await hosting.init();overlay=new OverlayServer(hosting,join(__dirname,'../../dist'));await overlay.start();
-  const applyLayouts=async()=>{for(const p of (await store.settings()).enabledPlatforms)if(obs.states[p].ready)await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);};
+  const applyLayouts=async()=>{const settings=await store.settings();if(settings.presentation==='gameplay')hosting.stop();for(const p of settings.enabledPlatforms)if(obs.states[p].ready){if(settings.presentation==='gameplay')await obs.gameplay(p);else await obs.overlay(p,overlay.url(p),hosting.config.layouts[p]);}};
   window=new BrowserWindow({width:1480,height:960,minWidth:1080,minHeight:720,backgroundColor:'#f2f3f8',title:'JEV Studio',autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',(event)=>event.preventDefault());
@@ -86,7 +89,7 @@ app.whenReady().then(async()=>{
     if(next.googleClientId!==old.googleClientId) {await store.set('oauth.youtube',undefined);await store.set('google.clientSecret',undefined);}
     if(next.twitchClientId!==old.twitchClientId)await store.set('oauth.twitch',undefined);
     // Dedicated selectors own game/output selection, including when settings were opened earlier.
-    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,enabledPlatforms:old.enabledPlatforms,gameWindow:old.gameWindow});
+    await store.saveSettings({...next,steamAppId:old.steamAppId,addedSteamGames:old.addedSteamGames,enabledPlatforms:old.enabledPlatforms,gameWindow:old.gameWindow,presentation:old.presentation});
     currentLocale=next.locale;updateTray();
   });
   handler('selectPlatforms',async value=>{
@@ -98,6 +101,12 @@ app.whenReady().then(async()=>{
     await store.saveSettings({...old,enabledPlatforms:selected,gameWindow:addedOutput?'':old.gameWindow});
   },message('busy.platforms'));
   handler('setLocale',async value=>{const locale=z.enum(locales).parse(value);await store.saveSettings({...await store.settings(),locale});currentLocale=locale;updateTray();});
+  handler('setPresentation',async value=>{
+    const presentation=settingsSchema.shape.presentation.parse(value);
+    if(broadcast.state.state!=='idle')throw new Error(message('error.settingsDuringRun'));
+    if(presentation==='gameplay')hosting.stop();
+    await store.saveSettings({...await store.settings(),presentation});await applyLayouts();
+  });
   handler('saveJevKey',async value=>{const key=z.string().trim().min(8).max(4096).parse(value);await store.set('jev.key',key);log(message('event.keySaved'));});
   handler('importGoogleClient',async()=>{
     if(auth.pending.size || broadcast.state.state!=='idle')throw new Error(message('error.finishAuthOrLive'));
@@ -122,24 +131,27 @@ app.whenReady().then(async()=>{
     const checks=streamChecks({settings,accounts,xSource:await xLive.summary(),outputs:obs.states,selectedGame:game.selected,gameConnected:game.connected} as Snapshot);
     const installed=await access(join(settings.obsDirectory,'bin/64bit/obs64.exe')).then(()=>true,()=>false);
     checks.unshift({id:'obs-install',key:'setup.obsInstall',ready:installed,required:!settings.enabledPlatforms.every(p=>obs.states[p].ready),action:'obs'});
+    if(settings.presentation==='host'){
     let model=false;try{const url=hosting.config.apiBase.replace(/\/$/,'')+(hosting.config.modelProvider==='ollama'?'/api/tags':'/models');const r=await fetch(url,{signal:AbortSignal.timeout(2500),redirect:'error'});if(r.ok){const data=await r.json() as any;model=hosting.config.modelProvider==='ollama'?data.models?.some((m:any)=>m.name===hosting.config.model):data.data?.some((m:any)=>m.id===hosting.config.model);}}catch{}
     const speech=await hosting.speechReady();
     checks.push({id:'model',key:'setup.model',ready:!!model,required:false,action:'host'},{id:'voice',key:'setup.voice',ready:speech,required:false,action:'host'});
     if(hosting.config.chatPlatforms.includes('twitch')){let granted=false;try{const c=await auth.credentials('twitch'),scopes=typeof c.scope==='string'?c.scope.split(' '):c.scope??[];granted=['user:read:chat','user:write:chat'].every(scope=>scopes.includes(scope));}catch{}checks.push({id:'chat-twitch',key:'setup.chat',provider:'twitch',ready:granted,required:false,action:'host'});}
-    return {at:Date.now(),checks,canStream:checks.filter(c=>c.required).every(c=>c.ready),canHost:checks.filter(c=>['model','voice','chat-twitch'].includes(c.id)).every(c=>c.ready)} satisfies ReadinessReport;
+    }
+    return {at:Date.now(),checks,canStream:checks.filter(c=>c.required).every(c=>c.ready),canHost:settings.presentation==='host'&&checks.filter(c=>['model','voice','chat-twitch'].includes(c.id)).every(c=>c.ready)} satisfies ReadinessReport;
   });
   handler('saveHostConfig',async value=>{await hosting.save(value);await applyLayouts();});
   handler('saveHostLayouts',async value=>{await hosting.saveLayouts(value);await applyLayouts();});
   handler('saveHostKey',value=>hosting.key(value));
   handler('importAvatar',async()=>{if(hosting.running)throw new Error('host.stopFirst');const r=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'Avatar',extensions:['png','webp','jpg','jpeg','vrm']}]});if(r.canceled)return false;await hosting.importAsset(r.filePaths[0]);return true;});
-  handler('startHost',()=>hosting.start());handler('stopHost',async()=>hosting.stop());
+  const requireHost=async()=>{if((await store.settings()).presentation==='gameplay')throw new Error(message('presentation.hostRequired'));};
+  handler('startHost',async()=>{await requireHost();return hosting.start();});handler('stopHost',async()=>hosting.stop());
   handler('importVoiceReference',async()=>{if(hosting.running)throw new Error('host.stopFirst');const r=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'English voice reference',extensions:['wav']}]});if(r.canceled)return false;await hosting.importVoiceReference(r.filePaths[0]);return true;});
-  handler('testHostVoice',async language=>{await hosting.testVoice(language===undefined?undefined:hostConfigSchema.shape.language.parse(language));return overlay.audioURL();});
+  handler('testHostVoice',async language=>{await requireHost();await hosting.testVoice(language===undefined?undefined:hostConfigSchema.shape.language.parse(language));return overlay.audioURL();});
   handler('applyHostLayout',applyLayouts);handler('gamePreview',value=>obs.gamePreview(provider.parse(value)));
   handler('preview',value=>obs.preview(provider.parse(value)));
   handler('launchGame',()=>game.launch(),message('busy.game'));
   handler('setMode',value=>game.setMode(mode.parse(value)));
-  handler('startStream',()=>broadcast.start(),message('busy.start'));
+  handler('startStream',async()=>{await applyLayouts();return broadcast.start();},message('busy.start'));
   handler('stopStream',()=>broadcast.stop(),message('busy.stop'));
   handler('openExternal',value=>shell.openExternal(allowedExternal(z.string().max(1500).parse(value))));
   if(dev) { if(dev!=='http://127.0.0.1:5173')throw new Error('Invalid development origin');await window.loadURL(dev); }

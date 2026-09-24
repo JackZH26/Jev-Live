@@ -154,6 +154,18 @@ export class Obs {
     await c.call('SetSceneItemTransform',{sceneName:'JEV Program',sceneItemId:game.sceneItemId,sceneItemTransform:{positionX:layout.game.x,positionY:layout.game.y,boundsType:'OBS_BOUNDS_SCALE_INNER',boundsWidth:layout.game.width,boundsHeight:layout.game.height,alignment:5}});
     await c.call('SetSceneItemEnabled',{sceneName:'JEV Program',sceneItemId:game.sceneItemId,sceneItemEnabled:layout.game.visible});
     const host=await c.call('GetSceneItemId',{sceneName:'JEV Program',sourceName:'JEV Host'});const list=await c.call('GetSceneItemList',{sceneName:'JEV Program'});await c.call('SetSceneItemIndex',{sceneName:'JEV Program',sceneItemId:host.sceneItemId,sceneItemIndex:list.sceneItems.length-1});
+    await c.call('SetSceneItemEnabled',{sceneName:'JEV Program',sceneItemId:host.sceneItemId,sceneItemEnabled:true});
+    await c.call('SetInputMute',{inputName:'JEV Host',inputMuted:false});
+  }
+  async gameplay(provider:Provider){
+    const c=this.client(provider),list=await c.call('GetSceneItemList',{sceneName:'JEV Program'});
+    // Pure gameplay also hides captions/chat/test overlays in this owned scene.
+    for(const item of list.sceneItems){
+      const game=item.sourceName==='ETC Game'||item.sourceName==='ETC Audio';
+      if(item.sourceName==='JEV Host')await c.call('SetInputMute',{inputName:'JEV Host',inputMuted:true});
+      await c.call('SetSceneItemEnabled',{sceneName:'JEV Program',sceneItemId:Number(item.sceneItemId),sceneItemEnabled:game});
+    }
+    await this.fit(provider);
   }
   async service(provider:Provider,server:string,key:string) {
     if(!/^rtmps?:\/\//.test(server)) throw new Error(message('error.destination'));

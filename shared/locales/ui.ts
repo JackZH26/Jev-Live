@@ -1,6 +1,13 @@
 // key, Simplified Chinese, Traditional Chinese, Japanese, Korean, English.
 // All six columns are mandatory; add new languages through the shared catalog contract.
 export const ui = [
+ ['presentation.title','直播模式','直播模式','配信モード','방송 모드','Stream mode'],
+ ['presentation.gameplay','纯游戏','純遊戲','ゲームのみ','게임만','Gameplay only'],
+ ['presentation.host','虚拟主播','虛擬主播','バーチャル配信者','버추얼 스트리머','Virtual host'],
+ ['presentation.gameplayHint','只播游戏画面和游戏声音，关闭形象、字幕、聊天叠层与语音。','只播遊戲畫面和遊戲聲音，關閉形象、字幕、聊天疊層與語音。','ゲーム映像と音声のみ。アバター・字幕・チャット・読み上げは非表示。','게임 화면과 소리만 송출합니다. 아바타·자막·채팅·음성은 꺼집니다.','Game video and audio only. Avatar, captions, chat overlay and speech are off.'],
+ ['presentation.hostHint','使用已配置的形象、解说和观众互动。','使用已設定的形象、解說和觀眾互動。','設定済みのアバター・実況・視聴者との交流を使用します。','설정한 아바타·해설·시청자 소통을 사용합니다.','Use your configured avatar, commentary and viewer interaction.'],
+ ['presentation.hostRequired','请先切换到虚拟主播模式','請先切換到虛擬主播模式','バーチャル配信者モードに切り替えてください','버추얼 스트리머 모드로 전환하세요','Switch to Virtual host mode first'],
+ ['etc.nextMatchIn','将在 {seconds} 秒后开始下一局','將在 {seconds} 秒後開始下一局','次の試合まで {seconds} 秒','다음 경기까지 {seconds}초','Next match in {seconds} seconds'],
  ["channels.minimum","请至少选择一个直播平台","請至少選擇一個直播平台","配信サービスを 1 つ以上選択してください","방송 플랫폼을 하나 이상 선택하세요","Select at least one streaming platform"],
  ["channels.include","向 {provider} 直播","向 {provider} 直播","{provider} に配信","{provider}에 송출","Stream to {provider}"],
  ["channels.enabled","直播","直播","配信","송출","Stream"],

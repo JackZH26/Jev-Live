@@ -6,6 +6,7 @@ export const providerNames:Record<Provider,string>={youtube:'YouTube',twitch:'Tw
 export interface XSourceInput { name:string; server:string; key:string }
 export interface XSourceSummary { configured:boolean; name:string }
 export type PlayMode = 'manual' | 'auto';
+export type Presentation = 'host' | 'gameplay';
 export interface SteamGame {appId:string;name:string;installDirectory:string;buildId:string;branch:string;autoSupport:'experimental'|'unavailable'}
 export interface Settings {
   locale: import('./i18n').Locale;
@@ -15,6 +16,7 @@ export interface Settings {
   enabledPlatforms: Provider[];
   decisionProvider: 'rules' | 'jev'; decisionIntervalMs: number;
   autoRestart: boolean; bitrate: number;
+  presentation: Presentation;
 }
 export interface Account { id: string; name: string; connected: boolean }
 export interface GameAction { id: string; label: string; kind: string; target?: string }
@@ -65,6 +67,7 @@ export interface StudioAPI extends HostingAPI {
   preview(provider: Provider): Promise<string>;
   launchGame(): Promise<void>;
   setMode(mode: PlayMode): Promise<void>;
+  setPresentation(mode: Presentation): Promise<void>;
   startStream(): Promise<void>;
   stopStream(): Promise<void>;
   openExternal(url: string): Promise<void>;

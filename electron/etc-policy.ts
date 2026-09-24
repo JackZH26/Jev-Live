@@ -1,5 +1,6 @@
 import { ETC_MAX_AGE_MS, type EtcAction, type EtcObservation } from '../shared/etc';
 import {canDefendRoom} from './etc-knowledge';
+import {EtcThreats,threatPriority,openingTie} from './etc-threats';
 
 /** Retire acknowledged pickups/chests even when the native offer lingers. */
 export class EtcCompletedActions {
@@ -24,6 +25,7 @@ export class EtcCompletedActions {
 
 /** Only observed affordances enter the policy. No world actors, hidden HP or future collapse schedule. */
 export class EtcPolicy {
+  private threats=new EtcThreats();
   private completed=new EtcCompletedActions();
   private match = '';
   private lastRoom = -1;
@@ -39,7 +41,7 @@ export class EtcPolicy {
   private movedAt=0;private moveAnchor?:EtcObservation['self']['position'];
   private coverAt=-Infinity;private coveredObjective='';private startRoom='';
   private coverStartedAt=-Infinity;private counterUntil=0;
-  reset(){this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;this.movedAt=0;this.moveAnchor=undefined;this.completed.reset();this.coverAt=-Infinity;this.coveredObjective='';this.startRoom='';this.coverStartedAt=-Infinity;this.counterUntil=0;}
+  reset(){this.threats.reset();this.match='';this.lastRoom=-1;this.visits.clear();this.active='';this.activeAt=0;this.failed.clear();this.health=undefined;this.hurtAt=-Infinity;this.seenAt=-Infinity;this.progressAt=0;this.bestDistance=Infinity;this.movedAt=0;this.moveAnchor=undefined;this.completed.reset();this.coverAt=-Infinity;this.coveredObjective='';this.startRoom='';this.coverStartedAt=-Infinity;this.counterUntil=0;}
   choose(o:EtcObservation, now:number, autoRestart:boolean, played:boolean, advice?:string, planned?:EtcAction):EtcAction|undefined {
     if(o.matchId!==this.match){this.reset();this.match=o.matchId;}
     const wait = o.actions.find(a=>a.kind==='wait');
@@ -49,7 +51,7 @@ export class EtcPolicy {
       if(o.roomPick.locked>=0)return wait;
       // Only public pick-screen supplies/connectivity, never hidden room types or spawns.
       if(!choices.some(a=>a.id===this.startRoom))this.startRoom=choices.map(a=>({a,r:o.roomPick!.rooms.find(r=>r.id===a.destination)}))
-        .sort((a,b)=>{const score=(r:typeof a.r)=>r?Math.min(r.exits,3)*8+Math.min(r.loot,8)*3-(r.hotspot?7:0):0;return score(b.r)-score(a.r)||a.a.id.localeCompare(b.a.id);})[0]?.a.id??'';
+        .sort((a,b)=>{const score=(r:typeof a.r)=>r?Math.min(r.exits,3)*8+Math.min(r.loot,3)*4-(r.hotspot?24:0):0;return score(b.r)-score(a.r)||openingTie(o.matchId,a.a.id)-openingTie(o.matchId,b.a.id);})[0]?.a.id??'';
       return choices.find(a=>a.id===this.startRoom)??wait;
     }
     if(o.phase==='menu'||o.phase==='dead'||o.phase==='ended'){
@@ -81,6 +83,7 @@ export class EtcPolicy {
       if(now-this.progressAt>20000||supply&&now-Math.max(this.progressAt,this.movedAt)>6500){this.failed.set(this.active,now+(supply?15000:5000));this.active='';}
     }
     const visible=o.enemies.length>0, low=o.self.health/o.self.maxHealth<0.4;
+    const pressure=this.threats.observe(o,now);
     // Losing the camera view is not proof that the attacker has stopped firing.
     // Remember only our own damage and actual sightings, never hidden actor state.
     if(this.health!==undefined&&o.self.health<this.health-.5)this.hurtAt=now;
@@ -95,7 +98,7 @@ export class EtcPolicy {
     const nativeLoadedPrimary=o.executor?.kind==='shared-bot-v1'&&o.self.magazine>0&&!/StarterPistol|^$/.test(o.self.weapon);
     const eligible=o.actions.filter(a=>!['new_match','inspect_map','pick_room'].includes(a.kind)&&!this.failed.has(a.id)&&a.safe&&this.completed.allows(a.id)&&!(a.kind==='equip'&&nativeLoadedPrimary)&&!(a.kind==='cover'&&a.id===this.coveredObjective&&a.distance<=150));
     const escape=eligible.filter(a=>a.kind==='portal');
-    const fights=eligible.filter(a=>a.kind==='engage').sort((a,b)=>a.distance-b.distance);
+    const fights=eligible.filter(a=>a.kind==='engage').sort((a,b)=>threatPriority(a,o)-threatPriority(b,o));
     // Finish a short burst on an actually visible target. Small distance changes
     // or a fresh cloud response must not reset aim/reaction on every tick.
     const heldFight=fights.find(a=>a.id===this.active);
@@ -110,6 +113,21 @@ export class EtcPolicy {
     // A yellow room without enemies is an evacuation order, including weak loadouts.
     if(o.self.danger&&escape.length)return this.select(planned&&escape.includes(planned)?planned:escape.sort(escapeOrder)[0],now);
     if(o.self.healing&&!threatened&&!o.self.danger)return wait;
+    // Burst damage and several firing lanes can make a formerly favorable burst
+    // lethal. This interrupts target persistence and cloud advice immediately.
+    if(visible&&(pressure.lethalPressure||pressure.overwhelming&&now-this.coverAt>2500)){
+      const shelter=nearbyCover();
+      if(shelter)return this.select(shelter,now);
+      const exit=escape.filter(a=>a.destinationRisk===0&&a.distance<=1800).sort(escapeOrder)[0];
+      if(exit&&(pressure.lethalPressure||low))return this.select(exit,now);
+    }
+    // Machines do not improve placement. With scarce ammunition, take an offered
+    // nearby safe exit instead of committing to distant mechanical attrition.
+    if(pressure.machines.length&&!pressure.players.length&&pressure.ammoScarce
+      &&pressure.machines.every(e=>e.distance>1500)&&!o.self.protected){
+      const exit=escape.filter(a=>a.destinationRisk===0&&a.distance<=1500).sort(escapeOrder)[0];
+      if(exit)return this.select(exit,now);
+    }
     // Reaching cover earns a real firing window; another small hit does not
     // immediately cancel it. Low health, empty ammo and evacuation still win.
     // Also bound a shelter approach that stays exposed instead of reaching cover.
@@ -182,7 +200,7 @@ export class EtcPolicy {
         &&!(defending&&tactical.kind==='portal')
         &&!(tactical.kind==='portal'&&(tactical.destinationRisk??0)>=2&&escape.some(a=>a.destinationRisk===0))
         &&(!threatened||!['loot','pickup','scan'].includes(tactical.kind));
-      if(legal&&!emergency)return this.select(tactical.kind==='engage'&&heldFight&&fight===heldFight?heldFight:tactical,now);
+      if(legal&&!emergency)return this.select(tactical.kind==='engage'&&fight?fight:tactical,now);
     }
     const score=(a:EtcAction)=>{
       const distance=a.distance/100; // UE centimetres -> metres
@@ -190,7 +208,7 @@ export class EtcPolicy {
       switch(a.kind){
         case 'wait': n=-100;break;
         case 'scan': n=0;break;
-        case 'engage': n=visible&&o.self.magazine>0&&!o.self.protected?90-distance*0.6: -1000;break;
+        case 'engage': n=visible&&o.self.magazine>0&&!o.self.protected?90-threatPriority(a,o)*.6: -1000;break;
         case 'cover': n=threatened?(low||o.self.magazine===0?160:65)-distance: -80;break;
         // Seven shells may already be a full shotgun. No hardcoded magazine capacity.
         case 'reload': n=o.self.reserve>0?(o.self.magazine===0?130:-60):-1000;break;

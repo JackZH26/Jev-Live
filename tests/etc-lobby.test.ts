@@ -20,13 +20,20 @@ function setup(){
  const tick=async(ms=50)=>{now+=ms;o.timestamp=now;o.frame++;if(game.observation){game.observation.timestamp=now;if(game.observation.lobbyReturn)game.observation.lobbyReturn.observedAt=now;}await (game as any).tick();};
  return {game,o,settings,send,decide,change,resume,tick};
 }
-it('clicks the observed result button, waits for the real lobby, then immediately rearms matchmaking',async()=>{
+it.each([0,.5,.999999])('waits a single sampled 5–8 second lobby delay after returning, random=%s',async random=>{
+ vi.spyOn(Math,'random').mockReturnValue(random);
  const {game,o,send,decide,change,tick}=setup();
  await tick();expect(send).toHaveBeenCalledWith({op:'return_lobby',epoch:1,processId:123,observedAt:o.timestamp});expect(decide).not.toHaveBeenCalled();
  await tick();expect(send).toHaveBeenCalledOnce();await tick(1450);expect(send).toHaveBeenCalledTimes(2);
  o.phase='loading';o.matchId='lobby';await tick();expect(decide).not.toHaveBeenCalled();
- o.phase='menu';o.mode='manual';o.result=null;await tick();expect(change).toHaveBeenCalledWith('auto',2);expect(decide).not.toHaveBeenCalled();
+ o.phase='menu';o.mode='manual';o.result=null;await tick();expect(change).not.toHaveBeenCalled();
+ const delay=5000+Math.floor(random*3001);await tick(delay-1);expect(change).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();
+ await tick(1);expect(change).toHaveBeenCalledWith('auto',2);expect(decide).not.toHaveBeenCalled();
  o.mode='auto';o.epoch=game.gate.epoch;await tick();expect(decide).toHaveBeenCalledOnce();
+});
+it('manual control cancels a lobby countdown and never starts a match later',async()=>{
+ const {game,o,change,decide,tick}=setup();await tick();o.phase='menu';o.result=null;await tick();
+ await game.setMode('manual');change.mockClear();await tick(9000);expect(change).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();
 });
 it.each(['missing','wrongPid','background','captureError','noResult'] as const)('does not guess a result button after %s',fault=>{
  const {game,o,send,decide,tick}=setup();

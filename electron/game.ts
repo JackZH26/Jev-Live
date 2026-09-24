@@ -44,7 +44,7 @@ export class Game {
  private reconnectUntil=0;private reconnectMatch='';
  private focusRecovery=new EtcFocusRecovery();
  private focusSuspendedAt=0;
- private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';
+ private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
    ?process.env.JEV_TEST_ETC_BRIDGE_DIR:join(process.env.LOCALAPPDATA??store.directory,'JevLive','etc-bridge');
@@ -78,7 +78,7 @@ export class Game {
    authorized=o;
   }
   if(request!==this.modeRequest)return;
-  this.focusRecovery.reset();this.focusSuspendedAt=0;this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;
+  this.focusRecovery.reset();this.focusSuspendedAt=0;this.returningLobby=false;this.lobbyDeadline=0;this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;
   const epoch=this.gate.change(mode);
   if(mode==='manual'){this.portalUntil=0;this.reconnectUntil=0;}
   // ETC owns gameplay input. The helper only clicks its observed result-screen return button.
@@ -92,7 +92,7 @@ export class Game {
  }
  private async returnToLobby(o:EtcObservation,now:number){
   // Returning is driven by the real button, not the native new_match shortcut.
-  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyReturnAt=-Infinity;}
+  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;}
   if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
   const screen=this.observation;
   if(!screen?.lobbyReturn||!screen.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
@@ -137,6 +137,7 @@ export class Game {
     // Background time is a pause, not a failed lobby click or loading attempt.
     const pausedFor=now-this.focusSuspendedAt;this.focusSuspendedAt=0;
     if(this.returningLobby)this.lobbyDeadline+=pausedFor;
+    if(this.lobbyReadyAt)this.lobbyReadyAt+=pausedFor;
     if(this.autoplay.transitionUntil)this.autoplay.transitionUntil+=pausedFor;
     this.reconnectUntil=0;this.portalUntil=0;this.error='';
     await this.autoplay.resumeControl(this.gate.change('auto'));return;
@@ -150,6 +151,9 @@ export class Game {
    if(this.returningLobby){
     if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
     if(o.phase!=='menu')return;
+    this.lobbyReadyAt||=now+5000+Math.floor(Math.random()*3001);
+    if(now<this.lobbyReadyAt){this.decision=message('etc.nextMatchIn',{seconds:Math.ceil((this.lobbyReadyAt-now)/1000)});return;}
+    this.lobbyReadyAt=0;
     this.returningLobby=false;this.portalUntil=0;this.reconnectUntil=0;this.autoplay.transitionUntil=0;
     await this.autoplay.change('auto',this.gate.change('auto'));return;
    }
