@@ -47,10 +47,18 @@ it('pauses focus without rearming and resumes only after fresh stable foreground
  o.mode='manual';o.executor={...o.executor!,status:'released',reason:'focus_lost'};
  for(let i=1;i<=8;i++){o.foreground=true;o.timestamp=1000+i*125;o.frame++;expect(r.poll(o,1,o.timestamp)).toBe(i===7?'resume':i===8?'active':'wait');}
 });
-it('can return from focus pause after an official result in the same match',()=>{
+it.each(['lease_expired','not_started'])('can return from focus pause after an official result with %s in the same match',reason=>{
  const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);
- o.foreground=true;o.phase='ended';o.result={placement:2,won:false};o.mode='manual';o.executor={...o.executor!,status:'released',reason:'lease_expired'};
+ o.foreground=true;o.phase='ended';o.result={placement:2,won:false};o.mode='manual';o.executor={...o.executor!,status:'released',reason};
  for(let i=1;i<=4;i++){o.timestamp=2000+i*250;o.frame++;expect(r.poll(o,1,o.timestamp)).toBe(i===4?'resume':'wait');}
+});
+it.each(['noResult','playing','manualTakeover','changedMatch','changedEpoch','runningMotor'] as const)('does not treat a destroyed pawn as a recoverable result after %s',fault=>{
+ const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);
+ o.foreground=true;o.phase='dead';o.result={placement:48,won:false};o.mode='manual';o.executor={...o.executor!,status:'released',reason:'not_started'};
+ if(fault==='noResult')o.result=null;if(fault==='playing')o.phase='playing';
+ if(fault==='manualTakeover')o.executor.reason='manual_takeover';if(fault==='changedMatch')o.matchId='other';
+ if(fault==='changedEpoch')o.epoch++;if(fault==='runningMotor')o.executor.status='running';
+ expect(r.poll(o,1,1000)).toBe('stop');
 });
 it.each(['match','session','pid','epoch','manual','paused'] as const)('focus recovery rejects changed %s',change=>{
  const r=new EtcFocusRecovery(),o=observed();o.foreground=false;r.poll(o,1,1000);o.foreground=true;o.mode='manual';o.executor={...o.executor!,status:'released',reason:'focus_lost'};

@@ -64,10 +64,10 @@ it('does not recover an unrequested native manual takeover on the result screen'
  const {game,o,send,decide,tick}=setup();o.mode='manual';o.executor!.reason='manual_takeover';await tick();
  expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);expect(decide).not.toHaveBeenCalled();
 });
-it('focus loss pauses automatic intent and lets the same match finish before returning to lobby',async()=>{
+it.each(['focus_lost','not_started'])('focus loss pauses automatic intent and returns to lobby after a result with %s',async reason=>{
  const {game,o,send,resume,tick}=setup();o.phase='playing';o.result=null;o.foreground=false;
  await tick();expect(game.gate.mode).toBe('auto');expect(send).not.toHaveBeenCalled();
- o.phase='ended';o.result={placement:2,won:false};o.foreground=true;o.mode='manual';o.executor!.reason='focus_lost';
+ o.phase='ended';o.result={placement:2,won:false};o.foreground=true;o.mode='manual';o.executor!.reason=reason;
  for(let i=0;i<4;i++)await tick(250);
  expect(resume).toHaveBeenCalledWith(2);expect(send).not.toHaveBeenCalled();
  o.epoch=2;o.mode='auto';await tick();expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby',epoch:2}));

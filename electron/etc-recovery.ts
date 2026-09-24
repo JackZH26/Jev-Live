@@ -27,7 +27,12 @@ export class EtcFocusRecovery {
     }
     if(!this.pending)return 'active';
     if(o.mode!=='manual'||o.diagnostics.heldInputs!==0){this.stableAt=0;return 'wait';}
-    if(!this.requestedFrom&&!['focus_lost','lease_expired'].includes(o.executor?.reason??''))return 'stop';
+    // Elimination can destroy the pawn while the game is unfocused. Its fresh
+    // result still belongs to this match, but the missing motor reports the
+    // default not_started status instead of the original focus_lost reason.
+    const eliminatedPawn=['dead','ended'].includes(o.phase)&&!!o.result
+      &&o.executor?.status==='released'&&o.executor.reason==='not_started';
+    if(!this.requestedFrom&&!eliminatedPawn&&!['focus_lost','lease_expired'].includes(o.executor?.reason??''))return 'stop';
     if(o.frame===this.frame)return 'wait';
     if(!this.stableAt||now-this.lastAt>250)this.stableAt=now;
     this.frame=o.frame;this.lastAt=now;
