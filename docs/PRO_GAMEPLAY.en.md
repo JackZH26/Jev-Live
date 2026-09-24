@@ -6,7 +6,7 @@ Continuous play uses the official BOT MATCH rules. After a result, return to the
 
 The local policy retains the existing Pro aiming executor and adds visible mechanical/player target priorities, conservation of scarce ammunition against distant machines, and nearby cover under multiple threats or rapid damage. Hidden machine health, subtype and target are unavailable and are not inferred. Opening selection uses public supplies, exits and hotspots, varying equal choices by match rather than always choosing the lowest room ID.
 
-Pro here means native aiming and partial action execution, not the complete autonomous Pro BOT. External control bypasses parts of native survival, recovery and automatic traversal. Full takeover requires a game-side adapter and an installed Steam update. The [native Pro assessment](NATIVE_PRO_CONTROL.md) records the proposed integration and the five completed r3 matches: no wins, best placement 43, one total player kill. Native takeover is not implemented yet.
+The local policy above uses Pro aiming and action execution. A separate Native Pro BOT mode now lets the full game brain decide while preserving player identity; Studio only renews control ownership and manages match entry/continuation. It requires the installed game to advertise `nativePro`; older packages are rejected without silent fallback. Game commit `5c7bd455` and Studio strategy `fdc5da051f61` passed regression checks. Five actual Steam matches on BuildID `25504980` confirmed native ownership and continuation, but produced no wins or player damage. Combat acceptance failed. The next candidate fixes NPC skirmish pacing incorrectly applied to the controlled player. The [implementation and evaluation record](NATIVE_PRO_CONTROL.md) retains individual results and the r3 comparison.
 
 ## Evaluation procedure
 
@@ -16,6 +16,8 @@ Pro here means native aiming and partial action execution, not the complete auto
 4. Change one diagnosed failure at a time, pass regression tests and freeze the package/strategy identity. Follow five-match smoke tests with 20 complete matches, then a separate 100-match evaluation reporting win/top-ten rates, median placement, damage, kills, abnormal termination and uncertainty. These are planned sample sizes, not completed evidence.
 5. Prioritize opening hazard deaths, failed evacuation and weapon/path loops before combat tuning. Preserve opponent count/difficulty, health and weapon damage. Use player-perceivable observations only.
 6. Verify ingestion, advancing playback, actual gameplay and audio independently on X, YouTube and Twitch. OBS connection alone is insufficient; Twitch bandwidth tests do not verify viewer playback. Check encoding drops, game frame rate and decision latency with all outputs active.
+
+Run `node scripts/summarize-steam-evaluation.cjs <summary.json>` for each frozen cohort. It reports win/top-ten rates with Wilson 95% intervals, median placement, player damage/kills, observed shots when recorded, native sampling coverage and lobby waits. Missing measurements remain unknown; mechanical engagement frames are not kills. Intervals describe limited random samples rather than proving improvement. Check the statistics with `node --test scripts/summarize-steam-evaluation.verify.cjs`.
 
 ## Initial baseline
 
