@@ -6,6 +6,8 @@ Continuous play uses the official BOT MATCH rules. After a result, return to the
 
 The local policy retains the existing Pro aiming executor and adds visible mechanical/player target priorities, conservation of scarce ammunition against distant machines, and nearby cover under multiple threats or rapid damage. Hidden machine health, subtype and target are unavailable and are not inferred. Opening selection uses public supplies, exits and hotspots, varying equal choices by match rather than always choosing the lowest room ID.
 
+Pro here means native aiming and partial action execution, not the complete autonomous Pro BOT. External control bypasses parts of native survival, recovery and automatic traversal. Full takeover requires a game-side adapter and an installed Steam update. The [native Pro assessment](NATIVE_PRO_CONTROL.md) records the proposed integration and the five completed r3 matches: no wins, best placement 43, one total player kill. Native takeover is not implemented yet.
+
 ## Evaluation procedure
 
 1. Start in a connected Steam lobby or official result with manual control. Record Steam BuildID, Studio strategy hash, process and session. Confirm real game capture, game audio and absent overlays before broadcasting.
