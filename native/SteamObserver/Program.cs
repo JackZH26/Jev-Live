@@ -8,13 +8,12 @@ using Windows.Globalization;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 
-// Only the selected installation is observed. No arbitrary commands or desktop capture.
+// Only the foreground client area of the selected installation is observed.
 class Program
 {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h, ref POINT p);
-    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern uint SendInput(uint count, INPUT[] inputs, int size);
@@ -102,12 +101,19 @@ class Program
             FindWindow();var target=window;
             if(target==IntPtr.Zero){lobbyTarget=null;Emit(new{type="observation",connected=false,timestamp=Now(),heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(800);continue;}
             if(IsIconic(target)){lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=false,timestamp=Now(),error="minimized",actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(500);continue;}
+            if(!Foreground()){lobbyTarget=null;botTarget=null;previousBotTarget=null;Emit(new{type="observation",connected=true,processId,foreground=false,timestamp=Now(),heldInputs=held.Count,controlMode=enabled?"auto":"manual"});await Task.Delay(250);continue;}
             var watch=Stopwatch.StartNew();
             try{
                 GetClientRect(target,out var rect);int width=rect.Right,height=rect.Bottom;
                 if(width<100||height<100||width>7680||height>4320)throw new Exception();
                 using var bitmap=new Bitmap(width,height,PixelFormat.Format32bppArgb);
-                using(var graphics=Graphics.FromImage(bitmap)){var dc=graphics.GetHdc();try{if(!PrintWindow(target,dc,3))throw new Exception();}finally{graphics.ReleaseHdc(dc);}}
+                var origin=new POINT();if(!ClientToScreen(target,ref origin)||!Foreground())throw new Exception();
+                var capturedAt=Now();
+                // Unreal's PrintWindow redraw can warp or retain a menu frame,
+                // moving the OCR button onto Armory even while the live UI is stable.
+                // Read the visible game pixels and discard any focus/size transition.
+                using(var graphics=Graphics.FromImage(bitmap))graphics.CopyFromScreen(origin.X,origin.Y,0,0,bitmap.Size,CopyPixelOperation.SourceCopy);
+                if(!Foreground()||window!=target||!GetClientRect(target,out var after)||after.Right!=width||after.Bottom!=height)throw new Exception();
                 if(args.Length>1&&args[1]=="--capture"){bitmap.Save(args[2],ImageFormat.Png);Emit(new{type="capture",processId,width,height});break;}
                 using var scaled=new Bitmap(bitmap,new Size(Math.Min(width,1280),Math.Max(1,(int)(height*Math.Min(1,1280.0/width)))));
                 using var stream=new MemoryStream();scaled.Save(stream,ImageFormat.Png);stream.Position=0;
@@ -117,7 +123,7 @@ class Program
                 var lines=result?.Lines.Select(l=>new {text=l.Text,x=l.Words.Min(w=>w.BoundingRect.X)/scaled.Width,y=l.Words.Min(w=>w.BoundingRect.Y)/scaled.Height,
                     width=(l.Words.Max(w=>w.BoundingRect.Right)-l.Words.Min(w=>w.BoundingRect.Left))/scaled.Width,
                     height=(l.Words.Max(w=>w.BoundingRect.Bottom)-l.Words.Min(w=>w.BoundingRect.Top))/scaled.Height}).ToArray();
-                var at=Now();
+                var at=capturedAt;
                 var returns=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(RETURN TO LOBBY|BACK TO LOBBY|返回大厅|返回大廳)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
                 lobbyTarget=returns?.Length==1?new LobbyTarget(target,processId,at,returns[0].x+returns[0].width/2,returns[0].y+returns[0].height/2):null;
                 var bots=lines?.Where(l=>Regex.IsMatch(l.text.Trim(),@"^(BOT MATCH|人机对战|人機對戰)$",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant)).ToArray();
@@ -128,7 +134,7 @@ class Program
                     &&at-previousBotTarget.ObservedAt<=1500&&Math.Abs(candidate.X-previousBotTarget.X)<.003&&Math.Abs(candidate.Y-previousBotTarget.Y)<.003?candidate:null;
                 previousBotTarget=candidate;
                 Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=at,width,height,lines,lobbyReturn=lobbyTarget==null?null:new {observedAt=at},botMatch=botTarget==null?null:new {observedAt=at},ocrAvailable=ocr!=null,elapsedMs=watch.ElapsedMilliseconds,actionCount,lastAction,heldInputs=held.Count,controlMode=enabled?"auto":"manual",controlEpoch=epoch});
-            }catch{lobbyTarget=null;Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
+            }catch{lobbyTarget=null;botTarget=null;previousBotTarget=null;Emit(new{type="observation",connected=true,processId,foreground=Foreground(),timestamp=Now(),error="capture_unavailable"});}
             await Task.Delay(Math.Max(50,700-(int)watch.ElapsedMilliseconds));
         }}finally{running=false;input.Join(1000);}
     }
