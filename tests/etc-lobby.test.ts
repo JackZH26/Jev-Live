@@ -7,7 +7,8 @@ afterEach(()=>vi.restoreAllMocks());
 function setup(){
  let now=100000;vi.spyOn(Date,'now').mockImplementation(()=>now);
  const settings=settingsSchema.parse({autoRestart:true,decisionProvider:'rules'});
- const game=new Game({directory:'.',settings:async()=>settings} as any,()=>{}, {games:[]} as any,'unused');
+ const close=vi.fn().mockResolvedValue(undefined);
+ const game=new Game({directory:'.',settings:async()=>settings} as any,()=>{}, {games:[],closePlaytest:close} as any,'unused');
  (game as any).selectedId='5272970';game.gate.change('auto');
  const o={version:3,appId:'5272970',session:'s',matchId:'m',timestamp:now,frame:1,processId:123,phase:'ended',mode:'auto',epoch:1,ack:1,foreground:true,map:'L_ETC_Match',
   self:{position:[0,0,0],health:0,maxHealth:100,magazine:0,reserve:0,weapon:'',protected:false,traveling:false,healing:false,room:1,danger:false,evacuationSeconds:0,kills:1},
@@ -18,7 +19,7 @@ function setup(){
  const change=vi.spyOn(game.autoplay,'change').mockResolvedValue(),resume=vi.spyOn(game.autoplay,'resumeControl').mockResolvedValue();
  vi.spyOn(game.autoplay,'observe').mockImplementation(async()=>o);
  const tick=async(ms=50)=>{now+=ms;o.timestamp=now;o.frame++;if(game.observation){game.observation.timestamp=now;if(game.observation.lobbyReturn)game.observation.lobbyReturn.observedAt=now;}await (game as any).tick();};
- return {game,o,settings,send,decide,change,resume,tick};
+ return {game,o,settings,send,decide,change,resume,tick,close};
 }
 it.each([0,.5,.999999])('waits a single sampled 5–8 second lobby delay after returning, random=%s',async random=>{
  vi.spyOn(Math,'random').mockReturnValue(random);
@@ -79,14 +80,20 @@ it('stops safely if an attempted lobby navigation times out or the game process 
   expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);
  }
 });
-it('retains automatic return when the native death overlay is absent for over thirty seconds',async()=>{
- const {game,o,send,decide,resume,tick}=setup();game.observation!.lobbyReturn=null;
- await tick();await tick(31000);await tick(31000);
+it('restarts a confirmed eliminated client with a missing overlay and waits in the actual new lobby',async()=>{
+ vi.spyOn(Math,'random').mockReturnValue(.5);
+ const {game,o,send,decide,resume,tick,close,change}=setup();game.observation!.lobbyReturn=null;
+ const launch=vi.spyOn(game,'launch').mockResolvedValue();
+ await tick();await tick(9999);expect(close).not.toHaveBeenCalled();await tick(1);
+ expect(close).toHaveBeenCalledWith(123,expect.any(AbortSignal));expect(launch).not.toHaveBeenCalled();
  expect(game.gate.mode).toBe('auto');expect(send).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();
- o.phase='ended';game.observation!.lobbyReturn={observedAt:o.timestamp};await tick();
- expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby'}));
- o.phase='menu';o.result=null;await tick();expect((game as any).lobbyReadyAt-o.timestamp).toBeGreaterThanOrEqual(5000);
- await tick(8000);expect(game.autoplay.change).toHaveBeenCalledWith('auto',2);
+ await tick();expect(launch).toHaveBeenCalledOnce();await tick();expect(close).toHaveBeenCalledOnce();
+ o.processId=456;o.matchId='new-lobby';o.phase='menu';o.mode='manual';o.epoch=0;o.result=null;o.executor!.reason='not_started';
+ game.observation!.processId=456;
+ await tick(5000);expect(change).not.toHaveBeenCalled(); // Startup/menu phase alone is not a visible lobby.
+ game.observation!.botMatch={observedAt:o.timestamp};await tick();
+ await tick(6499);expect(change).not.toHaveBeenCalled();await tick(1);
+ expect(change).toHaveBeenCalledWith('auto',2);expect(launch).toHaveBeenCalledOnce();
 });
 it.each(['match','epoch','stale','noResult','manualTakeover'] as const)('does not extend a missing-button wait after %s',fault=>{
  const {game,o,send,tick}=setup();game.observation!.lobbyReturn=null;
@@ -96,6 +103,30 @@ it.each(['match','epoch','stale','noResult','manualTakeover'] as const)('does no
   if(fault==='stale')vi.spyOn(game.autoplay,'observe').mockImplementation(async()=>({...o,timestamp:o.timestamp-1000}));
   await tick(31000);expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);
  });
+});
+it('manual takeover during a graceful game close cancels relaunch',async()=>{
+ const {game,tick,close}=setup();game.observation!.lobbyReturn=null;
+ let finish!:()=>void;close.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+ const launch=vi.spyOn(game,'launch').mockResolvedValue();await tick();
+ const pending=tick(10000);await vi.waitFor(()=>expect(close).toHaveBeenCalledOnce());
+ const signal=close.mock.calls[0][1] as AbortSignal;await game.setMode('manual');expect(signal.aborted).toBe(true);
+ finish();await pending;await tick();expect(launch).not.toHaveBeenCalled();expect(game.gate.mode).toBe('manual');
+});
+it.each(['playing','background','captureError','heldInput'] as const)('never closes a client with %s while waiting for a result button',async fault=>{
+ const {game,o,tick,close}=setup();game.observation!.lobbyReturn=null;await tick();
+ if(fault==='playing'){o.phase='playing';o.result=null;}
+ if(fault==='background'){o.foreground=false;game.observation!.foreground=false;}
+ if(fault==='captureError')game.observation!.error='capture_unavailable';
+ if(fault==='heldInput')o.diagnostics.heldInputs=1;
+ await tick(12000);expect(close).not.toHaveBeenCalled();
+});
+it.each(['timeout','newSession','newControl','playing','disabled'] as const)('cancels a result-client recovery after %s',async fault=>{
+ const {game,o,tick,settings,change}=setup();game.observation!.lobbyReturn=null;vi.spyOn(game,'launch').mockResolvedValue();
+ await tick();await tick(10000);await tick();
+ o.processId=456;o.matchId='new-lobby';o.phase='menu';o.mode='manual';o.epoch=0;o.result=null;
+ game.observation!.processId=456;game.observation!.botMatch={observedAt:o.timestamp};
+ if(fault==='newSession')o.session='other';if(fault==='newControl')o.epoch=99;if(fault==='playing')o.phase='playing';if(fault==='disabled')settings.autoRestart=false;
+ await tick(fault==='timeout'?120001:50);expect(game.gate.mode).toBe('manual');expect(change.mock.calls.some(([mode])=>mode==='auto')).toBe(false);
 });
 it('excludes time spent unfocused from the lobby return timeout',async()=>{
  const {game,o,send,resume,tick}=setup();await tick();

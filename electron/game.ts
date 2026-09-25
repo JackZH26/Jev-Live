@@ -44,7 +44,8 @@ export class Game {
  private reconnectUntil=0;private reconnectMatch='';
  private focusRecovery=new EtcFocusRecovery();
  private focusSuspendedAt=0;
- private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;private lobbyResultMatch='';
+ private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;private lobbyResultMatch='';private lobbyHiddenAt=0;
+ private resultRestart?:{request:number;controller:AbortController;processId:number;session:string;stage:'closing'|'launch'|'loading';deadline:number;lobbyAt:number};
  private botStartAt=-Infinity;private botDeadline=0;
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
@@ -68,6 +69,7 @@ export class Game {
  async launch(){if(!this.selected)throw new Error(message('error.steamSelection'));if(!this.process)await this.observe();if(this.selectedId===ETC_APP_ID)await this.autoplay.bridge.heartbeat();await this.steam.launch(this.selected.appId);this.log(message('event.steamLaunched',{name:this.selected.name}));}
  async setMode(mode:PlayMode){
   const request=++this.modeRequest;
+  this.resultRestart?.controller.abort();this.resultRestart=undefined;
   let authorized:EtcObservation|null=null;
   if(mode==='auto'){
    if(this.selectedId!==ETC_APP_ID)throw new Error(message('error.autoUnsupported'));
@@ -95,22 +97,48 @@ export class Game {
  }
  private async returnToLobby(o:EtcObservation,now:number){
   // Returning is driven by the real button, not the native new_match shortcut.
-  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyResultMatch=o.matchId;this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;}
+  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyResultMatch=o.matchId;this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;this.lobbyHiddenAt=now;}
   // The Steam spectator overlay can remain hidden until the whole BOT match
   // ends. A fresh, owned elimination is not a failed navigation attempt.
-  // Keep waiting for its real button without renewing gameplay input. Start
-  // the navigation timeout only when a visible return button is clicked.
+  // Wait for its real button without renewing gameplay input. If it remains
+  // absent for ten seconds, recover through a graceful Steam client restart.
+  // Start the navigation timeout only when a visible return button is clicked.
   const waitingForButton=!Number.isFinite(this.lobbyReturnAt);
-  if(waitingForButton&&o.matchId===this.lobbyResultMatch&&o.epoch===this.gate.epoch
+  const ownedResult=waitingForButton&&o.matchId===this.lobbyResultMatch&&o.epoch===this.gate.epoch
     &&['dead','ended'].includes(o.phase)&&o.result&&o.foreground
-    &&now-o.timestamp<=250&&o.timestamp<=now+50&&o.executor?.reason!=='manual_takeover')this.lobbyDeadline=now+30000;
+    &&now-o.timestamp<=250&&o.timestamp<=now+50&&o.executor?.reason!=='manual_takeover';
+  if(ownedResult)this.lobbyDeadline=now+30000;
   if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
   const screen=this.observation;
-  if(!screen?.lobbyReturn||!screen.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
+  if(!screen?.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
+  if(!screen.lobbyReturn){
+   if(ownedResult&&o.diagnostics.heldInputs===0&&now-this.lobbyHiddenAt>=10000){
+    const restart={request:this.modeRequest,controller:new AbortController(),processId:o.processId,session:o.session,stage:'closing' as const,deadline:now+15000,lobbyAt:0};
+    this.resultRestart=restart;
+    await this.steam.closePlaytest(o.processId,restart.controller.signal);
+    if(this.resultRestart===restart&&this.gate.mode==='auto'&&this.modeRequest===restart.request)this.resultRestart.stage='launch';
+   }
+   return;
+  }
   if(now-this.lobbyReturnAt<1500)return;
   if(waitingForButton)this.lobbyDeadline=now+30000;
   this.send({op:'return_lobby',epoch:this.gate.epoch,processId:o.processId,observedAt:screen.lobbyReturn.observedAt});
   this.lobbyReturnAt=now;
+ }
+ private async recoverResultClient(now:number,autoRestart:boolean){
+  const restart=this.resultRestart;if(!restart)return false;
+  if(!autoRestart||this.gate.mode!=='auto'||this.modeRequest!==restart.request||now>=restart.deadline){await this.setMode('manual');this.error=message('etc.lost');return true;}
+  if(restart.stage==='closing')return true;
+  if(restart.stage==='launch'){restart.stage='loading';restart.deadline=now+120000;await this.launch();return true;}
+  const o=await this.autoplay.observe(this.connected?this.pid:undefined,false);
+  if(this.resultRestart!==restart||this.gate.mode!=='auto'||!o)return true;
+  if(o.processId===restart.processId)return true;
+  if(o.session!==restart.session||o.epoch!==0||o.mode!=='manual'||!['menu','loading'].includes(o.phase)){await this.setMode('manual');this.error=message('etc.lost');return true;}
+  const screen=this.observation;
+  if(o.phase!=='menu'||!o.foreground||Date.now()-o.timestamp>250||!screen?.botMatch||!screen.foreground||screen.processId!==o.processId||screen.error||Date.now()-screen.timestamp>1500)return true;
+  restart.lobbyAt||=Date.now()+5000+Math.floor(Math.random()*3001);
+  if(Date.now()<restart.lobbyAt){this.decision=message('etc.nextMatchIn',{seconds:Math.ceil((restart.lobbyAt-Date.now())/1000)});return true;}
+  this.resultRestart=undefined;await this.setMode('auto');return true;
  }
  private async tick(){
   if(this.inFlight)return;this.inFlight=true;
@@ -118,6 +146,7 @@ export class Game {
    let now=Date.now();if(!this.settingsCache||now-this.settingsAt>500){this.settingsCache=await this.store.settings();this.settingsAt=now;}
    const settings=this.settingsCache;
    if(this.selectedId!==ETC_APP_ID)return;
+   if(await this.recoverResultClient(now,settings.autoRestart))return;
    const previous=this.autoplay.observation;
    const o=await this.autoplay.observe(this.connected?this.pid:undefined,this.gate.mode==='auto'&&!this.focusRecovery.pending);
    // File reads and model/streaming contention can yield long enough for a newer

@@ -45,4 +45,13 @@ export class Steam {
  }
  async get(appId:string){if(!/^\d+$/.test(appId))throw new Error(message('error.steamSelection'));return (await this.scan()).find(g=>g.appId===appId);}
  async launch(appId:string){if(!await this.get(appId))throw new Error(message('error.steamSelection'));await this.open(`steam://rungameid/${appId}`);}
+ /** Gracefully close only the installed ETC Playtest after its confirmed result. */
+ async closePlaytest(processId:number,signal:AbortSignal){
+  if(!Number.isSafeInteger(processId)||processId<=0)throw new Error('Invalid Playtest process');
+  const game=await this.get('5272970');if(!game)throw new Error(message('error.steamSelection'));
+  signal.throwIfAborted();
+  const expected=join(game.installDirectory,'Lyra','Binaries','Win64','LyraGame-Win64-Shipping.exe').replace(/'/g,"''");
+  const script=`$ErrorActionPreference='Stop'\n$targetGame=Get-Process -Id ${processId} -ErrorAction Stop\nif($targetGame.Path -ne '${expected}'){throw 'Playtest process changed'}\nif(-not $targetGame.CloseMainWindow()){throw 'Playtest window could not close'}\nif(-not $targetGame.WaitForExit(10000)){throw 'Playtest did not exit'}`;
+  await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{windowsHide:true,signal,timeout:15000});
+ }
 }
