@@ -44,7 +44,7 @@ export class Game {
  private reconnectUntil=0;private reconnectMatch='';
  private focusRecovery=new EtcFocusRecovery();
  private focusSuspendedAt=0;
- private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;
+ private lobbyReturnAt=-Infinity;private returningLobby=false;private lobbyDeadline=0;private lobbyIdentity='';private lobbyReadyAt=0;private lobbyResultMatch='';
  private botStartAt=-Infinity;private botDeadline=0;
  constructor(private store:Store,private log:(text:string)=>void,readonly steam:Steam,private helper:string){
   const bridgeDirectory=process.env.JEV_TEST_DATA_DIR&&process.env.JEV_TEST_ETC_BRIDGE_DIR
@@ -95,11 +95,20 @@ export class Game {
  }
  private async returnToLobby(o:EtcObservation,now:number){
   // Returning is driven by the real button, not the native new_match shortcut.
-  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;}
+  if(!this.returningLobby){this.returningLobby=true;this.lobbyDeadline=now+30000;this.lobbyIdentity=JSON.stringify([o.session,o.processId]);this.lobbyResultMatch=o.matchId;this.lobbyReturnAt=-Infinity;this.lobbyReadyAt=0;}
+  // The Steam spectator overlay can remain hidden until the whole BOT match
+  // ends. A fresh, owned elimination is not a failed navigation attempt.
+  // Keep waiting for its real button without renewing gameplay input. Start
+  // the navigation timeout only when a visible return button is clicked.
+  const waitingForButton=!Number.isFinite(this.lobbyReturnAt);
+  if(waitingForButton&&o.matchId===this.lobbyResultMatch&&o.epoch===this.gate.epoch
+    &&['dead','ended'].includes(o.phase)&&o.result&&o.foreground
+    &&now-o.timestamp<=250&&o.timestamp<=now+50&&o.executor?.reason!=='manual_takeover')this.lobbyDeadline=now+30000;
   if(JSON.stringify([o.session,o.processId])!==this.lobbyIdentity||now>=this.lobbyDeadline){await this.setMode('manual');this.error=message('etc.lost');return;}
   const screen=this.observation;
   if(!screen?.lobbyReturn||!screen.foreground||screen.processId!==o.processId||screen.error||now-screen.timestamp>1500||screen.timestamp>now+50)return;
   if(now-this.lobbyReturnAt<1500)return;
+  if(waitingForButton)this.lobbyDeadline=now+30000;
   this.send({op:'return_lobby',epoch:this.gate.epoch,processId:o.processId,observedAt:screen.lobbyReturn.observedAt});
   this.lobbyReturnAt=now;
  }

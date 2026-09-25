@@ -72,12 +72,30 @@ it.each(['focus_lost','not_started'])('focus loss pauses automatic intent and re
  expect(resume).toHaveBeenCalledWith(2);expect(send).not.toHaveBeenCalled();
  o.epoch=2;o.mode='auto';await tick();expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby',epoch:2}));
 });
-it('stops safely if lobby navigation times out or the game process changes',async()=>{
+it('stops safely if an attempted lobby navigation times out or the game process changes',async()=>{
  for(const fault of ['timeout','identity']){
   const {game,o,send,tick}=setup();await tick();send.mockClear();
   if(fault==='identity')o.processId=456;await tick(fault==='timeout'?30001:50);
   expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);
  }
+});
+it('retains automatic return when the native death overlay is absent for over thirty seconds',async()=>{
+ const {game,o,send,decide,resume,tick}=setup();game.observation!.lobbyReturn=null;
+ await tick();await tick(31000);await tick(31000);
+ expect(game.gate.mode).toBe('auto');expect(send).not.toHaveBeenCalled();expect(decide).not.toHaveBeenCalled();expect(resume).not.toHaveBeenCalled();
+ o.phase='ended';game.observation!.lobbyReturn={observedAt:o.timestamp};await tick();
+ expect(send).toHaveBeenCalledWith(expect.objectContaining({op:'return_lobby'}));
+ o.phase='menu';o.result=null;await tick();expect((game as any).lobbyReadyAt-o.timestamp).toBeGreaterThanOrEqual(5000);
+ await tick(8000);expect(game.autoplay.change).toHaveBeenCalledWith('auto',2);
+});
+it.each(['match','epoch','stale','noResult','manualTakeover'] as const)('does not extend a missing-button wait after %s',fault=>{
+ const {game,o,send,tick}=setup();game.observation!.lobbyReturn=null;
+ return tick().then(async()=>{
+  if(fault==='match')o.matchId='other';if(fault==='epoch')o.epoch++;
+  if(fault==='noResult')o.result=null;if(fault==='manualTakeover'){o.mode='manual';o.executor!.reason='manual_takeover';}
+  if(fault==='stale')vi.spyOn(game.autoplay,'observe').mockImplementation(async()=>({...o,timestamp:o.timestamp-1000}));
+  await tick(31000);expect(game.gate.mode).toBe('manual');expect(send.mock.calls.some(([c])=>(c as any).op==='return_lobby')).toBe(false);
+ });
 });
 it('excludes time spent unfocused from the lobby return timeout',async()=>{
  const {game,o,send,resume,tick}=setup();await tick();
